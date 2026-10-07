@@ -27,6 +27,7 @@ import { PartyLine } from "@/components/case/party";
 import { DocumentPreview } from "@/components/evidence/document-preview";
 import { ExtractionBadge } from "@/components/evidence/extraction-badge";
 import { FieldDataCard, ProofCard } from "@/components/evidence/proof-card";
+import { StableOrder } from "@/components/evidence/stable-order";
 import { orderFields } from "@/components/evidence/evidence-detail";
 import { HashGlyph } from "@/components/viz/hash-glyph";
 import { CaseTitleTransition, PageTransition } from "@/components/motion/page-transition";
@@ -199,13 +200,13 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
               </p>
             )}
             {actionCards.length > 0 && (
-              <ul className="space-y-3">
+              <StableOrder key={previewFile.id} className="space-y-3">
                 {actionCards.map((f) => (
                   <li key={f.id}>
                     <ProofCard field={f} fileName={previewFile.fileName} />
                   </li>
                 ))}
-              </ul>
+              </StableOrder>
             )}
             {dataCards.length > 0 && (
               <div className="@container">
