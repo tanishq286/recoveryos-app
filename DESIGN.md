@@ -171,7 +171,7 @@ Chart Signal / Credit / Muted (`#4f93dc` / `#2ea98a` / `#5a6c75` dark; `#3f7fd0`
 
 ## Layout
 
-12-column container: 1200px marketing, 84rem case page. The case page is two panes from lg: **Milestones** (next step, lifecycle tracker, tasks, activity) and the **Document inspector** (forensic page preview, proof cards, quote, holdings, consents). Below lg the panes stack behind a segmented Milestones / Documents switch that sticks to the top; in-page links open the pane that holds their target. No horizontal scroll at 320px.
+12-column container: 1200px marketing, 84rem app shell (header, case page, evidence room and footer share it). The case page is two panes from lg: **Milestones** (next step, lifecycle tracker, tasks, activity) and the **Document inspector** (forensic page preview, proof cards, quote, holdings, consents). Below lg the panes stack behind a segmented Milestones / Documents switch that sticks to the top; in-page links open the pane that holds their target. No horizontal scroll at 320px.
 
 ## Elevation & Depth
 
@@ -195,7 +195,11 @@ Controls 10px, panels 16px, overlays 20px, status badges and switches are pills.
 - **Lifecycle tracker**: six display stages over the eleven case states, each an accordion showing its states and dates from history. Regulatory stages carry an IEPF tag.
 - **Diagnostic receipt**: the check's review step; dashed rules, Edit per row, a perforated tear, and a real SHA-256 fingerprint of the answers.
 - **Command HUD**: vault glass over a `backdrop-blur-xl` scrim, spring highlight between rows, full keyboard support.
-- **Quick-scan bar**: GET form to `/check`; works without JavaScript; never looks anything up.
+- **Quick-scan bar**: GET form to `/check`; works without JavaScript; never looks anything up. Holding chips sit two by two until the form is wide enough for one row of pills (a container query, not a breakpoint).
+- **Grounding line**: a one-line confidence pill, then the cross-check note and page as plain text that wraps as one run. Data-card grids size to their container (`@container`), never the viewport.
+- **Document switcher**: chips above the inspector, a tone dot per read status and a count of details waiting; `?doc=` swaps the inspector in place.
+- **Seven-year rule** (landing): seven year tiles, then transfer, Form IEPF-5 and credit. General law only, no case figures.
+- **Horizontal scrollers** (`scroll-fade-x` utility): edges fade only while there is more to scroll (scroll-driven animation; a static end fade elsewhere). Scrollers leave room for the focus ring. Used by the mobile nav and the document switcher.
 
 ## Motion
 
@@ -203,6 +207,7 @@ Controls 10px, panels 16px, overlays 20px, status badges and switches are pills.
 - Shared layout springs: nav rule, segmented pill, HUD highlight, pane switch, stepper ring.
 - The check: steps enter from the side you are heading (x 20, blur 6px), leaving steps are inert while they exit.
 - Hover and press stay in CSS (160 to 300ms, `--ease-vault`). GSAP keeps the hero split-line reveal and scroll scenes.
+- Arrivals: a detail opened from the palette or a `#field-` link scrolls into view and glows once (no glow under reduced motion).
 - Reduced motion: no transforms, no counts, no pings, no scan line; opacity feedback remains.
 
 ## Do's and Don'ts

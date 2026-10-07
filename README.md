@@ -45,7 +45,7 @@ Optional environment variables (none are required):
 
 | Route                  | What it shows                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/`                    | Landing page: the promise, how it works (evidence room → recovery engine → trust layer), what we don't do, free official routes beside paid help, pricing, and an anti-fraud notice.                                                                                                                                                                                                                                     |
+| `/`                    | Landing page: the promise and quick-scan bar, the seven-year rule and the way back, how it works (evidence room → recovery engine → trust layer), what we don't do, free official routes beside paid help, pricing, and an anti-fraud notice.                                                                                                                                                                            |
 | `/check`               | Guided triage: one question per screen with a clickable stepper (jump back to any answered step and forward again), four holding cards, and a diagnostic receipt to review answers. Accepts `?asset=&issuer=&ref=` from the home page's quick-scan bar. The result gives a route assessment, exact "insufficient evidence" states and a timestamped **sources checked** receipt.                                         |
 | `/cases`               | The three sample cases.                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `/cases/rc-2026-0147`  | Mid-review case: value at stake and a KPI strip, then two panes. Milestones: the next-step card, the six-stage IEPF lifecycle tracker (over the 12 case states), tasks and activity. Document inspector: a forensic page preview, proof cards with a grounded confidence line and an Approve / Flag a discrepancy switch, the quote, holdings and consents. Below `lg` the panes become a Milestones / Documents switch. |
@@ -60,7 +60,11 @@ Things to try:
 - On the review step of the check, use **Edit** or the stepper to change an answer, then
   **Back to review**. Change the holding type and jump forward: the stepper stops at the
   reference step, because the old reference no longer applies.
-- Press ⌘K / Ctrl+K anywhere and arrow through cases, actions and fraud reporting.
+- Press ⌘K / Ctrl+K anywhere and arrow through cases, actions and fraud reporting. Type
+  a detail such as "folio": picking it opens the case on that document, opens the
+  Documents pane on a phone and marks the detail.
+- On RC-2026-0147, use the document chips above the inspector to read any other document
+  in place.
 - Approve the three waiting details on RC-2026-0147. The "what happens next" card counts
   down, then hands the next step to the name-change upload. Each review is added to the
   timeline and written to the mock audit log.
@@ -176,10 +180,12 @@ Where the system is written down:
 **Interface layer.** Also presentation only, built on the same data the pages already read:
 
 - **Command palette** (`components/command/`): ⌘K / Ctrl+K anywhere, or the header Search
-  button. Searches pages, sample cases, evidence rooms and documents (by name, reference,
-  category or checksum prefix), remembers recent picks, and follows the WAI-ARIA combobox
-  pattern. The index (`lib/command-index.ts`) is built on the server from the data source;
-  with real data it must be scoped to the signed-in viewer.
+  button. Searches pages, sample cases, evidence rooms, documents (by name, reference,
+  category or checksum prefix) and the details read from each document (by label only:
+  values such as folio numbers or PAN never enter the index, which every page carries).
+  Remembers recent picks, orders result groups by their best match, and follows the
+  WAI-ARIA combobox pattern. The index (`lib/command-index.ts`) is built on the server
+  from the data source; with real data it must be scoped to the signed-in viewer.
 - **Visualizations** (`components/viz/`), every one drawn from real case data with its
   numbers also in text: the time-scaled route timeline (Stages / Timeline tabs in the case
   page's lifecycle tracker), the "what reaches you" waterfall in the quote (value, fee, planned protection, net
