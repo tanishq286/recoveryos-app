@@ -570,6 +570,12 @@
 
   /* Radiant headline type. A solid colour is set first for engines without clip. */
   .text-gradient-cyan {
+    /* Shrink the box to the text so the full gradient lands on the glyphs,
+       however wide the container; inline fragments each get their own. */
+    width: fit-content;
+    max-width: 100%;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
     color: var(--color-fg);
     background: var(--gradient-text);
     -webkit-background-clip: text;

@@ -26,9 +26,13 @@ export function MarketingHeader() {
           <NavLinks items={NAV} label="Main" />
         </div>
         <div className="order-2 flex items-center gap-3 lg:order-3">
-          <CommandTrigger />
+          <CommandTrigger compactAtLg />
           <ThemeToggle />
-          <Button asChild size="sm" className="hidden sm:inline-flex">
+          <Button
+            asChild
+            size="sm"
+            className="hidden whitespace-nowrap sm:inline-flex lg:hidden xl:inline-flex"
+          >
             <Link href="/check">{CHECK_CTA}</Link>
           </Button>
         </div>
