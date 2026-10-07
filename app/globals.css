@@ -816,34 +816,33 @@ body::after {
       translate 420ms var(--ease-vault);
     transition-delay: calc(1050ms + var(--i) * 160ms);
   }
+}
 
-  /* A horizontal scroller whose edges fade where more content waits. Where
-     scroll-driven animation runs, each edge fades only while there is
-     something past it; elsewhere the end edge always fades, so the
-     scroller needs end padding for its last item to land clear. */
-  .scroll-fade-x {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--fade-start),
-      #000 calc(100% - var(--fade-end)),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--fade-start),
-      #000 calc(100% - var(--fade-end)),
-      transparent
-    );
-    --fade-end: 2rem;
-  }
+/* A horizontal scroller whose edges fade where more content waits. Where
+   scroll-driven animation runs, each edge fades only while there is
+   something past it; elsewhere the end edge always fades, so the scroller
+   needs end padding for its last item to land clear. A utility, so it takes
+   breakpoint variants (max-lg:scroll-fade-x). */
+@utility scroll-fade-x {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  --fade-end: 2rem;
   @supports (animation-timeline: scroll()) {
-    .scroll-fade-x {
-      --fade-end: 0px;
-      animation: scroll-fade-x linear both;
-      animation-timeline: scroll(self inline);
-    }
+    --fade-end: 0px;
+    animation: scroll-fade-x linear both;
+    animation-timeline: scroll(self inline);
   }
 }
 

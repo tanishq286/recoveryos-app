@@ -167,15 +167,20 @@ export function lifecycleStages(input: {
 }
 
 /** Where a status sits on the six stages, from the status alone (lists, previews). */
-export function stageOf(status: CaseStatus): {
+export function stageOf(
+  status: CaseStatus,
+  holder: HolderType | null = null,
+): {
   index: number;
   total: number;
   label: string;
   short: string;
 } {
   const index = STAGES.findIndex((s) => s.statuses.includes(status));
-  const def = STAGES[index];
+  const def = forHolder(STAGES[index], holder);
   return { index, total: STAGES.length, label: def.label, short: def.short };
 }
 
 export const LIFECYCLE_SHORT_LABELS = STAGES.map((s) => s.short);
+
+export const STAGE_KEYS: LifecycleStageKey[] = STAGES.map((s) => s.key);

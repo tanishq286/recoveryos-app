@@ -402,7 +402,11 @@ export default async function LandingPage() {
                 <p className="mt-3 text-[0.9375rem] text-fg-2">
                   We are waiting for {sample.nextStep.waitingFor}.
                 </p>
-                <RouteProgress status={sample.status} className="mt-6" />
+                <RouteProgress
+                  status={sample.status}
+                  holderType={sample.claimant.holderType}
+                  className="mt-6"
+                />
                 <RouteTimeline
                   history={sample.statusHistory}
                   status={sample.status}
