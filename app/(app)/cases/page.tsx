@@ -23,8 +23,7 @@ export default async function CasesPage() {
   return (
     <PageTransition>
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
-        <p className="text-sm font-medium text-signal">Sample cases</p>
-        <h1 className="text-gradient-cyan mt-2 max-w-2xl text-3xl leading-tight sm:text-[2.75rem] sm:leading-[1.08]">
+        <h1 className="text-gradient-cyan max-w-2xl text-3xl leading-tight sm:text-[2.75rem] sm:leading-[1.08]">
           What a case looks like from the inside
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-fg-2">

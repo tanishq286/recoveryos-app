@@ -347,7 +347,7 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
           <CasePanes
             milestones={milestones}
             documents={documents}
-            documentsBadge={needsYou.length > 0 ? `${needsYou.length} to check` : undefined}
+            documentsToCheck={needsYou.length}
           />
         </div>
       </div>

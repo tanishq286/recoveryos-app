@@ -16,12 +16,12 @@ type PaneId = "milestones" | "documents";
 export function CasePanes({
   milestones,
   documents,
-  documentsBadge,
+  documentsToCheck = 0,
 }: {
   milestones: ReactNode;
   documents: ReactNode;
-  /** Short count shown on the Documents switch, e.g. "2 to check". */
-  documentsBadge?: string;
+  /** Details waiting for the client, shown as a count on the Documents switch. */
+  documentsToCheck?: number;
 }) {
   const [active, setActive] = useState<PaneId>("milestones");
   const docsRef = useRef<HTMLDivElement>(null);
@@ -50,9 +50,9 @@ export function CasePanes({
     return () => document.removeEventListener("click", onClick, { capture: true });
   }, []);
 
-  const options: { id: PaneId; label: string; badge?: string }[] = [
+  const options: { id: PaneId; label: string; count?: number }[] = [
     { id: "milestones", label: "Milestones" },
-    { id: "documents", label: "Documents", badge: documentsBadge },
+    { id: "documents", label: "Documents", count: documentsToCheck },
   ];
 
   return (
@@ -83,9 +83,10 @@ export function CasePanes({
                 />
               )}
               <span className="relative">{o.label}</span>
-              {o.badge && (
-                <span className="tnum relative rounded-full bg-signal-wash px-1.5 text-xs text-signal">
-                  {o.badge}
+              {!!o.count && (
+                <span className="relative grid min-w-5 place-items-center rounded-full bg-brand px-1.5 text-xs font-semibold text-on-brand tabular-nums">
+                  {o.count}
+                  <span className="sr-only"> to check</span>
                 </span>
               )}
             </button>

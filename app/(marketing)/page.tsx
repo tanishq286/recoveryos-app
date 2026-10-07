@@ -372,9 +372,6 @@ export default async function LandingPage() {
               {/* Terminal bar: the case reference and when it last moved. */}
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-(--glass-border) bg-(--glass-elevated) px-5 py-3 sm:px-7">
                 <p className="tnum font-mono text-sm text-fg-2">
-                  <span aria-hidden="true" className="text-signal">
-                    ●
-                  </span>{" "}
                   {sample.reference}
                 </p>
                 <p className="tnum text-sm text-fg-3">Updated {formatDate(sample.updatedAt)}</p>

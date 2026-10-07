@@ -45,12 +45,9 @@ export function QuickScanBar({ className }: { className?: string }) {
         <legend id="quick-scan-heading" className="text-sm font-medium text-fg-2">
           Start from what you know
         </legend>
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-3 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
           {ASSETS.map(({ value, label, Icon }, i) => (
-            <label
-              key={value}
-              className="relative min-w-[calc(50%-0.25rem)] flex-1 cursor-pointer sm:min-w-0 sm:flex-none"
-            >
+            <label key={value} className="relative cursor-pointer">
               <input
                 type="radio"
                 name="asset"
@@ -58,7 +55,7 @@ export function QuickScanBar({ className }: { className?: string }) {
                 defaultChecked={i === 0}
                 className="peer sr-only"
               />
-              <span className="flex min-h-11 items-center gap-1.5 rounded-full border border-(--glass-border) bg-(--glass-elevated) px-3 py-2 text-[0.9375rem] whitespace-nowrap text-fg-2 transition-[border-color,background-color,color,box-shadow] duration-150 peer-checked:border-signal peer-checked:bg-signal-wash peer-checked:text-fg peer-checked:shadow-[inset_0_0_0_1px_var(--color-signal)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-signal hover:border-(--glass-border-hover) hover:text-fg">
+              <span className="flex h-full min-h-11 items-center gap-1.5 rounded-[12px] border border-(--glass-border) bg-(--glass-elevated) px-3 py-2 text-[0.9375rem] text-fg-2 sm:rounded-full sm:whitespace-nowrap transition-[border-color,background-color,color,box-shadow] duration-150 peer-checked:border-signal peer-checked:bg-signal-wash peer-checked:text-fg peer-checked:shadow-[inset_0_0_0_1px_var(--color-signal)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-signal hover:border-(--glass-border-hover) hover:text-fg">
                 <Icon className="size-4 shrink-0 text-signal" aria-hidden="true" />
                 <span className="leading-tight">{label}</span>
               </span>

@@ -80,9 +80,8 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
 
         <header className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:items-start lg:gap-12">
           <div className="max-w-3xl min-w-0">
-            <p className="text-sm font-medium text-signal">Forensic evidence room</p>
             <CaseTitleTransition caseId={room.caseId}>
-              <h1 className="mt-2 text-3xl leading-tight text-fg sm:text-[2.75rem] sm:leading-[1.08]">
+              <h1 className="text-3xl leading-tight text-fg sm:text-[2.75rem] sm:leading-[1.08]">
                 {room.title}
               </h1>
             </CaseTitleTransition>

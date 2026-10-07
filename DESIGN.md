@@ -1,31 +1,40 @@
 ---
 name: RecoveryOS
-description: Calm, precise, clinical-tech. Deep ink base, one signal-blue accent, richness from motion and craft.
+description: Sovereign Vault. An abyss canvas, acrylic glass with a specular rim, one electric-cyan action, and four status hues that each mean one thing.
 colors:
-  ink-950: "#0b1114"
-  ink-900: "#10181c"
-  ink-850: "#141e23"
-  ink-800: "#1a262c"
-  line: "#223038"
-  control: "#5e717a"
-  fg: "#e6edef"
-  fg-2: "#a3b3b9"
-  fg-3: "#8699a0"
-  signal: "#7cb8ff"
-  signal-strong: "#9ccaff"
-  on-signal: "#07121c"
-  signal-wash: "#13263a"
-  confirmed: "#5cd3b4"
-  confirmed-wash: "#10281f"
-  blocker: "#ff7a72"
-  blocker-wash: "#2c1515"
+  vault-abyss: "#05080e"
+  vault-surface: "rgb(13 20 36 / 0.72)"
+  vault-elevated: "rgb(22 33 58 / 0.55)"
+  vault-border: "rgb(255 255 255 / 0.08)"
+  vault-border-highlight: "rgb(56 189 248 / 0.35)"
+  ink-950: "#05080e"
+  ink-900: "#080d17"
+  ink-850: "#0d1424"
+  ink-800: "#16213a"
+  line: "#1b2537"
+  control: "#62738e"
+  fg: "#e8eef7"
+  fg-2: "#a9b6cb"
+  fg-3: "#8593aa"
+  brand-cyan: "#00f2fe"
+  brand-blue: "#4facfe"
+  signal: "#4facfe"
+  on-brand: "#031018"
+  status-success: "#10b981"
+  status-pending: "#f59e0b"
+  status-error: "#ef4444"
+  status-iepf: "#8b5cf6"
+  confirmed: "#10b981"
+  pending: "#f59e0b"
+  blocker: "#f87171"
+  iepf: "#a78bfa"
   chart-signal: "#4f93dc"
   chart-credit: "#2ea98a"
   chart-muted: "#5a6c75"
 typography:
   display:
     fontFamily: "Mona Sans Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "clamp(2.5rem, 5.6vw, 4.5rem)"
+    fontSize: "clamp(2.5rem, 5.6vw, 4.75rem)"
     fontWeight: 560
     lineHeight: 1.02
     letterSpacing: "-0.035em"
@@ -57,8 +66,9 @@ typography:
     fontWeight: 400
     lineHeight: 1.5
 rounded:
-  control: "8px"
-  panel: "12px"
+  control: "10px"
+  panel: "16px"
+  overlay: "20px"
   pill: "9999px"
 spacing:
   xs: "8px"
@@ -68,195 +78,144 @@ spacing:
   xl: "40px"
 components:
   button-primary:
-    backgroundColor: "{colors.signal}"
-    textColor: "{colors.on-signal}"
-    rounded: "{rounded.control}"
-    padding: "12px 20px"
-  button-primary-hover:
-    backgroundColor: "{colors.signal-strong}"
-  button-outline:
-    backgroundColor: "{colors.ink-900}"
-    textColor: "{colors.fg}"
+    background: "linear-gradient(135deg, #00f2fe, #4facfe)"
+    textColor: "{colors.on-brand}"
     rounded: "{rounded.control}"
     padding: "12px 20px"
   panel:
-    backgroundColor: "{colors.ink-850}"
-    textColor: "{colors.fg}"
+    backgroundColor: "rgb(13 20 36 / 0.62)"
+    border: "1px solid {colors.vault-border}"
     rounded: "{rounded.panel}"
     padding: "24px"
-  badge-progress:
-    backgroundColor: "{colors.signal-wash}"
-    textColor: "{colors.signal}"
+  vault-glass:
+    backgroundColor: "{colors.vault-surface}"
+    backdropFilter: "blur(24px) saturate(150%)"
+    border: "1px solid {colors.vault-border}"
+  badge-pending:
+    backgroundColor: "#221806"
+    textColor: "{colors.pending}"
     rounded: "{rounded.pill}"
     padding: "2px 10px"
-  badge-confirmed:
-    backgroundColor: "{colors.confirmed-wash}"
-    textColor: "{colors.confirmed}"
-    rounded: "{rounded.pill}"
-    padding: "2px 10px"
-  badge-blocker:
-    backgroundColor: "{colors.blocker-wash}"
-    textColor: "{colors.blocker}"
-    rounded: "{rounded.pill}"
-    padding: "2px 10px"
-  input:
-    backgroundColor: "{colors.ink-900}"
-    textColor: "{colors.fg}"
-    rounded: "{rounded.control}"
-    padding: "12px"
 ---
 
 # Design System: RecoveryOS
 
 ## Overview
 
-**Creative North Star: "The Precision Statement"**
+**Creative North Star: "The Sovereign Vault"**
 
-RecoveryOS reads like a depository holding statement rendered as software: ruled, exact, unhurried. The base is deep ink, never pure black. A single cool accent, signal blue, marks what is live or actionable. Everything else is quiet text on layered ink. Richness comes from motion and craft (a route drawn through a field of records, line masks, a receipt that prints in), never from density or decoration.
+RecoveryOS is a vault you can see into. The canvas is deep space (`#05080e`), lit from above by a soft radial mesh (cyan, blue, a little violet and emerald) and a fine grain. Content sits on acrylic glass: translucent panels with a 1px specular rim, a lit top edge, and on fine pointers a cyan glow that follows the cursor. One electric-cyan gradient marks the action you can take; four status hues tell you, everywhere, what state something is in.
 
-Dark is the default and the cinematic register; a cool editorial light theme restates every token (never cream). It is minimalist on purpose: generous whitespace, one idea per section, hairlines instead of boxes where possible. Trust is the product, so nothing in the interface claims more than the product can deliver.
+Luxury here means restraint and exactness: tabular figures, slashed zeros on IDs and money, grounded data on every card, and motion that lands rather than bounces. Nothing claims more than the product can deliver.
+
+Dark is the base. A frosted light theme restates every token.
 
 **Key Characteristics:**
 
-- Deep ink grounds with tonal layering; depth from borders and one lift shadow, not glow.
-- One locked accent. Mint (confirmed) and coral (blocker) are semantic only.
-- Mona Sans Variable with width and tracking tuned per size; Geist Mono only for real identifiers.
-- Motion is transform and opacity only, with one signature easing family.
+- Abyss canvas, glass panels, specular rims. Depth from translucency, rim light and one soft shadow, not from heavy drop shadows.
+- One action colour (the cyan gradient) and four status hues with fixed meanings.
+- Mona Sans Variable, width and tracking tuned per size; Geist Mono for real identifiers.
+- Framer Motion springs for spatial motion, CSS for micro-interactions, GSAP for the authored hero and scroll scenes.
 
 ## Colors
 
-A near-monochrome ink ladder with one cool accent and two semantic colors. All text pairs meet WCAG AA on their grounds.
+### Action
 
-### Primary
+- **Electric Cyan** (`#00f2fe` to `#4facfe`, 135deg): the primary button and the skip link only. Text on it is On-Brand (`#031018`, 7.9 to 13.9:1), in both themes.
+- **Signal** (`#4facfe` dark, `#0369a1` light): links, focus ring, active nav, icons that invite action, the "you are here" marker.
 
-- **Signal Blue** (#7cb8ff): the only accent. Primary buttons, active step, focus ring, links on hover, "waiting for you" states. Hover lifts to Signal Strong (#9ccaff). Text on it is On-Signal (#07121c, 9.1:1).
+### Status (each hue means one thing)
 
-### Secondary
+| Tone                         | Fill (spec) | Text (AA)                   | Means                                            |
+| ---------------------------- | ----------- | --------------------------- | ------------------------------------------------ |
+| Success / Solvency emerald   | `#10b981`   | `#10b981` (light `#047857`) | Confirmed, credited, done                        |
+| Pending / Adjudication amber | `#f59e0b`   | `#f59e0b` (light `#92400e`) | In review, waiting on a company, RTA or reviewer |
+| Error red                    | `#ef4444`   | `#f87171` (light `#b91c1c`) | A real blocker, a mismatch, a failed read        |
+| IEPF legal purple            | `#8b5cf6`   | `#a78bfa` (light `#6d28d9`) | IEPF-5 filing and other regulatory milestones    |
+| Active cyan                  | `#00f2fe`   | `#4facfe`                   | In progress, your turn                           |
 
-- **Confirmed Mint** (#5cd3b4): completed steps, confirmed details, "Checked". Never decorative.
-- **Blocker Coral** (#ff7a72): real blockers and errors only.
+The spec hues `#ef4444` and `#8b5cf6` are fills (dots, bars, nodes). Their text steps are lighter so small type keeps 4.5:1 on raised glass. `components/case/status-tone.ts` is the one place case data maps to a tone.
 
 ### Neutral
 
-- **Ink 950 / 900 / 850 / 800** (#0b1114 / #10181c / #141e23 / #1a262c): page, wells, panels, raised chips.
-- **Line** (#223038): hairlines and dividers. **Control** (#5e717a): input and control boundaries (3:1 for 1.4.11).
-- **Foreground** (#e6edef, 16:1), **Foreground 2** (#a3b3b9, 8.8:1), **Foreground 3** (#8699a0, 6.4:1): primary, supporting and metadata text.
-- Washes (#13263a, #10281f, #2c1515) fill badges and alerts behind their semantic color.
-
-### Chart steps
-
-- **Chart Signal / Chart Credit / Chart Muted** (#4f93dc / #2ea98a / #5a6c75 dark; #3f7fd0 / #1f9a7c / #8796a0 light): fills only, stepped into the categorical lightness band and validated for colour-vision deficiency. Text never wears them.
+- **Ink ladder** 950 / 900 / 850 / 800 (`#05080e` / `#080d17` / `#0d1424` / `#16213a`): page, wells, panel base, raised.
+- **Glass**: panel `rgb(13 20 36 / 0.62)`, surface `0.72`, elevated `rgb(22 33 58 / 0.55)`, border `rgb(255 255 255 / 0.08)`, hover border `rgb(56 189 248 / 0.3)`.
+- **Text**: fg `#e8eef7` (17:1), fg-2 `#a9b6cb` (9.8:1), fg-3 `#8593aa` (6.4:1; 5.6:1 on raised glass). **Control** `#62738e` (3:1+ for input boundaries).
 
 ### Light theme
 
-Page #f3f5f6, wells #eaeef0, panels #ffffff, line #d6dde1, control #6f7e85, text #0b1114 / #3b4950 / #56656c, signal #1f5fcc (white text on it), confirmed #08705a, blocker #b3332a. Shadows replace the inset highlight; the WebGL route switches to normal blending.
+Page `#f3f6fa`, panels white glass at 0.78, line `#d5dde8`, text `#0a1424` / `#3a4a61` / `#556580`, signal `#0369a1`. Actions keep the cyan gradient with dark text. The WebGL route switches to normal blending.
+
+### Chart steps
+
+Chart Signal / Credit / Muted (`#4f93dc` / `#2ea98a` / `#5a6c75` dark; `#3f7fd0` / `#1f9a7c` / `#8796a0` light), validated for colour-vision deficiency. Fills only.
 
 ### Named Rules
 
-**The Route Gradient Rule.** The signal-to-mint gradient (`--gradient-route`) belongs to routes and progress only: in progress becoming credited. Never on text, buttons or backgrounds.
-
-**The One Voice Rule.** Signal blue is the only accent. Mint and coral carry state, never decoration.
-**The No-Warm Rule.** No cream, beige or yellow anywhere. The palette stays cool.
+**The One Action Rule.** Only the primary button wears the cyan gradient. One primary per view.
+**The Status Hue Rule.** A hue is never decoration. Amber always means waiting on someone, purple always means IEPF/regulatory, and so on.
+**The Route Gradient Rule.** `--gradient-route` (signal to emerald) belongs to routes and progress lines only.
+**The No-Warm Rule.** No cream or beige surfaces. Amber exists only as the pending status.
 
 ## Typography
 
-**Display and Body Font:** Mona Sans Variable (fallback ui-sans-serif, system-ui)
-**Mono Font:** Geist Mono Variable, for identifiers only
+**Display and Body:** Mona Sans Variable. **Identifiers:** Geist Mono Variable.
 
-**Character:** One variable family does both jobs. Width and tracking shift with size: wide and tight at display, neutral at body.
+- **Display** (560, up to 4.75rem, 1.02, stretch 112%, -0.035em): hero, value at stake, KPI figures. The landing headline and section closers may wear `.text-gradient-cyan`.
+- **Headline** (560, clamp(1.75rem, 3.4vw, 2.75rem), 1.1, -0.02em).
+- **Title** (560, 1.25rem). **Body** (400, 1rem, 1.6, never below 16px). **Label** (500, 0.9375rem; 14px floor for metadata).
 
-### Hierarchy
+### Tabular precision
 
-- **Display** (560, clamp(2.5rem, 5.6vw, 4.5rem), 1.02, stretch 112%, -0.035em): the landing hero only.
-- **Headline** (560, clamp(1.75rem, 3.4vw, 2.75rem), 1.1, stretch 106%, -0.02em): section and page headings.
-- **Title** (560, 1.25rem, 1.3): panel and list headings.
-- **Body** (400, 1rem, 1.6): never below 16px; prose max about 65ch.
-- **Label** (500, 0.9375rem): metadata, badges, table headers. 14px is the floor, for metadata only.
-- **Identifier** (Geist Mono, 0.9375rem, tabular): folio and certificate numbers, SHA-256, receipt ids.
-
-### Named Rules
-
-**The Real Identifier Rule.** Mono is for strings a person might copy or compare. Never for emphasis or "technical feel".
-**The No Eyebrow Rule.** No small uppercase kickers above headings.
+`.font-tabular` / `.tnum`: tabular, lining figures with a slashed zero, for folio and certificate numbers, money and dates. Count metrics (`MetricCounter` with `kind="count"`) and standalone display numerals ("₹0", "0") use plain tabular digits so a lone zero never reads as Ø.
 
 ## Layout
 
-Single-column editorial on mobile, widening to a 12-column container (max 72rem marketing, 80rem product) at lg. Sections are separated by whitespace and hairlines, not stacked cards. Product screens use a left reading column and a right evidence column at lg and above; the evidence room splits only at xl. Spacing runs on a 4px base with generous section rhythm (roughly 96px between marketing sections). The header is sticky only at lg; on phones it scrolls away to keep the viewport for content.
+12-column container: 1200px marketing, 84rem case page. The case page is two panes from lg: **Milestones** (next step, lifecycle tracker, tasks, activity) and the **Document inspector** (forensic page preview, proof cards, quote, holdings, consents). Below lg the panes stack behind a segmented Milestones / Documents switch that sticks to the top; in-page links open the pane that holds their target. No horizontal scroll at 320px.
 
 ## Elevation & Depth
 
-Tonal layering first: ink-950 page, ink-900 wells, ink-850 panels, ink-800 raised chips, each with a 1px line border and a faint top highlight. One lift shadow exists for the single focal panel per screen.
-
-### Shadow Vocabulary
-
-- **Highlight** (`inset 0 1px 0 rgb(230 237 239 / 0.05)`): top edge on every panel.
-- **Lift** (`inset 0 1px 0 rgb(230 237 239 / 0.05), 0 32px 64px -24px rgb(2 6 8 / 0.85)`): the next-step card and the receipt.
-
-### Named Rules
-
-**The One Lift Rule.** At most one lifted panel per screen. Everything else is flat on its ink step.
+- **Panel** (`.panel`): translucent glass, specular rim, a 1px lit top edge. No backdrop blur (the field behind is a soft gradient; blurring it costs GPU and shows nothing).
+- **Vault glass** (`.vault-glass`): `blur(24px) saturate(150%)` for surfaces that float over content: the command HUD, the quick-scan bar, sticky chrome.
+- **Lift** (`.panel-lift`): rim plus `0 20px 40px -15px rgb(0 0 0 / 0.7)` for the focal card per screen (value at stake, next step, teaser).
+- **Hover lift** (`.vault-glass-hover`): -2px, cyan-tinted border and shadow, fine pointers only.
 
 ## Shapes
 
-Precise, small radii. Controls use 8px, panels 12px, status badges are pills. Borders are 1px; dashed borders mean "planned" or "not yet", never decoration. No side stripes over 1px, no nested cards.
+Controls 10px, panels 16px, overlays 20px, status badges and switches are pills. Dashed borders mean planned, not yet, or a tear line on a receipt.
 
 ## Components
 
-### Buttons
+- **VaultCard** (`components/ui/vault-card.tsx`): `.panel .vault-card`; cursor glow `radial-gradient(circle at var(--mouse-x) var(--mouse-y), rgb(56 189 248 / 0.1), transparent 40%)` plus a lit edge, driven by one listener in `<CursorGlow />`. Props: `as`, `interactive` (hover lift), `lift`.
+- **StatusBadge**: tone dot plus a word; pending tones ping (paused under reduced motion).
+- **StepBreadcrumb**: numbered nodes joined by route-gradient lines; every reached step is a button; step names stay in the accessible name on phones.
+- **MetricCounter**: counts once on view; server-rendered final value; screen readers get only the final value; later changes count from the current number.
+- **Buttons**: primary gradient with an inner highlight and cyan glow on hover; outline is elevated glass; `confirm` emerald; `discrepancy` amber. Press `scale(0.97)`.
+- **Proof card**: label, value, a grounded line built only from the extraction record ("High confidence · matches the registrar's entitlement letter · p.1"), source and reason, then one Approve / Flag a discrepancy switch. No scores are invented.
+- **Lifecycle tracker**: six display stages over the eleven case states, each an accordion showing its states and dates from history. Regulatory stages carry an IEPF tag.
+- **Diagnostic receipt**: the check's review step; dashed rules, Edit per row, a perforated tear, and a real SHA-256 fingerprint of the answers.
+- **Command HUD**: vault glass over a `backdrop-blur-xl` scrim, spring highlight between rows, full keyboard support.
+- **Quick-scan bar**: GET form to `/check`; works without JavaScript; never looks anything up.
 
-- **Shape:** 8px radius, min 44px touch height.
-- **Primary:** Signal Blue fill, On-Signal text. Hover lifts to Signal Strong. One primary per view.
-- **Outline / Ghost:** ink-900 fill with a control border, or text-only.
-- **Press:** `scale(0.97)` over 160ms with the out-curve. Hover effects exist only on hover-capable pointers.
+## Motion
 
-### Cards / Containers
-
-- **Panel:** ink-850, 1px line, 12px radius, 24px padding, highlight shadow. Blocked panels use a coral border at 50%.
-
-### Badges
-
-Pill, always a word plus an icon, never color alone. Variants: neutral, progress (signal), confirmed (mint), blocker (coral), outline.
-
-### Inputs / Fields
-
-- **Style:** ink-900 fill, control border, 8px radius, 48px min height. **Focus:** 2px signal outline, 3px offset. **Error:** coral border plus an icon and message.
-
-### Command palette
-
-Centred sheet at 12vh, panel surface with the overlay shadow, rises 8px over 320ms. Combobox input, grouped results (Recent, Actions, Sample cases, Evidence rooms, Documents, Pages), a single highlight that slides between rows, keys shown in the footer.
-
-### Segmented tabs
-
-Pill track on the well colour; the selected pill slides with transform. Arrow keys, Home and End move between tabs. Panels animate only after a real switch.
-
-### Data visualization
-
-Bars no taller than 12px with 3 to 4px rounded ends and 2px surface gaps; one hairline baseline; values printed beside every bar, never inside it; the list or legend beside a chart is its accessible table. Signature charts: route timeline (time-scaled stages, a "you are here" node, dashed projection to the next date), value waterfall, reading summary (textured "not found" slice), route progress, checksum fingerprint.
-
-### Signature surfaces
-
-Grain and a two-point light field behind the page; cursor spotlight (1px lit edge plus a 5% wash) on interactive cards; one sheen sweep and a 3px magnetic lean on the primary CTA; the route loader (a short route draws, credit lands, repeat).
-
-### Status rail and receipt (signature)
-
-The case status rail draws done steps in mint with a check, the current step as a ringed signal marker, blockers in coral. The assessment receipt prints its lines in order with a clip-path reveal and states "never, not queried" for sources not connected.
+- Framer Motion behind `<MotionProvider>` (LazyMotion `strict`, features loaded after hydration, `reducedMotion="user"`). Use `m.*`, never `motion.*`. Springs live in `lib/motion/springs.ts`: `SPRING` (UI), `SPRING_SOFT` (surfaces), `EXIT` (quick, plain).
+- Shared layout springs: nav rule, segmented pill, HUD highlight, pane switch, stepper ring.
+- The check: steps enter from the side you are heading (x 20, blur 6px), leaving steps are inert while they exit.
+- Hover and press stay in CSS (160 to 300ms, `--ease-vault`). GSAP keeps the hero split-line reveal and scroll scenes.
+- Reduced motion: no transforms, no counts, no pings, no scan line; opacity feedback remains.
 
 ## Do's and Don'ts
 
-### Do:
+### Do
 
+- **Do** ground every number and label in case data. If the data has no estimate, say "Not started" or "Not estimated yet".
 - **Do** keep one primary action per view and one CTA label ("Start the 3-minute check").
-- **Do** animate transform and opacity only, with `cubic-bezier(0.23, 1, 0.32, 1)` for entrances and 160 to 260ms for UI.
-- **Do** honor `prefers-reduced-motion`, `prefers-reduced-transparency` and `prefers-contrast: more`.
-- **Do** write only copy the product can fully deliver, with synthetic data labeled as such.
+- **Do** honour `prefers-reduced-motion`, `prefers-reduced-transparency` and `prefers-contrast: more`.
 
-### Don't:
+### Don't
 
-- **Don't** add cream, beige or yellow, or a second accent.
-- **Don't** put an eyebrow above a heading, use em or en dashes in visible copy, or use decorative dots.
-- **Don't** build fake product UI out of divs in marketing, or three equal feature cards in a row.
-- **Don't** animate layout properties or add scroll reveals to functional product screens.
-- **Don't** draw a chart from invented or illustrative numbers; every mark comes from the case data, and every value also appears as text.
-- **Don't** colour text with a chart fill or use the route gradient outside routes and progress.
-
-Not canonized (defects carried by the build, not rules): none recorded at the craft-floor level; the landing "How it works" index uses small dot nodes as scroll-progress markers, which is functional state, not decoration.
+- **Don't** invent match percentages, registry lookups, durations or statistics.
+- **Don't** use a status hue for decoration, or the cyan gradient on anything but the primary action.
+- **Don't** put backdrop blur on every panel; keep it for floating surfaces.
+- **Don't** animate layout properties directly; use transforms or Framer layout animations.
