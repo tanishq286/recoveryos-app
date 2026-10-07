@@ -15,6 +15,7 @@ import {
   BriefcaseBusinessIcon,
   ChartCandlestickIcon,
   ChartPieIcon,
+  ChevronDownIcon,
   CircleAlertIcon,
   CornerDownLeftIcon,
   LandmarkIcon,
@@ -445,23 +446,31 @@ function YearSelect({
   invalid?: boolean;
 }) {
   const years = Array.from({ length: maxYear - 1959 }, (_, i) => String(maxYear - i));
+  // Native select (keyboard, screen readers and phone pickers all work), with
+  // the platform arrow swapped for the icon set's chevron.
   return (
-    <select
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-describedby={describedBy}
-      aria-invalid={invalid || undefined}
-      className="tnum block min-h-12 w-full max-w-xs rounded-[var(--radius-control)] border border-control bg-(--glass-elevated) px-3 py-2.5 text-base text-fg shadow-[inset_0_1px_2px_rgb(0_0_0/0.12)] transition-[border-color,box-shadow] duration-[160ms] hover:border-fg-3 focus-visible:border-signal focus-visible:shadow-[0_0_0_4px_var(--selection)] aria-invalid:border-blocker"
-    >
-      <option value="">Choose a year</option>
-      <option value="unknown">I don&apos;t remember</option>
-      {years.map((y) => (
-        <option key={y} value={y}>
-          {y}
-        </option>
-      ))}
-    </select>
+    <div className="relative max-w-xs">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
+        className="tnum block min-h-12 w-full cursor-pointer appearance-none rounded-[var(--radius-control)] border border-control bg-(--glass-elevated) py-2.5 pr-10 pl-3.5 text-base text-fg shadow-[inset_0_1px_2px_rgb(0_0_0/0.12)] transition-[border-color,box-shadow] duration-[160ms] hover:border-fg-3 focus-visible:border-signal focus-visible:shadow-[0_0_0_4px_var(--selection)] aria-invalid:border-blocker"
+      >
+        <option value="">Choose a year</option>
+        <option value="unknown">I don&apos;t remember</option>
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+      <ChevronDownIcon
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-fg-3"
+      />
+    </div>
   );
 }
 

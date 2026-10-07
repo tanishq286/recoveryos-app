@@ -109,15 +109,25 @@ export function Stages({ stages }: { stages: Stage[] }) {
 
       const mm = gsap.matchMedia();
       mm.add(MOTION_QUERIES.wide, () => {
-        setActive(0);
-        items.forEach((item, i) =>
-          ScrollTrigger.create({
-            trigger: item,
-            start: "top 55%",
-            end: "bottom 55%",
-            onToggle: (self) => self.isActive && setActive(i),
-          }),
-        );
+        // The lit stage is the last card whose top has crossed 55% of the
+        // viewport, read from layout on every update. Per-card toggles missed
+        // a stage when a fast scroll jumped clean over it.
+        const pick = () => {
+          const line = window.innerHeight * 0.55;
+          let current = 0;
+          items.forEach((item, i) => {
+            if (item.getBoundingClientRect().top <= line) current = i;
+          });
+          setActive(current);
+        };
+        ScrollTrigger.create({
+          trigger: root.querySelector("[data-stage-list]"),
+          start: "top bottom",
+          end: "bottom top",
+          onUpdate: pick,
+          onRefresh: pick,
+        });
+        pick();
         if (route && matchMedia(MOTION_QUERIES.motion).matches) {
           gsap.fromTo(
             route,

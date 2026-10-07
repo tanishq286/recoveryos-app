@@ -3,15 +3,20 @@ import { ArrowUpRightIcon } from "lucide-react";
 
 import { Wordmark } from "@/components/brand/wordmark";
 import { OFFICIAL_LINKS } from "@/lib/sources";
+import { cn } from "@/lib/utils";
 
 function shortName(label: string) {
   return label.split(": ")[0];
 }
 
-export function SiteFooter() {
+/** `wide` matches the app shell's container (84rem); the default matches marketing pages. */
+export function SiteFooter({ wide = false }: { wide?: boolean }) {
+  const width = wide ? "max-w-[84rem]" : "max-w-[1200px]";
   return (
     <footer className="mt-auto border-t border-(--glass-border) bg-ink-950/60">
-      <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div
+        className={cn("mx-auto grid gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]", width)}
+      >
         <div className="space-y-4">
           <Wordmark />
           <p className="max-w-sm text-sm text-fg-3">
@@ -76,7 +81,7 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="border-t border-(--glass-border)">
-        <p className="mx-auto max-w-[1200px] px-4 py-5 text-sm text-fg-3 sm:px-6">
+        <p className={cn("mx-auto px-4 py-5 text-sm text-fg-3 sm:px-6", width)}>
           Product demo, September 2026. All cases shown are fictional.
         </p>
       </div>

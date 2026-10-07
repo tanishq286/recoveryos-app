@@ -8,7 +8,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>
-      <SiteFooter />
+      <SiteFooter wide />
     </div>
   );
 }
