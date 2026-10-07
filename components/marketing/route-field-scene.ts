@@ -23,7 +23,7 @@ import {
  *
  * A field of points stands for the registry. A route draws from one holding
  * (left, deep) to credit (right, near); points within its reach light as it
- * passes, and the end point turns mint only once the route arrives.
+ * passes, and the end point turns emerald only once the route arrives.
  *
  * Once drawn, the field is quietly alive: signal pulses run along the route
  * and wake the records beside it, the sheet swells slowly, and on fine
@@ -40,18 +40,18 @@ import {
  */
 const PALETTES = {
   dark: {
-    ink: new Color("#8699a0"),
-    signal: new Color("#7cb8ff"),
-    hot: new Color("#d6e9ff"),
-    confirmed: new Color("#5cd3b4"),
+    ink: new Color("#7f8ea8"),
+    signal: new Color("#3cc6fe"),
+    hot: new Color("#c8fbff"),
+    confirmed: new Color("#10b981"),
     glow: AdditiveBlending,
-    halo: 0.11,
+    halo: 0.12,
   },
   light: {
-    ink: new Color("#7d8c93"),
-    signal: new Color("#1f5fcc"),
-    hot: new Color("#5c9cff"),
-    confirmed: new Color("#08705a"),
+    ink: new Color("#7d8ba0"),
+    signal: new Color("#0369a1"),
+    hot: new Color("#0891b2"),
+    confirmed: new Color("#047857"),
     glow: NormalBlending,
     halo: 0.045,
   },

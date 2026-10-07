@@ -1,33 +1,62 @@
 @import "tailwindcss";
 
 /*
- * RecoveryOS: "precision statement" system. Canonical values: MASTER.md.
- * Contrast (WCAG, computed on ink-950 #0B1114):
- *   fg #E6EDEF 16.1  fg-2 #A3B3B9 8.8  fg-3 #8699A0 6.4 (5.2 on ink-800)
- *   signal #7CB8FF 9.2  confirmed #5CD3B4 10.4  blocker #FF7A72 7.5
- *   control #5E717A 3.3-3.7 (UI boundaries, 1.4.11)  on-signal on signal 9.1
+ * RecoveryOS: "Sovereign Vault" system. Canonical values: DESIGN.md.
+ * Dark is the base: an abyss canvas, acrylic glass panels with a specular rim,
+ * one electric-cyan accent, and four status hues that each mean one thing.
+ *
+ * Contrast (WCAG, dark; on abyss / glass panel / raised):
+ *   fg 17.2 / 16.2 / 14.9   fg-2 9.8 / 9.2 / 8.5   fg-3 6.4 / 6.1 / 5.6
+ *   signal 8.3 / 7.8 / 7.2  confirmed 7.9 / 7.4 / 6.8  pending 9.3 / 8.8 / 8.1
+ *   blocker 7.3 / 6.8 / 6.3  iepf 7.4 / 6.9 / 6.4  control 3.8+ (1.4.11)
+ *   on-brand on the cyan gradient 7.9-13.9.
+ * The spec hues (#EF4444, #8B5CF6) are fills only; their text steps are
+ * lighter so small type keeps 4.5:1 on raised glass.
  */
 @theme {
-  --color-ink-950: #0b1114;
-  --color-ink-900: #10181c;
-  --color-ink-850: #141e23;
-  --color-ink-800: #1a262c;
-  --color-line: #223038;
-  --color-control: #5e717a;
-  --color-fg: #e6edef;
-  --color-fg-2: #a3b3b9;
-  --color-fg-3: #8699a0;
-  --color-signal: #7cb8ff;
-  --color-signal-strong: #9ccaff;
-  --color-on-signal: #07121c;
-  --color-signal-wash: #13263a;
-  --color-confirmed: #5cd3b4;
-  --color-confirmed-wash: #10281f;
-  --color-blocker: #ff7a72;
-  --color-blocker-wash: #2c1515;
+  /* Elevation ladder: 950 page, 900 well, 850 panel, 800 raised. */
+  --color-ink-950: #05080e;
+  --color-ink-900: #080d17;
+  --color-ink-850: #0d1424;
+  --color-ink-800: #16213a;
+  --color-line: #1b2537;
+  --color-control: #62738e;
+  --color-fg: #e8eef7;
+  --color-fg-2: #a9b6cb;
+  --color-fg-3: #8593aa;
+
+  /* Electric cyan. signal = text, icons, focus; the gradient fills actions. */
+  --color-signal: #4facfe;
+  --color-signal-strong: #00f2fe;
+  --color-on-signal: #031018;
+  --color-on-brand: #031018;
+  --color-signal-wash: #0a1a2c;
+
+  /* Status: each hue means one thing everywhere. */
+  --color-confirmed: #10b981; /* solvency: confirmed, credited, done */
+  --color-confirmed-wash: #06201a;
+  --color-pending: #f59e0b; /* adjudication: in review, waiting on a third party */
+  --color-pending-wash: #221806;
+  --color-blocker: #f87171; /* error text; fill is status-error */
+  --color-blocker-wash: #2a1012;
+  --color-iepf: #a78bfa; /* IEPF legal and regulatory milestones (text) */
+  --color-iepf-wash: #17112e;
+
+  /* Sovereign Vault spec values, as named tokens. */
+  --color-vault-abyss: #05080e;
+  --color-vault-surface: rgb(13 20 36 / 0.72);
+  --color-vault-elevated: rgb(22 33 58 / 0.55);
+  --color-vault-border: rgb(255 255 255 / 0.08);
+  --color-vault-border-highlight: rgb(56 189 248 / 0.35);
+  --color-brand-cyan: #00f2fe;
+  --color-brand-blue: #4facfe;
+  --color-status-success: #10b981;
+  --color-status-pending: #f59e0b;
+  --color-status-error: #ef4444;
+  --color-status-iepf: #8b5cf6;
+
   /*
-   * Chart fills. Same hues as signal and confirmed, stepped into the dark-mode
-   * categorical band (OKLCH L 0.48-0.67), validated: CVD dE 14.1, normal 15.9.
+   * Chart fills, validated in both themes (CVD dE 14.1 dark, 15.8 light).
    * Context bars use the neutral; text never wears these.
    */
   --color-chart-signal: #4f93dc;
@@ -49,12 +78,14 @@
   --text-lg: 1.0625rem;
   --text-lg--line-height: 1.6;
 
-  --radius-control: 8px;
-  --radius-panel: 12px;
+  --radius-control: 10px;
+  --radius-panel: 16px;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* The vault ease: a long, soft landing for lifts and glass. */
+  --ease-vault: cubic-bezier(0.16, 1, 0.3, 1);
 
   --animate-arrive: arrive 220ms var(--ease-out) both;
   --animate-marker: marker 320ms var(--ease-out) both;
@@ -153,7 +184,7 @@
   }
 }
 
-/* shadcn/ui semantic tokens, mapped onto the ink system. Dark by default; light restates the ink tokens. */
+/* shadcn/ui semantic tokens, mapped onto the vault. Dark by default; light restates the same names. */
 :root {
   color-scheme: dark;
   --background: var(--color-ink-950);
@@ -174,25 +205,44 @@
   --border: var(--color-line);
   --input: var(--color-control);
   --ring: var(--color-signal);
-  --radius: 8px;
+  --radius: 10px;
 
-  /* Effect tokens. Every rgb() literal lives here so a theme can restate it. */
-  --edge: rgb(230 237 239 / 0.05);
-  --edge-strong: rgb(230 237 239 / 0.09);
-  --shadow-deep: rgb(2 6 8 / 0.85);
+  /* Glass. Every rgb() literal lives here so the light theme can restate it. */
+  --glass-bg: rgb(13 20 36 / 0.72);
+  --glass-panel: rgb(13 20 36 / 0.62);
+  --glass-elevated: rgb(22 33 58 / 0.55);
+  --glass-border: rgb(255 255 255 / 0.08);
+  --glass-border-hover: rgb(56 189 248 / 0.3);
+  --glass-rim: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  --glass-shadow: 0 20px 40px -15px rgb(0 0 0 / 0.7);
+  --glass-shadow-hover: 0 24px 48px -12px rgb(0 242 254 / 0.12);
+  --specular: linear-gradient(90deg, transparent, rgb(56 189 248 / 0.35), transparent);
+  --gradient-brand: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  --gradient-text: linear-gradient(135deg, #ffffff 30%, #38bdf8 70%, #00f2fe 100%);
+  --brand-glow: 0 0 0 1px rgb(0 242 254 / 0.35), 0 10px 30px -8px rgb(0 242 254 / 0.45);
+
+  --edge: rgb(255 255 255 / 0.06);
+  --edge-strong: rgb(255 255 255 / 0.1);
+  --shadow-deep: rgb(0 0 0 / 0.8);
   --highlight: inset 0 1px 0 var(--edge);
-  --lift: inset 0 1px 0 var(--edge), 0 32px 64px -24px var(--shadow-deep);
-  --overlay: 0 0 0 1px var(--edge-strong), 0 40px 80px -20px var(--shadow-deep);
-  --chrome-bg: rgb(11 17 20 / 0.9);
-  --scrim: rgb(4 8 10 / 0.6);
-  --link-rule: rgb(230 237 239 / 0.35);
-  --selection: rgb(124 184 255 / 0.3);
-  --glow-signal: rgb(124 184 255 / 0.075);
-  --glow-confirmed: rgb(92 211 180 / 0.04);
-  --spot: rgb(124 184 255 / 0.55);
-  --spot-wash: rgb(124 184 255 / 0.05);
-  --sheen: rgb(255 255 255 / 0.32);
-  --grain-opacity: 0.05;
+  --lift: var(--glass-rim), var(--glass-shadow);
+  --overlay: 0 0 0 1px var(--glass-border), 0 40px 80px -20px var(--shadow-deep);
+  --chrome-bg: rgb(5 8 14 / 0.72);
+  --scrim: rgb(2 4 8 / 0.62);
+  --link-rule: rgb(232 238 247 / 0.35);
+  --selection: rgb(79 172 254 / 0.32);
+  --mesh-1: rgb(0 242 254 / 0.08);
+  --mesh-2: rgb(79 172 254 / 0.07);
+  --mesh-3: rgb(139 92 246 / 0.06);
+  --mesh-4: rgb(16 185 129 / 0.035);
+  --hero-1: rgb(0 242 254 / 0.13);
+  --hero-2: rgb(79 172 254 / 0.16);
+  --hero-3: rgb(139 92 246 / 0.11);
+  --hero-4: rgb(16 185 129 / 0.07);
+  --spot: rgb(56 189 248 / 0.55);
+  --spot-wash: rgb(56 189 248 / 0.1);
+  --sheen: rgb(255 255 255 / 0.45);
+  --grain-opacity: 0.045;
 
   /*
    * Semantic layer. New components read these names; the ink ladder underneath
@@ -202,21 +252,21 @@
   --surface-raised: var(--color-ink-800);
   --surface-sunken: var(--color-ink-900);
   --surface-hover: var(--color-ink-800);
-  --border-highlight: var(--color-control);
+  --border-highlight: var(--color-vault-border-highlight);
   --text-primary: var(--color-fg);
   --text-secondary: var(--color-fg-2);
   --text-tertiary: var(--color-fg-3);
   --accent-hover: var(--color-signal-strong);
   --success: var(--color-confirmed);
   --info: var(--color-signal);
-  /* No warm hue in the system: warnings borrow the blocker colour at lower weight. */
-  --warning: var(--color-blocker);
+  --warning: var(--color-pending);
   --danger: var(--color-blocker);
+  --legal: var(--color-iepf);
   /* Chart series, fixed order: accent, credit, then neutrals. */
   --chart-1: var(--color-chart-signal);
   --chart-2: var(--color-chart-credit);
   --chart-3: var(--color-chart-muted);
-  /* The signature gradient: in progress (signal) to credited (mint). Routes and progress only. */
+  /* The route gradient: in progress (signal) to credited. Routes and progress only. */
   --gradient-route: linear-gradient(90deg, var(--color-signal), var(--color-confirmed));
 
   --duration-micro: 160ms;
@@ -228,50 +278,77 @@
 }
 
 /*
- * Light theme: editorial and cool, never cream. Same token names, restated.
- * Contrast (WCAG): fg 19.0 / fg-2 9.3 / fg-3 6.1 on panels; signal 5.9,
- * confirmed 6.0, blocker 6.1; white on signal 5.9; control 4.2 (1.4.11).
- * Chart steps validated for light mode (CVD dE 15.8, normal 17.2).
+ * Light theme: frosted, cool and editorial; never cream. Same token names.
+ * Contrast (WCAG, on white / page / raised): fg 18.5 / 17.0 / 15.5,
+ * fg-3 5.9 / 5.4 / 5.0, signal 5.9 / 5.5 / 5.0, confirmed 5.5 / 5.1 / 4.6,
+ * pending 7.0+, blocker 6.5+, iepf 7.1+, control 4.4 (1.4.11).
+ * Actions keep the cyan gradient with dark text in both themes.
  */
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-ink-950: #f3f5f6;
-  --color-ink-900: #eaeef0;
+  --color-ink-950: #f3f6fa;
+  --color-ink-900: #e9eef5;
   --color-ink-850: #ffffff;
-  --color-ink-800: #e4e9ec;
-  --color-line: #d6dde1;
-  --color-control: #6f7e85;
-  --color-fg: #0b1114;
-  --color-fg-2: #3b4950;
-  --color-fg-3: #56656c;
-  --color-signal: #1f5fcc;
-  --color-signal-strong: #174ea9;
+  --color-ink-800: #e6ecf4;
+  --color-line: #d5dde8;
+  --color-control: #6b7a90;
+  --color-fg: #0a1424;
+  --color-fg-2: #3a4a61;
+  --color-fg-3: #556580;
+  --color-signal: #0369a1;
+  --color-signal-strong: #075985;
   --color-on-signal: #ffffff;
-  --color-signal-wash: #e7effc;
-  --color-confirmed: #08705a;
-  --color-confirmed-wash: #e3f3ed;
-  --color-blocker: #b3332a;
-  --color-blocker-wash: #fbeceb;
+  --color-signal-wash: #e3f2fc;
+  --color-confirmed: #047857;
+  --color-confirmed-wash: #e3f5ee;
+  --color-pending: #92400e;
+  --color-pending-wash: #fdf1df;
+  --color-blocker: #b91c1c;
+  --color-blocker-wash: #fdecec;
+  --color-iepf: #6d28d9;
+  --color-iepf-wash: #f1ecfe;
+  --color-vault-abyss: #f3f6fa;
+  --color-vault-surface: rgb(255 255 255 / 0.72);
+  --color-vault-elevated: rgb(255 255 255 / 0.9);
+  --color-vault-border: rgb(10 20 36 / 0.08);
+  --color-vault-border-highlight: rgb(3 105 161 / 0.35);
   --color-chart-signal: #3f7fd0;
   --color-chart-credit: #1f9a7c;
   --color-chart-muted: #8796a0;
 
-  --edge: rgb(255 255 255 / 0.8);
-  --edge-strong: rgb(11 17 20 / 0.07);
-  --shadow-deep: rgb(11 17 20 / 0.16);
-  --highlight: 0 1px 2px rgb(11 17 20 / 0.04);
-  --lift: 0 1px 2px rgb(11 17 20 / 0.04), 0 28px 56px -28px rgb(11 17 20 / 0.22);
-  --overlay: 0 0 0 1px rgb(11 17 20 / 0.06), 0 40px 80px -24px rgb(11 17 20 / 0.28);
-  --chrome-bg: rgb(243 245 246 / 0.88);
-  --scrim: rgb(11 17 20 / 0.28);
-  --link-rule: rgb(11 17 20 / 0.3);
-  --selection: rgb(31 95 204 / 0.18);
-  --glow-signal: rgb(31 95 204 / 0.07);
-  --glow-confirmed: rgb(8 112 90 / 0.05);
-  --spot: rgb(31 95 204 / 0.45);
-  --spot-wash: rgb(31 95 204 / 0.035);
-  --sheen: rgb(255 255 255 / 0.38);
-  --grain-opacity: 0.035;
+  --glass-bg: rgb(255 255 255 / 0.72);
+  --glass-panel: rgb(255 255 255 / 0.78);
+  --glass-elevated: rgb(255 255 255 / 0.92);
+  --glass-border: rgb(10 20 36 / 0.09);
+  --glass-border-hover: rgb(3 105 161 / 0.35);
+  --glass-rim: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  --glass-shadow: 0 1px 2px rgb(10 20 36 / 0.04), 0 20px 40px -18px rgb(10 20 36 / 0.18);
+  --glass-shadow-hover: 0 24px 48px -16px rgb(3 105 161 / 0.2);
+  --specular: linear-gradient(90deg, transparent, rgb(3 105 161 / 0.3), transparent);
+  --gradient-text: linear-gradient(135deg, #0a1424 30%, #0369a1 70%, #0891b2 100%);
+  --brand-glow: 0 0 0 1px rgb(3 105 161 / 0.3), 0 10px 26px -10px rgb(8 145 178 / 0.5);
+
+  --edge: rgb(255 255 255 / 0.85);
+  --edge-strong: rgb(10 20 36 / 0.07);
+  --shadow-deep: rgb(10 20 36 / 0.16);
+  --highlight: 0 1px 2px rgb(10 20 36 / 0.04);
+  --overlay: 0 0 0 1px rgb(10 20 36 / 0.07), 0 40px 80px -24px rgb(10 20 36 / 0.3);
+  --chrome-bg: rgb(243 246 250 / 0.78);
+  --scrim: rgb(10 20 36 / 0.3);
+  --link-rule: rgb(10 20 36 / 0.3);
+  --selection: rgb(3 105 161 / 0.18);
+  --mesh-1: rgb(0 200 230 / 0.09);
+  --mesh-2: rgb(79 172 254 / 0.1);
+  --mesh-3: rgb(139 92 246 / 0.06);
+  --mesh-4: rgb(16 185 129 / 0.05);
+  --hero-1: rgb(0 200 230 / 0.14);
+  --hero-2: rgb(79 172 254 / 0.16);
+  --hero-3: rgb(139 92 246 / 0.08);
+  --hero-4: rgb(16 185 129 / 0.07);
+  --spot: rgb(3 105 161 / 0.45);
+  --spot-wash: rgb(3 105 161 / 0.06);
+  --sheen: rgb(255 255 255 / 0.5);
+  --grain-opacity: 0.03;
 }
 
 @theme inline {
@@ -308,6 +385,7 @@
   --color-info: var(--info);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-legal: var(--legal);
 }
 
 @layer base {
@@ -392,9 +470,17 @@
 }
 
 @layer utilities {
-  /* Dates, amounts, IDs and checksums line up in columns. */
+  /*
+   * Tabular precision: folio IDs, certificate numbers, money and dates line up
+   * in columns, with a slashed zero where the face has one (Geist Mono does).
+   */
+  .font-tabular,
   .tnum {
-    font-variant-numeric: tabular-nums lining-nums;
+    font-variant-numeric: tabular-nums lining-nums slashed-zero;
+    font-feature-settings:
+      "tnum" 1,
+      "zero" 1,
+      "lnum" 1;
   }
 
   .display {
@@ -405,15 +491,65 @@
     line-height: 1.02;
   }
 
+  /*
+   * Panel: the everyday glass surface. Translucent fill, specular rim and a
+   * lit top edge, but no backdrop blur: the field behind a panel is a soft
+   * gradient, so blurring it costs GPU and changes nothing you can see.
+   * Blur is kept for surfaces that float over content (.vault-glass, .chrome).
+   */
   .panel {
-    background-color: var(--color-ink-850);
-    border: 1px solid var(--color-line);
+    background:
+      var(--specular) top center / 100% 1px no-repeat,
+      var(--glass-panel);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-panel);
-    box-shadow: var(--highlight);
+    box-shadow: var(--glass-rim);
   }
 
   .panel-lift {
     box-shadow: var(--lift);
+  }
+
+  /* Specular rim light and acrylic glass, for surfaces that float. */
+  .vault-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-rim), var(--glass-shadow);
+  }
+
+  .vault-elevated {
+    background: var(--glass-elevated);
+  }
+
+  /* Hover lift for interactive glass. Fine pointers only, so taps never stick. */
+  .vault-glass-hover {
+    transition:
+      border-color 300ms var(--ease-vault),
+      box-shadow 300ms var(--ease-vault),
+      transform 300ms var(--ease-vault);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .vault-glass-hover:hover {
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-rim), var(--glass-shadow-hover);
+      transform: translateY(-2px);
+    }
+  }
+
+  /* Radiant headline type. A solid colour is set first for engines without clip. */
+  .text-gradient-cyan {
+    color: var(--color-fg);
+    background: var(--gradient-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* The action fill: electric cyan, dark text, in both themes. */
+  .bg-brand {
+    background-image: var(--gradient-brand);
   }
 
   .link {
@@ -429,15 +565,20 @@
   /* Translucent sticky chrome; content scrolls underneath. */
   .chrome {
     background-color: var(--chrome-bg);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
   }
 }
 
+/* Lucide icons: one crisp stroke across the product. */
+svg.lucide {
+  stroke-width: 1.75;
+}
+
 /*
- * Signature atmosphere. A faint light field (signal above, credit below) and
- * a fine grain sit behind every page. Both are fixed, painted once, and never
- * animate, so they cost nothing while scrolling.
+ * Signature atmosphere. A layered radial mesh (cyan and blue above, violet
+ * and emerald below) and a fine grain sit behind every page. Both are fixed,
+ * painted once, and never animate, so they cost nothing while scrolling.
  */
 body {
   position: relative;
@@ -453,48 +594,50 @@ body::after {
 }
 body::before {
   background:
-    radial-gradient(64rem 40rem at 82% -12%, var(--glow-signal), transparent 62%),
-    radial-gradient(52rem 34rem at -8% 112%, var(--glow-confirmed), transparent 60%);
+    radial-gradient(60rem 36rem at 88% -12%, var(--mesh-1), transparent 62%),
+    radial-gradient(52rem 34rem at 8% -8%, var(--mesh-2), transparent 62%),
+    radial-gradient(60rem 40rem at 55% 118%, var(--mesh-3), transparent 62%),
+    radial-gradient(44rem 32rem at -12% 88%, var(--mesh-4), transparent 60%);
 }
 body::after {
   opacity: var(--grain-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .7 0 0 0 0 .75 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .7 0 0 0 0 .8 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @layer components {
   /*
-   * Spotlight: interactive cards catch the cursor with a 1px lit edge and a
-   * faint wash. Fine pointers only; position comes from <Spotlight /> as CSS
-   * custom properties, so nothing re-renders.
+   * VaultCard: a glass card that catches the cursor. A soft cyan glow follows
+   * the pointer and a 1px lit edge traces it. Fine pointers only; position
+   * comes from <CursorGlow /> as --mouse-x / --mouse-y, so nothing re-renders.
    */
-  .spotlight {
+  .vault-card {
     position: relative;
     isolation: isolate;
   }
   @media (hover: hover) and (pointer: fine) {
-    .spotlight::before,
-    .spotlight::after {
+    .vault-card::before,
+    .vault-card::after {
       content: "";
       position: absolute;
       pointer-events: none;
       border-radius: inherit;
       opacity: 0;
-      transition: opacity 260ms var(--ease-out);
+      transition: opacity 300ms var(--ease-vault);
     }
-    .spotlight::before {
+    .vault-card::before {
       inset: 0;
       z-index: -1;
       background: radial-gradient(
-        22rem 22rem at var(--mx, 50%) var(--my, 0%),
+        circle at var(--mouse-x, 50%) var(--mouse-y, 0%),
         var(--spot-wash),
-        transparent 65%
+        transparent 40%
       );
     }
-    .spotlight::after {
+    .vault-card::after {
       inset: -1px;
       padding: 1px;
       background: radial-gradient(
-        16rem 16rem at var(--mx, 50%) var(--my, 0%),
+        16rem 16rem at var(--mouse-x, 50%) var(--mouse-y, 0%),
         var(--spot),
         transparent 60%
       );
@@ -504,8 +647,8 @@ body::after {
       -webkit-mask-composite: xor;
       mask-composite: exclude;
     }
-    .spotlight:hover::before,
-    .spotlight:hover::after {
+    .vault-card:hover::before,
+    .vault-card:hover::after {
       opacity: 1;
     }
   }
@@ -520,9 +663,9 @@ body::after {
     content: "";
     position: absolute;
     inset: 0;
-    z-index: -1;
     pointer-events: none;
     background: linear-gradient(105deg, transparent 30%, var(--sheen) 50%, transparent 70%);
+    mix-blend-mode: soft-light;
     transform: translateX(-110%);
   }
   @media (hover: hover) and (pointer: fine) {
@@ -544,6 +687,89 @@ body::after {
     background: linear-gradient(90deg, transparent, var(--edge-strong), transparent);
     transform: translateX(-100%);
     animation: sweep 1.8s var(--ease-in-out) infinite;
+  }
+
+  /*
+   * Forensic page: a faint ruled grid, and one pass of a cyan scan line when
+   * the page first appears (never loops; skipped under reduced motion).
+   */
+  .forensic-page {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--glass-elevated);
+    background-image:
+      linear-gradient(var(--edge-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--edge-strong) 1px, transparent 1px);
+    background-size:
+      100% 1.75rem,
+      1.75rem 100%;
+    background-position:
+      0 -1px,
+      -1px 0;
+  }
+  .forensic-page::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 3.5rem;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgb(0 242 254 / 0.12) 70%,
+      rgb(0 242 254 / 0.55) 98%,
+      transparent
+    );
+    transform: translateY(-110%);
+    animation: scan 1.6s var(--ease-in-out) 0.25s 1 both;
+  }
+
+  /*
+   * Hero atmosphere: a layered radial mesh (cyan, blue, violet, emerald) over a
+   * receding grid that fades out toward the edges. Static: painted once.
+   */
+  .hero-mesh {
+    background:
+      radial-gradient(44rem 30rem at 74% 40%, var(--hero-1), transparent 62%),
+      radial-gradient(36rem 26rem at 96% 6%, var(--hero-2), transparent 62%),
+      radial-gradient(32rem 24rem at 14% -4%, var(--hero-3), transparent 62%),
+      radial-gradient(30rem 22rem at 42% 108%, var(--hero-4), transparent 60%);
+  }
+  .hero-mesh::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--edge-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--edge-strong) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 60% 40%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 60% at 60% 40%, #000 20%, transparent 75%);
+    opacity: 0.55;
+  }
+
+  /* Receipt edge: a perforated tear line, drawn with a repeating mask. */
+  .receipt-tear {
+    height: 10px;
+    background: var(--glass-panel);
+    -webkit-mask: radial-gradient(circle at 6px 0, transparent 5px, #000 5.5px) 0 0 / 12px 10px
+      repeat-x;
+    mask: radial-gradient(circle at 6px 0, transparent 5px, #000 5.5px) 0 0 / 12px 10px repeat-x;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-110%);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--scan-distance, 32rem));
+    opacity: 0;
   }
 }
 
@@ -584,6 +810,14 @@ body::after {
 [data-motion="on"] [data-hero-reveal] {
   visibility: hidden;
   animation: failsafe-reveal 0s 2.4s forwards;
+}
+/* Metric counters: hidden until they start counting; same failsafe as the hero. */
+[data-motion="on"] [data-metric]:not([data-metric-ready]) {
+  visibility: hidden;
+  animation: failsafe-reveal 0s 2.4s forwards;
+}
+[data-motion="on"] [data-metric][data-metric-armed]:not([data-metric-ready]) {
+  animation: none;
 }
 @keyframes failsafe-reveal {
   to {
@@ -685,6 +919,11 @@ body::after {
 }
 
 @media (prefers-reduced-transparency: reduce) {
+  .vault-glass {
+    background: var(--color-ink-850);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
   .chrome {
     background-color: var(--color-ink-950);
     backdrop-filter: none;
@@ -694,16 +933,18 @@ body::after {
 
 @media (prefers-contrast: more) {
   :root:not([data-theme="light"]) {
-    --color-line: #45565e;
-    --color-fg-2: #c3cfd3;
-    --color-fg-3: #b1bfc4;
-    --color-control: #8a9ca3;
+    --color-line: #3a4a63;
+    --color-fg-2: #c6d0df;
+    --color-fg-3: #b2bdcf;
+    --color-control: #8a9bb5;
+    --glass-border: rgb(255 255 255 / 0.22);
   }
   :root[data-theme="light"] {
-    --color-line: #b9c4ca;
-    --color-fg-2: #26333a;
-    --color-fg-3: #3b4950;
-    --color-control: #55646b;
+    --color-line: #b5c1d1;
+    --color-fg-2: #26354a;
+    --color-fg-3: #3a4a61;
+    --color-control: #55647a;
+    --glass-border: rgb(10 20 36 / 0.25);
   }
   body::after {
     display: none;

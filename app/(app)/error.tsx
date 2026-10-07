@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
+import { CircleAlertIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RouteMark } from "@/components/brand/route-mark";
@@ -22,7 +22,7 @@ export default function AppError({
     <div role="alert" className="mx-auto max-w-2xl px-4 py-20 sm:px-6 sm:py-28">
       <RouteMark variant="lost" className="w-56" />
       <p className="mt-10 flex items-center gap-2 text-sm font-medium text-fg-2">
-        <WarningCircleIcon weight="bold" className="size-4 text-blocker" aria-hidden="true" />
+        <CircleAlertIcon className="size-4 text-blocker" aria-hidden="true" />
         Something went wrong on our side
       </p>
       <h1 className="mt-3 text-3xl leading-tight text-fg sm:text-4xl">

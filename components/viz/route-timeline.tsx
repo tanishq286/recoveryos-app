@@ -119,7 +119,14 @@ export function RouteTimeline({
         {segments.at(-1)?.kind === "next" && (
           <span className="absolute top-[0.5rem] right-0 size-[0.9375rem] translate-x-1/2 rounded-full border-2 border-signal bg-ink-850" />
         )}
-        {/* You are here: the last update, in the current stage's status colour. */}
+        {/* You are here: the last update, in the current stage's status colour, pulsing. */}
+        <span
+          className={cn(
+            "absolute top-[0.5rem] size-[0.9375rem] -translate-x-1/2 animate-ping rounded-full opacity-60",
+            blocked ? "bg-status-error" : "bg-brand-cyan",
+          )}
+          style={{ left: `${updateX}%` }}
+        />
         <span
           className={cn(
             "absolute top-[0.5rem] size-[0.9375rem] -translate-x-1/2 animate-marker rounded-full ring-[3px] ring-ink-850",

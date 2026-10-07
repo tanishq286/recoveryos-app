@@ -1,9 +1,4 @@
-import {
-  HourglassIcon,
-  InfoIcon,
-  UploadSimpleIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react/dist/ssr";
+import { CircleAlertIcon, HourglassIcon, InfoIcon, UploadIcon } from "lucide-react";
 
 import type { EvidenceFile, ExtractedField } from "@/lib/types";
 import { formatBytes, formatDateTime } from "@/lib/format";
@@ -98,13 +93,13 @@ export function EvidenceDetail({ file, fields }: { file: EvidenceFile; fields: E
         </div>
       ) : file.extractionStatus === "failed" ? (
         <Alert variant="blocker">
-          <WarningCircleIcon aria-hidden="true" />
+          <CircleAlertIcon aria-hidden="true" />
           <AlertTitle>We couldn&apos;t read this file</AlertTitle>
           <AlertDescription>
             <p>{file.extractionNote ?? EXTRACTION_LABELS.failed.explain}</p>
             <div>
               <Button variant="outline" disabled aria-describedby="reupload-note">
-                <UploadSimpleIcon aria-hidden="true" />
+                <UploadIcon aria-hidden="true" />
                 Upload a clearer copy
               </Button>
               <p id="reupload-note" className="mt-2 text-sm text-fg-3">

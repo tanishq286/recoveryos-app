@@ -4,19 +4,24 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Badges always carry a word (and usually an icon): colour is never the only signal.
- * signal = in progress, confirmed = done, blocker = real blocker.
+ * Badges always carry a word (and usually an icon or dot): colour is never the
+ * only signal. progress = in progress (cyan), confirmed = done (emerald),
+ * pending = in review or waiting on a third party (amber), iepf = legal and
+ * regulatory milestones (purple), blocker = a real blocker (red).
+ * For a status with a live dot, use <StatusBadge />.
  */
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-medium [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-medium tracking-[0.005em] [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        neutral: "border-line bg-ink-800 text-fg-2",
+        neutral: "border-(--glass-border) bg-(--glass-elevated) text-fg-2",
         progress: "border-signal/35 bg-signal-wash text-signal",
         confirmed: "border-confirmed/35 bg-confirmed-wash text-confirmed",
+        pending: "border-pending/40 bg-pending-wash text-pending",
+        iepf: "border-iepf/40 bg-iepf-wash text-iepf",
         blocker: "border-blocker/45 bg-blocker-wash text-blocker",
-        outline: "border-control bg-transparent text-fg-2",
+        outline: "border-control/70 bg-transparent text-fg-2",
       },
     },
     defaultVariants: {

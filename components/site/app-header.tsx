@@ -1,4 +1,4 @@
-import { InfoIcon } from "@phosphor-icons/react/dist/ssr";
+import { InfoIcon } from "lucide-react";
 
 import { Wordmark } from "@/components/brand/wordmark";
 import { CommandTrigger } from "@/components/command/command-trigger";
@@ -14,9 +14,9 @@ export function AppHeader() {
   return (
     <header
       style={{ viewTransitionName: "site-header" }}
-      className="chrome relative top-0 z-(--z-chrome) border-b border-line/70 lg:sticky"
+      className="chrome relative top-0 z-(--z-chrome) border-b border-(--glass-border) lg:sticky"
     >
-      <div role="note" className="border-b border-line/70 bg-signal-wash/60">
+      <div role="note" className="border-b border-(--glass-border) bg-signal-wash/50">
         <p className="mx-auto flex max-w-[1280px] items-start gap-2 px-4 py-2 text-sm text-fg-2 sm:px-6">
           <InfoIcon className="mt-0.5 size-4 shrink-0 text-signal" aria-hidden="true" />
           <span>

@@ -36,7 +36,7 @@ export function PartyLine({
             "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-semibold tracking-[0.02em]",
             isClient
               ? "border-signal/50 bg-signal-wash text-signal"
-              : "border-line bg-ink-800 text-fg-2",
+              : "border-(--glass-border) bg-(--glass-elevated) text-fg-2",
           )}
         >
           {isClient ? "You" : initials(party.name)}

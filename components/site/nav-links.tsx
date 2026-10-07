@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { m } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
@@ -12,10 +13,12 @@ export interface NavItem {
 
 /**
  * Header navigation with a real active state: the current section is marked
- * with aria-current and a 1px signal rule that grows in under the label.
+ * with aria-current and a lit rule under the label. The rule is one shared
+ * layout element, so it springs across when the section changes.
  */
 export function NavLinks({ items, label }: { items: NavItem[]; label: string }) {
   const pathname = usePathname();
+  const layoutId = `nav-rule-${label}`;
   return (
     <nav aria-label={label}>
       <ul className="-mx-2 flex flex-wrap gap-x-1">
@@ -33,13 +36,13 @@ export function NavLinks({ items, label }: { items: NavItem[]; label: string }) 
                 )}
               >
                 {item.label}
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "absolute inset-x-2 bottom-2 h-px origin-left bg-signal transition-transform duration-[240ms] ease-(--ease-out)",
-                    active ? "scale-x-100" : "scale-x-0",
-                  )}
-                />
+                {active && (
+                  <m.span
+                    layoutId={layoutId}
+                    aria-hidden="true"
+                    className="absolute inset-x-2 bottom-2 h-px rounded-full bg-brand shadow-[0_0_10px_var(--color-brand-cyan)]"
+                  />
+                )}
               </Link>
             </li>
           );

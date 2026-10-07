@@ -1,8 +1,8 @@
-import { ShieldCheckIcon } from "@phosphor-icons/react/dist/ssr";
+import { ShieldCheckIcon } from "lucide-react";
 
 import type { Consent } from "@/lib/types";
 import { formatDate } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export function ConsentList({ consents }: { consents: Consent[] }) {
   return (
@@ -16,7 +16,7 @@ export function ConsentList({ consents }: { consents: Consent[] }) {
           No consent recorded. We do not read documents or contact anyone for you until you give it.
         </p>
       ) : (
-        <ul className="mt-4 divide-y divide-line">
+        <ul className="mt-4 divide-y divide-(--glass-border)">
           {consents.map((c) => (
             <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-4">
               <div className="min-w-0 flex-1">
@@ -27,9 +27,9 @@ export function ConsentList({ consents }: { consents: Consent[] }) {
                 </p>
               </div>
               {c.withdrawnAt ? (
-                <Badge variant="neutral">Withdrawn</Badge>
+                <StatusBadge tone="neutral">Withdrawn</StatusBadge>
               ) : (
-                <Badge variant="confirmed">Active</Badge>
+                <StatusBadge tone="success">Active</StatusBadge>
               )}
             </li>
           ))}

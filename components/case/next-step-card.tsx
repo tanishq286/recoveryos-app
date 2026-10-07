@@ -1,9 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowRightIcon,
-  CalendarBlankIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react/dist/ssr";
+import { ArrowRightIcon, CalendarIcon, CircleAlertIcon } from "lucide-react";
 
 import type { NextStep } from "@/lib/types";
 import { formatDate, formatDayShort } from "@/lib/format";
@@ -29,11 +25,22 @@ export function NextStepCard({
   return (
     <section
       aria-labelledby="next-step-heading"
-      className={cn("panel panel-lift p-6 sm:p-8", blocked && "border-blocker/50")}
+      className={cn(
+        "panel panel-lift vault-card p-6 sm:p-8",
+        blocked &&
+          "border-blocker/50 shadow-[var(--glass-rim),0_24px_48px_-24px_var(--color-status-error)]",
+      )}
     >
+      <p className="flex items-center gap-2 text-sm font-medium text-signal">
+        <span aria-hidden="true" className="relative flex size-2">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-cyan opacity-70" />
+          <span className="relative inline-flex size-2 rounded-full bg-brand-cyan" />
+        </span>
+        Next step
+      </p>
       <h2
         id="next-step-heading"
-        className="max-w-[28ch] text-[clamp(1.5rem,2.8vw,2.125rem)] leading-[1.15] text-fg"
+        className="mt-3 max-w-[28ch] text-[clamp(1.5rem,2.6vw,2rem)] leading-[1.15] text-fg"
       >
         We are waiting for {step.waitingFor}.
       </h2>
@@ -50,9 +57,9 @@ export function NextStepCard({
           <dd className="mt-2 flex items-center gap-3">
             <span
               aria-hidden="true"
-              className="grid size-9 place-items-center rounded-full border border-line bg-ink-800"
+              className="grid size-9 place-items-center rounded-full border border-(--glass-border) bg-(--glass-elevated)"
             >
-              <CalendarBlankIcon className="size-4 text-fg-2" />
+              <CalendarIcon className="size-4 text-fg-2" />
             </span>
             <span>
               <span className="tnum block font-medium text-fg">
@@ -66,7 +73,7 @@ export function NextStepCard({
 
       {step.blocker && (
         <Alert variant="blocker" className="mt-7">
-          <WarningCircleIcon weight="bold" aria-hidden="true" />
+          <CircleAlertIcon aria-hidden="true" />
           <AlertTitle>
             <span className="sr-only">Blocker: </span>
             {step.blocker.title}
@@ -77,7 +84,7 @@ export function NextStepCard({
         </Alert>
       )}
 
-      <div className="mt-8 grid gap-6 border-t border-line pt-6 md:grid-cols-2">
+      <div className="mt-8 grid gap-6 border-t border-(--glass-border) pt-6 md:grid-cols-2">
         <div>
           <h3 className="text-base font-semibold text-fg">Why it matters</h3>
           <p className="mt-1.5 text-base text-fg-2">{step.whyItMatters}</p>
@@ -90,7 +97,7 @@ export function NextStepCard({
 
       {action && (
         <div className="mt-8">
-          <Button asChild>
+          <Button asChild className="sheen">
             <Link href={action.href}>
               {action.label}
               <ArrowRightIcon aria-hidden="true" />

@@ -18,7 +18,7 @@ export function MarketingHeader() {
   return (
     <header
       style={{ viewTransitionName: "site-header" }}
-      className="chrome relative top-0 z-(--z-chrome) border-b border-line/70 lg:sticky"
+      className="chrome relative top-0 z-(--z-chrome) border-b border-(--glass-border) lg:sticky"
     >
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-x-8 gap-y-1 px-4 py-2.5 sm:px-6 lg:flex-nowrap">
         <Wordmark />

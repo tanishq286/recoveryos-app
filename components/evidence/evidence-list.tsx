@@ -38,7 +38,7 @@ export function EvidenceList({
             Documents on this case, with category, upload date, SHA-256 checksum and extraction
             status
           </caption>
-          <thead className="border-b border-line">
+          <thead className="border-b border-(--glass-border) bg-(--glass-elevated)">
             <tr>
               <th scope="col" className="px-4 py-3 text-sm font-medium whitespace-nowrap text-fg-3">
                 Document
@@ -54,7 +54,7 @@ export function EvidenceList({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody className="divide-y divide-(--glass-border)">
             {files.map((f) => {
               const selected = f.id === selectedId;
               const pending = pendingFor(f.id, fields);
@@ -62,8 +62,9 @@ export function EvidenceList({
                 <tr
                   key={f.id}
                   className={cn(
-                    "align-top transition-colors duration-[160ms]",
-                    selected && "bg-signal-wash/70 shadow-[inset_1px_0_0_var(--color-signal)]",
+                    "align-top transition-colors duration-[160ms] hover:bg-(--glass-elevated)",
+                    selected &&
+                      "bg-signal-wash/70 shadow-[inset_2px_0_0_var(--color-brand-cyan)] hover:bg-signal-wash/70",
                   )}
                 >
                   <td className="px-4 py-4">
@@ -121,7 +122,13 @@ export function EvidenceList({
           const selected = f.id === selectedId;
           const pending = pendingFor(f.id, fields);
           return (
-            <li key={f.id} className={cn("panel p-4", selected && "border-signal/60")}>
+            <li
+              key={f.id}
+              className={cn(
+                "panel vault-card p-4",
+                selected && "border-signal/60 shadow-[inset_2px_0_0_var(--color-brand-cyan)]",
+              )}
+            >
               <Link
                 href={hrefFor(f.id)}
                 scroll={false}

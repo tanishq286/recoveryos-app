@@ -25,7 +25,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => retry()}
-            className="mt-8 min-h-11 rounded-[var(--radius-control)] bg-signal px-5 py-2.5 font-medium text-on-signal transition-transform duration-[160ms] active:scale-[0.97]"
+            className="mt-8 min-h-11 rounded-[var(--radius-control)] bg-brand px-5 py-2.5 font-semibold text-on-brand transition-transform duration-[160ms] active:scale-[0.97]"
           >
             Try again
           </button>

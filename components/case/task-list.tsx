@@ -1,31 +1,17 @@
-import {
-  CheckIcon,
-  ClockIcon,
-  HourglassIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react/dist/ssr";
-
 import type { CaseTask, TaskStatus } from "@/lib/types";
 import { formatDate } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { PartyLine } from "@/components/case/party";
+import { TASK_TONE } from "@/components/case/status-tone";
 
-const STATUS_BADGE: Record<
-  TaskStatus,
-  {
-    label: string;
-    variant: "neutral" | "progress" | "confirmed" | "blocker";
-    Icon: typeof CheckIcon;
-  }
-> = {
-  open: { label: "To do", variant: "progress", Icon: ClockIcon },
-  waiting: { label: "Waiting", variant: "neutral", Icon: HourglassIcon },
-  blocked: { label: "Blocked", variant: "blocker", Icon: WarningCircleIcon },
-  done: { label: "Done", variant: "confirmed", Icon: CheckIcon },
+const STATUS_LABEL: Record<TaskStatus, string> = {
+  open: "To do",
+  waiting: "Waiting",
+  blocked: "Blocked",
+  done: "Done",
 };
 
 function TaskItem({ task }: { task: CaseTask }) {
-  const s = STATUS_BADGE[task.status];
   const dateText =
     task.status === "done" && task.completedAt
       ? `Done ${formatDate(task.completedAt)}`
@@ -37,10 +23,7 @@ function TaskItem({ task }: { task: CaseTask }) {
     <li className="py-5 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 className="min-w-0 flex-1 text-base font-semibold text-fg">{task.title}</h3>
-        <Badge variant={s.variant}>
-          <s.Icon weight="bold" aria-hidden="true" />
-          {s.label}
-        </Badge>
+        <StatusBadge tone={TASK_TONE[task.status]}>{STATUS_LABEL[task.status]}</StatusBadge>
       </div>
       <p className="mt-1.5 text-base text-fg-2">{task.detail}</p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -68,7 +51,7 @@ export function TaskList({ tasks }: { tasks: CaseTask[] }) {
       ) : (
         <>
           {open.length > 0 ? (
-            <ul className="panel mt-4 divide-y divide-line p-5 sm:p-6">
+            <ul className="panel mt-4 divide-y divide-(--glass-border) p-5 sm:p-6">
               {open.map((t) => (
                 <TaskItem key={t.id} task={t} />
               ))}
@@ -82,7 +65,7 @@ export function TaskList({ tasks }: { tasks: CaseTask[] }) {
                 <span className="group-open:hidden">Show {done.length} completed</span>
                 <span className="hidden group-open:inline">Hide completed</span>
               </summary>
-              <ul className="panel mt-3 animate-arrive divide-y divide-line p-5 sm:p-6">
+              <ul className="panel mt-3 animate-arrive divide-y divide-(--glass-border) p-5 sm:p-6">
                 {done.map((t) => (
                   <TaskItem key={t.id} task={t} />
                 ))}

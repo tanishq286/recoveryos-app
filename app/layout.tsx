@@ -4,7 +4,8 @@ import "@fontsource-variable/geist-mono";
 import "./globals.css";
 
 import { CommandMenu } from "@/components/command/command-menu";
-import { Spotlight } from "@/components/motion/spotlight";
+import { CursorGlow } from "@/components/motion/cursor-glow";
+import { MotionProvider } from "@/components/motion/motion-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B1114",
+  themeColor: "#05080E",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -39,13 +40,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-dvh bg-ink-950 text-fg">
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-signal focus:px-4 focus:py-3 focus:font-medium focus:text-on-signal"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-brand focus:px-4 focus:py-3 focus:font-semibold focus:text-on-brand"
         >
           Skip to main content
         </a>
-        {children}
-        <CommandMenu />
-        <Spotlight />
+        <MotionProvider>
+          {children}
+          <CommandMenu />
+        </MotionProvider>
+        <CursorGlow />
       </body>
     </html>
   );

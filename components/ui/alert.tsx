@@ -8,9 +8,11 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-line bg-ink-850 text-fg [&>svg]:text-fg-2",
+        default: "border-(--glass-border) bg-(--glass-panel) text-fg [&>svg]:text-fg-2",
         info: "border-signal/30 bg-signal-wash text-fg [&>svg]:text-signal",
         confirmed: "border-confirmed/30 bg-confirmed-wash text-fg [&>svg]:text-confirmed",
+        pending: "border-pending/35 bg-pending-wash text-fg [&>svg]:text-pending",
+        iepf: "border-iepf/35 bg-iepf-wash text-fg [&>svg]:text-iepf",
         blocker: "border-blocker/50 bg-blocker-wash text-fg [&>svg]:text-blocker",
       },
     },
