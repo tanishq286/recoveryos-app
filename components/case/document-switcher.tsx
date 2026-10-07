@@ -25,9 +25,9 @@ export function DocumentSwitcher({
   return (
     <nav
       aria-label="Documents on this case"
-      className="relative -mx-1 mt-5 overflow-x-auto px-1 pb-1"
+      className="scroll-fade-x relative -mx-1 mt-5 overflow-x-auto px-1 pb-1"
     >
-      <ul className="flex gap-2">
+      <ul className="flex gap-2 after:block after:w-6 after:shrink-0">
         {files.map((f) => {
           const selected = f.id === selectedId;
           const waiting = fields.filter(

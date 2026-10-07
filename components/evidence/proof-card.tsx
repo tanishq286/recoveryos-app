@@ -64,42 +64,61 @@ function ReviewBadge({ field }: { field: ExtractedField }) {
   );
 }
 
-/** "Matches the registrar's entitlement letter." → "matches the registrar's entitlement letter" */
-function clause(note: string): string {
+/** Sentence case with a closing full stop, whatever the record holds. */
+function sentence(note: string): string {
   const t = note.trim().replace(/\.$/, "");
-  return t.charAt(0).toLowerCase() + t.slice(1);
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)}.`;
 }
 
 /**
- * The grounded one-liner: our confidence, what it was checked against, and
- * the page. Every word comes from the extraction record; nothing is scored.
+ * The grounded line: our confidence as a short pill, then what it was checked
+ * against and the page in plain text. Every word comes from the extraction
+ * record; nothing is scored. The pill stays one line at any width so the
+ * note, not the pill, does the wrapping.
  */
 export function GroundingLine({ field }: { field: ExtractedField }) {
-  const parts: string[] = [`${CONFIDENCE_LABELS[field.confidence].short} confidence`];
-  if (field.crossCheck?.outcome === "match") parts.push(clause(field.crossCheck.note));
-  else if (field.crossCheck?.outcome === "mismatch")
-    parts.push(`mismatch: ${clause(field.crossCheck.note)}`);
-  else if (field.crossCheck?.outcome === "not_checked") parts.push("not cross-checked");
-  if (field.sourcePage !== null) parts.push(`p.${field.sourcePage}`);
+  const check = field.crossCheck;
+  const pill =
+    field.confidence === "not_found"
+      ? CONFIDENCE_LABELS.not_found.short
+      : `${CONFIDENCE_LABELS[field.confidence].short} confidence`;
   const tone =
-    field.crossCheck?.outcome === "mismatch"
+    check?.outcome === "mismatch"
       ? "border-blocker/40 bg-blocker-wash text-blocker"
-      : field.confidence === "high" && field.crossCheck?.outcome === "match"
+      : field.confidence === "high" && check?.outcome === "match"
         ? "border-confirmed/35 bg-confirmed-wash text-confirmed"
         : field.confidence === "not_found"
           ? "border-(--glass-border) bg-(--glass-elevated) text-fg-2"
           : "border-pending/35 bg-pending-wash text-pending";
-  const Icon =
-    field.crossCheck?.outcome === "mismatch" ? CircleAlertIcon : CONFIDENCE_ICON[field.confidence];
+  const Icon = check?.outcome === "mismatch" ? CircleAlertIcon : CONFIDENCE_ICON[field.confidence];
   return (
-    <p
-      className={cn(
-        "tnum mt-3 inline-flex max-w-full items-start gap-1.5 rounded-[8px] border px-2.5 py-1 text-sm font-medium",
-        tone,
-      )}
-    >
-      <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-      <span className="min-w-0">{parts.join(" · ")}</span>
+    <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1.5 text-sm text-fg-2">
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center gap-1.5 self-start rounded-[8px] border px-2 py-0.5 font-medium whitespace-nowrap",
+          tone,
+        )}
+      >
+        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+        {pill}
+      </span>
+      {/* Note and page wrap as one run, so the page never sits alone. */}
+      <span>
+        {check?.outcome === "match" ? `${sentence(check.note)} ` : null}
+        {check?.outcome === "mismatch" ? (
+          <>
+            <strong className="font-semibold text-blocker">Mismatch:</strong>{" "}
+            {sentence(check.note)}{" "}
+          </>
+        ) : null}
+        {check?.outcome === "not_checked" ? "Not cross-checked. " : null}
+        {field.sourcePage !== null ? (
+          <span className="whitespace-nowrap text-fg-3">
+            <span aria-hidden="true">p.{field.sourcePage}</span>
+            <span className="sr-only">Page {field.sourcePage}</span>
+          </span>
+        ) : null}
+      </span>
     </p>
   );
 }

@@ -55,7 +55,7 @@ export function QuickScanBar({ className }: { className?: string }) {
                 defaultChecked={i === 0}
                 className="peer sr-only"
               />
-              <span className="flex h-full min-h-11 items-center gap-1.5 rounded-[12px] border border-(--glass-border) bg-(--glass-elevated) px-3 py-2 text-[0.9375rem] text-fg-2 sm:rounded-full sm:whitespace-nowrap transition-[border-color,background-color,color,box-shadow] duration-150 peer-checked:border-signal peer-checked:bg-signal-wash peer-checked:text-fg peer-checked:shadow-[inset_0_0_0_1px_var(--color-signal)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-signal hover:border-(--glass-border-hover) hover:text-fg">
+              <span className="flex h-full min-h-11 items-center gap-1.5 rounded-[12px] border border-(--glass-border) bg-(--glass-elevated) px-3 py-2 text-[0.9375rem] sm:px-2.5 text-fg-2 sm:rounded-full sm:whitespace-nowrap transition-[border-color,background-color,color,box-shadow] duration-150 peer-checked:border-signal peer-checked:bg-signal-wash peer-checked:text-fg peer-checked:shadow-[inset_0_0_0_1px_var(--color-signal)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-signal hover:border-(--glass-border-hover) hover:text-fg">
                 <Icon className="size-4 shrink-0 text-signal" aria-hidden="true" />
                 <span className="leading-tight">{label}</span>
               </span>
@@ -89,7 +89,10 @@ export function QuickScanBar({ className }: { className?: string }) {
             spellCheck={false}
             maxLength={32}
             placeholder="If you have it"
-            className={cn(field, "tnum font-mono text-[0.9375rem]")}
+            className={cn(
+              field,
+              "tnum font-mono text-[0.9375rem] placeholder:font-sans placeholder:text-base",
+            )}
           />
         </div>
       </div>

@@ -23,6 +23,7 @@ import { MetricCounter } from "@/components/ui/metric-counter";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { VaultCard } from "@/components/ui/vault-card";
 import { QuickScanBar } from "@/components/marketing/quick-scan-bar";
+import { SevenYearRule } from "@/components/marketing/seven-year-rule";
 import { caseStatusTone } from "@/components/case/status-tone";
 import { DocumentPreview } from "@/components/evidence/document-preview";
 import { FieldDataCard } from "@/components/evidence/proof-card";
@@ -280,26 +281,29 @@ export default async function LandingPage() {
 
       {/* Why shares end up with IEPF: one editorial statement. */}
       <section aria-labelledby="iepf-heading">
-        <div className="mx-auto max-w-[1200px] px-4 py-24 sm:px-6 md:py-32">
-          <h2
-            id="iepf-heading"
-            className="max-w-[22ch] text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.12] text-fg"
-          >
-            When a dividend goes unclaimed for seven years in a row, the company must move the
-            shares to the IEPF.
-          </h2>
-          <div className="mt-10 grid gap-6 text-lg leading-relaxed text-fg-2 md:max-w-[62ch]">
-            <p>
-              It happens to people who moved house, changed their name, or inherited certificates in
-              an old file. The unclaimed dividends go too.
-            </p>
-            <p>
-              The shares are not lost. Getting them back means filing Form IEPF-5, sending signed
-              documents to the company, and waiting while the company and the IEPF Authority verify
-              the claim. It is slow and paper-heavy, and small mismatches send it back.{" "}
-              <span className="text-fg">That is the part we carry.</span>
-            </p>
+        <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-24 sm:px-6 md:py-32 lg:grid-cols-12 lg:items-center lg:gap-10">
+          <div className="lg:col-span-7">
+            <h2
+              id="iepf-heading"
+              className="max-w-[22ch] text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.12] text-fg"
+            >
+              When a dividend goes unclaimed for seven years in a row, the company must move the
+              shares to the IEPF.
+            </h2>
+            <div className="mt-10 grid gap-6 text-lg leading-relaxed text-fg-2 md:max-w-[62ch]">
+              <p>
+                It happens to people who moved house, changed their name, or inherited certificates
+                in an old file. The unclaimed dividends go too.
+              </p>
+              <p>
+                The shares are not lost. Getting them back means filing Form IEPF-5, sending signed
+                documents to the company, and waiting while the company and the IEPF Authority
+                verify the claim. It is slow and paper-heavy, and small mismatches send it back.{" "}
+                <span className="text-fg">That is the part we carry.</span>
+              </p>
+            </div>
           </div>
+          <SevenYearRule className="lg:col-span-5" />
         </div>
       </section>
 
@@ -326,7 +330,8 @@ export default async function LandingPage() {
       {sample && (
         <section aria-labelledby="inside-heading" className="border-t border-(--glass-border)">
           <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-24 sm:px-6 md:py-32 lg:grid-cols-12 lg:gap-10">
-            <div className="lg:col-span-5">
+            {/* Pinned beside the long case card on screens tall enough to hold it. */}
+            <div className="lg:col-span-5 lg:self-start lg:[@media(min-height:860px)]:sticky lg:[@media(min-height:860px)]:top-24">
               <h2
                 id="inside-heading"
                 className="max-w-[18ch] text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.1] text-fg"
@@ -409,7 +414,7 @@ export default async function LandingPage() {
                   }}
                 />
                 {teaserFile && teaserField && room && (
-                  <div className="mt-6 border-t border-(--glass-border) pt-6">
+                  <div className="@container mt-6 border-t border-(--glass-border) pt-6">
                     <p className="flex items-center gap-1.5 text-sm font-medium text-signal">
                       <FileSearchIcon className="size-4" aria-hidden="true" />
                       Read from {teaserFile.fileName}
@@ -422,7 +427,7 @@ export default async function LandingPage() {
                         highlightFieldId={teaserField.id}
                       />
                     </div>
-                    <ul className="mt-3 grid gap-3 md:grid-cols-3">
+                    <ul className="mt-3 grid gap-3 @lg:grid-cols-2 @lg:[&>li:last-child:nth-child(odd)]:col-span-2 @4xl:grid-cols-3 @4xl:[&>li:last-child:nth-child(odd)]:col-span-1">
                       {teaserFields.map((f) => (
                         <li key={f.id}>
                           <FieldDataCard field={f} />

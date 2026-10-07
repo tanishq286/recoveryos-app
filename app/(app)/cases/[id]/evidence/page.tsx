@@ -53,7 +53,7 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
 
   return (
     <PageTransition>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-[84rem] px-4 py-8 sm:px-6 sm:py-10">
         <nav aria-label="Breadcrumb" className="text-sm text-fg-3">
           <ol className="flex flex-wrap items-center gap-1.5">
             <li>

@@ -208,13 +208,13 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
               </ul>
             )}
             {dataCards.length > 0 && (
-              <div>
+              <div className="@container">
                 <h3 className="text-base font-semibold text-fg">
                   {actionCards.length > 0
                     ? "Also read from this document"
                     : "Read from this document"}
                 </h3>
-                <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+                <ul className="mt-3 grid gap-3 @lg:grid-cols-2 @lg:[&>li:last-child:nth-child(odd)]:col-span-2">
                   {dataCards.map((f) => (
                     <li key={f.id}>
                       <FieldDataCard field={f} />

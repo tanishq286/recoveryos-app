@@ -796,6 +796,81 @@ body::after {
       repeat-x;
     mask: radial-gradient(circle at 6px 0, transparent 5px, #000 5.5px) 0 0 / 12px 10px repeat-x;
   }
+
+  /* Seven-year rule: armed (dim) until in view, then the years fill in turn
+     and the steps follow. Without the armed state it is simply finished. */
+  .year-rule [data-phase="armed"] [data-year] {
+    opacity: 0.28;
+  }
+  .year-rule [data-phase="armed"] [data-step] {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  .year-rule [data-phase="run"] [data-year] {
+    transition: opacity 260ms var(--ease-out);
+    transition-delay: calc(var(--i) * 130ms);
+  }
+  .year-rule [data-phase="run"] [data-step] {
+    transition:
+      opacity 420ms var(--ease-vault),
+      translate 420ms var(--ease-vault);
+    transition-delay: calc(1050ms + var(--i) * 160ms);
+  }
+
+  /* A horizontal scroller whose edges fade where more content waits. Where
+     scroll-driven animation runs, each edge fades only while there is
+     something past it; elsewhere the end edge always fades, so the
+     scroller needs end padding for its last item to land clear. */
+  .scroll-fade-x {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--fade-start),
+      #000 calc(100% - var(--fade-end)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--fade-start),
+      #000 calc(100% - var(--fade-end)),
+      transparent
+    );
+    --fade-end: 2rem;
+  }
+  @supports (animation-timeline: scroll()) {
+    .scroll-fade-x {
+      --fade-end: 0px;
+      animation: scroll-fade-x linear both;
+      animation-timeline: scroll(self inline);
+    }
+  }
+}
+
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade-x {
+  0% {
+    --fade-start: 0px;
+    --fade-end: 2rem;
+  }
+  8%,
+  92% {
+    --fade-start: 2rem;
+    --fade-end: 2rem;
+  }
+  100% {
+    --fade-start: 0px;
+    --fade-end: 0px;
+  }
 }
 
 @keyframes scan {
