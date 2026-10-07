@@ -43,18 +43,24 @@ Optional environment variables (none are required):
 
 ## Screens
 
-| Route                  | What it shows                                                                                                                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                    | Landing page: the promise, how it works (evidence room → recovery engine → trust layer), what we don't do, free official routes beside paid help, pricing, and an anti-fraud notice.                                  |
-| `/check`               | Guided triage: one question per screen with a progress rail, then a check-your-answers step. The result gives a route assessment, exact "insufficient evidence" states and a timestamped **sources checked** receipt. |
-| `/cases`               | The three sample cases.                                                                                                                                                                                               |
-| `/cases/rc-2026-0147`  | Mid-review case: the "what happens next" card, the 12-state evidence-to-credit rail, tasks with named owners and dates, the timeline, proof cards you can approve or correct, the quote card and consents.            |
-| `/cases/rc-2026-0132`  | A case blocked by a company query (signature mismatch). Shows the red blocker state.                                                                                                                                  |
-| `/cases/rc-2026-0161`  | A legal-heir case that has just started. Shows empty states: no documents, no estimate.                                                                                                                               |
-| `/cases/[id]/evidence` | Evidence room: documents with category, upload date, SHA-256 checksum and extraction status (read, needs checking, reading now, couldn't read); proof-card detail per document via `?doc=`.                           |
+| Route                  | What it shows                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                    | Landing page: the promise, how it works (evidence room → recovery engine → trust layer), what we don't do, free official routes beside paid help, pricing, and an anti-fraud notice.                                                                                                                                                                                                                                     |
+| `/check`               | Guided triage: one question per screen with a clickable stepper (jump back to any answered step and forward again), four holding cards, and a diagnostic receipt to review answers. Accepts `?asset=&issuer=&ref=` from the home page's quick-scan bar. The result gives a route assessment, exact "insufficient evidence" states and a timestamped **sources checked** receipt.                                         |
+| `/cases`               | The three sample cases.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `/cases/rc-2026-0147`  | Mid-review case: value at stake and a KPI strip, then two panes. Milestones: the next-step card, the six-stage IEPF lifecycle tracker (over the 12 case states), tasks and activity. Document inspector: a forensic page preview, proof cards with a grounded confidence line and an Approve / Flag a discrepancy switch, the quote, holdings and consents. Below `lg` the panes become a Milestones / Documents switch. |
+| `/cases/rc-2026-0132`  | A case blocked by a company query (signature mismatch). Shows the red blocker state.                                                                                                                                                                                                                                                                                                                                     |
+| `/cases/rc-2026-0161`  | A legal-heir case that has just started. Shows empty states: no documents, no estimate.                                                                                                                                                                                                                                                                                                                                  |
+| `/cases/[id]/evidence` | Evidence room: documents with category, upload date, SHA-256 checksum and extraction status (read, needs checking, reading now, couldn't read); proof-card detail per document via `?doc=`.                                                                                                                                                                                                                              |
 
 Things to try:
 
+- On the home page, pick a holding in the quick-scan bar, type a company and start: the
+  check opens at the first question you haven't answered.
+- On the review step of the check, use **Edit** or the stepper to change an answer, then
+  **Back to review**. Change the holding type and jump forward: the stepper stops at the
+  reference step, because the old reference no longer applies.
+- Press ⌘K / Ctrl+K anywhere and arrow through cases, actions and fraud reporting.
 - Approve the three waiting details on RC-2026-0147. The "what happens next" card counts
   down, then hands the next step to the name-change upload. Each review is added to the
   timeline and written to the mock audit log.
@@ -74,13 +80,13 @@ app/
     error.tsx                 error boundary for the product
   not-found.tsx, global-error.tsx
 components/
-  ui/                         shadcn/ui primitives (new-york style), re-themed
-  case/                       status rail, next-step card, tasks, timeline, quote, consents, holdings
+  ui/                         shadcn/ui primitives re-themed, plus VaultCard, StatusBadge, StepBreadcrumb, MetricCounter
+  case/                       lifecycle tracker, case panes, status tones, next-step card, tasks, timeline, quote, consents, holdings
   evidence/                   evidence list, detail, proof card, document preview, copy button
-  triage/                     triage flow + assessment result
+  triage/                     triage flow, diagnostic receipt, assessment result
   command/                    ⌘K palette (client) + server index wrapper
   viz/                        route timeline, value waterfall, reading summary, route progress, hash glyph
-  motion/                     page transitions, spotlight, magnetic CTA, count interpolation
+  motion/                     Framer Motion provider, page transitions, cursor glow, magnetic CTA, count interpolation
   theme/                      theme store + toggle
   brand/                      wordmark, route loader, route illustrations
   marketing/, site/, brand/
@@ -91,6 +97,9 @@ lib/
   actions.ts                  server actions; re-validate every input (they are public endpoints)
   rules/triage.ts             versioned, deterministic route rules (iepf-triage-2026.09-r1)
   rules/case-states.ts        the 12 case states, rail logic, labels
+  rules/lifecycle.ts          the six display stages over those states (dates from history only)
+  triage-prefill.ts           reads ?asset=&issuer=&ref= for the check
+  motion/springs.ts, gsap.ts  the Framer Motion spring set; GSAP setup
   types.ts                    domain types, mirroring the SQL schema
   pricing.ts, sources.ts      one source of truth for fee terms and official links
   labels.ts, format.ts        display labels; INR / IST formatting (en-IN, tabular numerals)
@@ -116,15 +125,17 @@ call the same data source, and `revalidatePath` the affected pages. `lib/data.ts
 - Quotes carry an indicative value only with a stated basis (`value_needs_basis` in SQL).
   Unconfirmed amounts are listed as "left out", not guessed.
 
-**Design system.** "The Precision Statement": a deep-ink interface with one cool accent. Dark
-is the default; a cool, editorial light theme restates the same tokens (toggle in the header,
-remembered per browser, restored before first paint so it never flashes). Tokens live in `app/globals.css` (`@theme`): ink ladder `#0B1114` to `#1A262C`,
-foreground `#E6EDEF` / `#A3B3B9` / `#8699A0`, signal blue `#7CB8FF` (the only accent),
-confirmed mint `#5CD3B4` and blocker coral `#FF7A72` (semantic only). Every text pair is AA on
-its ground; the contrast values are noted in the CSS. Mona Sans Variable (display and body,
-with width and tracking tuned per size) and Geist Mono (real identifiers only) are
-self-hosted through `@fontsource-variable`, so the build never fetches fonts from the
-network. Icons are Phosphor. Dates, amounts, IDs and checksums use tabular numerals.
+**Design system.** "The Sovereign Vault": an abyss canvas (`#05080E`) under a soft radial
+mesh, acrylic glass panels with a specular rim and a lit top edge, one electric-cyan action
+gradient (`#00F2FE` to `#4FACFE`), and four status hues with fixed meanings: emerald
+`#10B981` (confirmed, credited), amber `#F59E0B` (in review, waiting on a third party), red
+`#EF4444` (blockers, mismatches) and purple `#8B5CF6` (IEPF and regulatory milestones). Text
+steps of those hues are tuned so every pair is AA, noted in the CSS. Dark is the default; a
+frosted light theme restates the same tokens (toggle in the header, remembered per browser,
+restored before first paint). Utilities: `.panel`, `.vault-glass`, `.vault-glass-hover`,
+`.vault-card` (cursor glow), `.text-gradient-cyan`, `.bg-brand`, `.font-tabular` (slashed
+zeros for IDs, money and dates). Mona Sans Variable is self-hosted from `public/fonts` and preloaded (no late font swap,
+no layout shift); Geist Mono comes through `@fontsource-variable`. Icons are Lucide, at one stroke weight.
 
 Charts draw from dedicated fills (`--color-chart-signal`, `--color-chart-credit`,
 `--color-chart-muted`), stepped into the categorical lightness band for each theme and checked
@@ -153,8 +164,12 @@ Where the system is written down:
   canvas is on screen and the tab is visible, caps pixel ratio, and falls back to an SVG
   route when WebGL is unavailable, Save-Data is on, or the device is low-end. Reduced
   motion renders one still frame.
-- Product screens use short CSS transitions only (press, state morph, direction-aware step
-  change, receipt lines printing in). Everything animates `transform` and `opacity`.
+- Product screens use Framer Motion springs (`components/motion/motion-provider.tsx`,
+  LazyMotion with `strict` and lazily loaded features, `reducedMotion="user"`): the check's
+  steps slide and blur in from the side you are heading, shared layout springs move the nav
+  rule, tab pills, the ⌘K highlight and the pane switch, and the lifecycle stages open as
+  accordions. Hover and press stay in CSS. Figures on the case page count up once with
+  `MetricCounter` (the final value is server-rendered and is all a screen reader hears).
 - An inline `<head>` script sets `data-motion="on"` only without a reduced-motion preference,
   and a CSS failsafe reveals hidden hero text after 2.4s, so content is never stuck hidden.
 
@@ -166,19 +181,19 @@ Where the system is written down:
   pattern. The index (`lib/command-index.ts`) is built on the server from the data source;
   with real data it must be scoped to the signed-in viewer.
 - **Visualizations** (`components/viz/`), every one drawn from real case data with its
-  numbers also in text: the time-scaled route timeline (Steps / Timeline tabs on the case
-  page), the "what reaches you" waterfall in the quote (value, fee, planned protection, net
+  numbers also in text: the time-scaled route timeline (Stages / Timeline tabs in the case
+  page's lifecycle tracker), the "what reaches you" waterfall in the quote (value, fee, planned protection, net
   before GST), the evidence reading summary (confirmed / waiting / no check needed / not
   found), route progress on the cases list, and each document's checksum drawn as a
   fingerprint mark.
 - **Page transitions**: React `<ViewTransition>` with typed navigations. Deeper links slide
   forward, breadcrumbs slide back, the header stays fixed, and case titles carry a shared
   name between list, case and evidence room. Browsers without the API simply swap pages.
-- **Signature surfaces**: a fixed light field and grain behind every page, a cursor spotlight
-  on interactive cards (fine pointers only), a sheen and a 3px magnetic lean on the main
+- **Signature surfaces**: a fixed radial mesh and grain behind every page, a cursor glow
+  on vault cards (fine pointers only), a sheen and a 3px magnetic lean on the main
   CTA, a branded route loader, and route illustrations on 404, error and empty states.
 
-**shadcn/ui.** `components.json` is configured (new-york style, CSS variables, Phosphor).
+**shadcn/ui.** `components.json` is configured (new-york style, CSS variables, Lucide).
 The primitives in `components/ui/` were added by hand in shadcn's current source style,
 because the shadcn registry was not reachable from the build environment.
 `npx shadcn add <component>` works as normal from here.

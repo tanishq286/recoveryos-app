@@ -15,7 +15,11 @@ export const CATEGORY_LABELS: Record<EvidenceCategory, string> = {
 
 export const EXTRACTION_LABELS: Record<
   ExtractionStatus,
-  { label: string; variant: "neutral" | "progress" | "confirmed" | "blocker"; explain: string }
+  {
+    label: string;
+    variant: "neutral" | "progress" | "confirmed" | "pending" | "blocker";
+    explain: string;
+  }
 > = {
   queued: {
     label: "Queued",
@@ -29,12 +33,12 @@ export const EXTRACTION_LABELS: Record<
   },
   extracted: {
     label: "Read",
-    variant: "neutral",
+    variant: "confirmed",
     explain: "Every page was read. Details are listed below with the page they came from.",
   },
   needs_review: {
     label: "Needs checking",
-    variant: "progress",
+    variant: "pending",
     explain: "Read, but at least one detail needs a person to check it.",
   },
   failed: {

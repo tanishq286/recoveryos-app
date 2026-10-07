@@ -23,8 +23,8 @@ export function DocumentPreview({
 
   return (
     <figure className="panel p-3">
-      <div className="rounded-[var(--radius-control)] border border-line bg-ink-900 px-4 py-5 sm:px-6">
-        <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-line pb-3">
+      <div className="forensic-page rounded-[var(--radius-control)] border border-(--glass-border) px-3 py-4 sm:px-5">
+        <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-(--glass-border) pb-3">
           <p className="text-sm text-fg-3">{CATEGORY_LABELS[file.category]}</p>
           <p className="tnum text-sm text-fg-3">
             Page {page} of {file.pageCount}
@@ -33,21 +33,33 @@ export function DocumentPreview({
         {lines.length === 0 ? (
           <p className="py-6 text-center text-base text-fg-3">No lines read from this page.</p>
         ) : (
-          <ul className="mt-3 space-y-1.5 font-mono text-[0.9375rem] leading-relaxed text-fg">
-            {lines.map((f) => (
-              <li
-                key={f.id}
-                className={cn(
-                  "rounded-sm px-2 py-1 break-words",
-                  highlightFieldId === f.id
-                    ? "bg-signal-wash outline-1 outline-signal/60 outline-solid"
-                    : "bg-transparent",
-                )}
-              >
-                {f.sourceSnippet}
-              </li>
-            ))}
-          </ul>
+          <ol className="mt-3 space-y-1 font-mono text-[0.9375rem] leading-relaxed text-fg">
+            {lines.map((f, i) => {
+              const lit = highlightFieldId === f.id;
+              return (
+                <li
+                  key={f.id}
+                  className={cn(
+                    "grid grid-cols-[1.75rem_minmax(0,1fr)] gap-2 rounded-[6px] py-1 pr-2",
+                    lit
+                      ? "bg-signal-wash shadow-[inset_2px_0_0_var(--color-brand-cyan),inset_0_0_0_1px_var(--color-vault-border-highlight)]"
+                      : "bg-transparent",
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="tnum text-right text-sm text-fg-3 select-none"
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="break-words">
+                    {f.sourceSnippet}
+                    {lit && <span className="sr-only"> (the line this detail was read from)</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </div>
       <figcaption className="mt-3 px-1 text-sm text-fg-3">

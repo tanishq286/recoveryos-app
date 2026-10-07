@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FingerprintIcon, InfoIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import { FingerprintIcon, InfoIcon, UploadIcon } from "lucide-react";
 
 import { getDataSource } from "@/lib/data";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { VaultCard } from "@/components/ui/vault-card";
 import { EvidenceList } from "@/components/evidence/evidence-list";
 import { ReadingSummary } from "@/components/viz/reading-summary";
 import { RouteMark } from "@/components/brand/route-mark";
@@ -80,7 +81,7 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
         <header className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:items-start lg:gap-12">
           <div className="max-w-3xl min-w-0">
             <CaseTitleTransition caseId={room.caseId}>
-              <h1 className="text-3xl leading-tight text-fg sm:text-4xl sm:leading-[1.1]">
+              <h1 className="text-3xl leading-tight text-fg sm:text-[2.75rem] sm:leading-[1.08]">
                 {room.title}
               </h1>
             </CaseTitleTransition>
@@ -96,20 +97,27 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
         </header>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <Alert variant="default">
-            <FingerprintIcon aria-hidden="true" />
-            <AlertTitle>Every file is fingerprinted on arrival</AlertTitle>
-            <AlertDescription>
-              <p>
+          <VaultCard className="flex gap-3 p-4 sm:p-5">
+            <span
+              aria-hidden="true"
+              className="grid size-10 shrink-0 place-items-center rounded-[12px] border border-signal/25 bg-signal-wash text-signal"
+            >
+              <FingerprintIcon className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-fg [font-stretch:100%]">
+                Every file is fingerprinted on arrival
+              </h2>
+              <p className="mt-1 text-base text-fg-2">
                 We record a SHA-256 checksum the moment a file lands. If even one pixel changes, the
                 checksum changes, so you, we, or a regulator can prove the file filed is the file
                 you gave us.
               </p>
-            </AlertDescription>
-          </Alert>
-          <div className="rounded-[var(--radius-panel)] border border-dashed border-control/70 p-4">
+            </div>
+          </VaultCard>
+          <div className="panel border-dashed p-4 sm:p-5">
             <p className="flex items-center gap-2 font-semibold text-fg">
-              <UploadSimpleIcon className="size-5 text-fg-2" aria-hidden="true" />
+              <UploadIcon className="size-5 text-fg-2" aria-hidden="true" />
               Add a document
             </p>
             <p id="upload-off" className="mt-1 text-base text-fg-2">
@@ -141,10 +149,7 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
         )}
 
         {room.files.length === 0 ? (
-          <section
-            aria-labelledby="empty-heading"
-            className="mt-10 rounded-[var(--radius-panel)] border border-dashed border-control/70 p-6 sm:p-8"
-          >
+          <section aria-labelledby="empty-heading" className="panel mt-10 border-dashed p-6 sm:p-8">
             <RouteMark variant="start" className="mb-6 w-48" />
             <h2 id="empty-heading" className="text-2xl text-fg">
               No documents yet

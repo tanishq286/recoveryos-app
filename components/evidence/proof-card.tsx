@@ -2,19 +2,19 @@
 
 import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 import {
+  BadgeCheckIcon,
   CheckIcon,
+  CircleAlertIcon,
+  CircleHelpIcon,
   FileTextIcon,
-  PencilSimpleIcon,
-  QuestionIcon,
-  SealCheckIcon,
-  WarningCircleIcon,
-  MagnifyingGlassIcon,
-} from "@phosphor-icons/react/dist/ssr";
+  FlagIcon,
+  SearchIcon,
+} from "lucide-react";
 
 import type { ExtractedField } from "@/lib/types";
 import { reviewFieldAction } from "@/lib/actions";
 import { formatDateTime } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,10 +23,10 @@ import { CONFIDENCE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
 const CONFIDENCE_ICON = {
-  high: SealCheckIcon,
-  medium: QuestionIcon,
-  low: WarningCircleIcon,
-  not_found: MagnifyingGlassIcon,
+  high: BadgeCheckIcon,
+  medium: CircleHelpIcon,
+  low: CircleAlertIcon,
+  not_found: SearchIcon,
 } as const;
 
 /** Real identifiers are set in mono; names, counts and dates are not. */
@@ -42,25 +42,65 @@ const IDENTIFIER_KEYS = new Set([
 function ReviewBadge({ field }: { field: ExtractedField }) {
   if (field.reviewStatus === "approved") {
     return (
-      <Badge variant="confirmed" className="animate-settle">
-        <CheckIcon weight="bold" aria-hidden="true" />
+      <StatusBadge tone="success" className="animate-settle">
         Confirmed
-      </Badge>
+      </StatusBadge>
     );
   }
   if (field.reviewStatus === "corrected") {
     return (
-      <Badge variant="confirmed" className="animate-settle">
-        <PencilSimpleIcon weight="bold" aria-hidden="true" />
+      <StatusBadge tone="success" className="animate-settle">
         Corrected
-      </Badge>
+      </StatusBadge>
     );
   }
-  if (field.value === null) return <Badge variant="neutral">Missing</Badge>;
+  if (field.value === null) return <StatusBadge tone="neutral">Missing</StatusBadge>;
   return field.needsClientCheck ? (
-    <Badge variant="progress">Waiting for you</Badge>
+    <StatusBadge tone="active" live>
+      Waiting for you
+    </StatusBadge>
   ) : (
-    <Badge variant="neutral">With our reviewer</Badge>
+    <StatusBadge tone="pending">With our reviewer</StatusBadge>
+  );
+}
+
+/** "Matches the registrar's entitlement letter." → "matches the registrar's entitlement letter" */
+function clause(note: string): string {
+  const t = note.trim().replace(/\.$/, "");
+  return t.charAt(0).toLowerCase() + t.slice(1);
+}
+
+/**
+ * The grounded one-liner: our confidence, what it was checked against, and
+ * the page. Every word comes from the extraction record; nothing is scored.
+ */
+export function GroundingLine({ field }: { field: ExtractedField }) {
+  const parts: string[] = [`${CONFIDENCE_LABELS[field.confidence].short} confidence`];
+  if (field.crossCheck?.outcome === "match") parts.push(clause(field.crossCheck.note));
+  else if (field.crossCheck?.outcome === "mismatch")
+    parts.push(`mismatch: ${clause(field.crossCheck.note)}`);
+  else if (field.crossCheck?.outcome === "not_checked") parts.push("not cross-checked");
+  if (field.sourcePage !== null) parts.push(`p.${field.sourcePage}`);
+  const tone =
+    field.crossCheck?.outcome === "mismatch"
+      ? "border-blocker/40 bg-blocker-wash text-blocker"
+      : field.confidence === "high" && field.crossCheck?.outcome === "match"
+        ? "border-confirmed/35 bg-confirmed-wash text-confirmed"
+        : field.confidence === "not_found"
+          ? "border-(--glass-border) bg-(--glass-elevated) text-fg-2"
+          : "border-pending/35 bg-pending-wash text-pending";
+  const Icon =
+    field.crossCheck?.outcome === "mismatch" ? CircleAlertIcon : CONFIDENCE_ICON[field.confidence];
+  return (
+    <p
+      className={cn(
+        "tnum mt-3 inline-flex max-w-full items-start gap-1.5 rounded-[8px] border px-2.5 py-1 text-sm font-medium",
+        tone,
+      )}
+    >
+      <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0">{parts.join(" · ")}</span>
+    </p>
   );
 }
 
@@ -170,8 +210,9 @@ export function ProofCard({
     <article
       aria-labelledby={`${ids}-label`}
       className={cn(
-        "rounded-[var(--radius-panel)] border bg-ink-850 p-4 shadow-[var(--highlight)] transition-[border-color] duration-300 ease-(--ease-out) sm:p-5",
-        canReview ? "border-signal/45" : "border-line",
+        "panel vault-card p-4 transition-[border-color,box-shadow] duration-300 ease-(--ease-out) sm:p-5",
+        canReview &&
+          "border-signal/45 shadow-[var(--glass-rim),0_18px_40px_-24px_var(--color-signal)]",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -204,6 +245,9 @@ export function ProofCard({
           {field.correctionReason ? `. ${field.correctionReason}` : ""}
         </p>
       )}
+      <div>
+        <GroundingLine field={field} />
+      </div>
 
       <dl className="mt-4 grid gap-2.5 text-sm">
         <div>
@@ -224,73 +268,26 @@ export function ProofCard({
         {field.sourceSnippet && (
           <div>
             <dt className="sr-only">Line as read</dt>
-            <dd className="rounded-[var(--radius-control)] border border-line bg-ink-900 px-3 py-2 font-mono text-[0.9375rem] break-words text-fg">
+            <dd className="rounded-[var(--radius-control)] border border-(--glass-border) bg-(--glass-elevated) px-3 py-2 font-mono text-[0.9375rem] break-words text-fg">
               {field.sourceSnippet}
             </dd>
           </div>
         )}
+        {/* The grounding line above already names the confidence and the check;
+            these rows give the reasons behind them. */}
         <div>
-          <dt className="sr-only">Confidence</dt>
+          <dt className="sr-only">Why we are this sure</dt>
           <dd className="flex min-w-0 items-start gap-2 text-fg-2">
-            <ConfIcon
-              weight="bold"
-              className={cn(
-                "mt-0.5 size-4 shrink-0",
-                field.confidence === "high"
-                  ? "text-confirmed"
-                  : field.confidence === "not_found"
-                    ? "text-fg-3"
-                    : "text-signal",
-              )}
-              aria-hidden="true"
-            />
-            <span className="min-w-0">
-              <span className="font-semibold text-fg">
-                {CONFIDENCE_LABELS[field.confidence].label}.
-              </span>{" "}
-              {field.confidenceReason}
-            </span>
+            <ConfIcon className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden="true" />
+            <span className="min-w-0">{field.confidenceReason}</span>
           </dd>
         </div>
-        {field.crossCheck && (
+        {field.crossCheck?.outcome === "not_checked" && (
           <div>
             <dt className="sr-only">Cross-check</dt>
-            <dd
-              className={cn(
-                "flex min-w-0 items-start gap-2 rounded-[var(--radius-control)] text-fg-2",
-                field.crossCheck.outcome === "mismatch" &&
-                  "border border-blocker/40 bg-blocker-wash px-2.5 py-2 text-fg",
-              )}
-            >
-              {field.crossCheck.outcome === "match" ? (
-                <CheckIcon
-                  weight="bold"
-                  className="mt-0.5 size-4 shrink-0 text-confirmed"
-                  aria-hidden="true"
-                />
-              ) : field.crossCheck.outcome === "mismatch" ? (
-                <WarningCircleIcon
-                  weight="bold"
-                  className="mt-0.5 size-4 shrink-0 text-blocker"
-                  aria-hidden="true"
-                />
-              ) : (
-                <QuestionIcon
-                  weight="bold"
-                  className="mt-0.5 size-4 shrink-0 text-fg-3"
-                  aria-hidden="true"
-                />
-              )}
-              <span className="min-w-0">
-                <span className="font-semibold text-fg">
-                  {field.crossCheck.outcome === "match"
-                    ? "Cross-check passed."
-                    : field.crossCheck.outcome === "mismatch"
-                      ? "Mismatch."
-                      : "Not cross-checked."}
-                </span>{" "}
-                {field.crossCheck.note}
-              </span>
+            <dd className="flex min-w-0 items-start gap-2 text-fg-2">
+              <CircleHelpIcon className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden="true" />
+              <span className="min-w-0">{field.crossCheck.note}</span>
             </dd>
           </div>
         )}
@@ -301,7 +298,7 @@ export function ProofCard({
           <p
             ref={statusRef}
             tabIndex={-1}
-            className="tnum mt-4 animate-settle border-t border-line pt-3 text-sm text-confirmed"
+            className="tnum mt-4 animate-settle border-t border-(--glass-border) pt-3 text-sm text-confirmed"
           >
             {field.reviewStatus === "approved" ? "Confirmed" : "Corrected"} by{" "}
             {field.reviewedBy ?? "you"}, {formatDateTime(field.reviewedAt)}
@@ -310,21 +307,35 @@ export function ProofCard({
         )}
 
       {canReview && mode === "view" && (
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
-          <Button onClick={approve} disabled={pending} aria-describedby={`${ids}-label`}>
-            <CheckIcon weight="bold" aria-hidden="true" />
-            {pending ? "Saving…" : "Approve, this is correct"}
-          </Button>
-          <Button
-            ref={correctBtnRef}
-            variant="outline"
-            onClick={openCorrect}
-            disabled={pending}
-            aria-describedby={`${ids}-label`}
+        <div className="mt-5 border-t border-(--glass-border) pt-4">
+          {/* One verification switch: approve, or flag what we got wrong. */}
+          <div
+            role="group"
+            aria-label={`Verify ${field.label}`}
+            className="grid gap-1 rounded-[12px] border border-(--glass-border) bg-(--glass-elevated) p-1 min-[420px]:grid-cols-2"
           >
-            <PencilSimpleIcon aria-hidden="true" />
-            Correct it
-          </Button>
+            <button
+              type="button"
+              onClick={approve}
+              disabled={pending}
+              aria-describedby={`${ids}-label`}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] px-3 text-[0.9375rem] font-semibold text-confirmed transition-[background-color,box-shadow,transform] duration-150 hover:bg-confirmed-wash hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-confirmed)_40%,transparent)] active:scale-[0.98] disabled:opacity-50"
+            >
+              <CheckIcon className="size-[18px]" aria-hidden="true" />
+              {pending ? "Saving…" : "Approve"}
+            </button>
+            <button
+              ref={correctBtnRef}
+              type="button"
+              onClick={openCorrect}
+              disabled={pending}
+              aria-describedby={`${ids}-label`}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] px-3 text-[0.9375rem] font-semibold text-pending transition-[background-color,box-shadow,transform] duration-150 hover:bg-pending-wash hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-pending)_40%,transparent)] active:scale-[0.98] disabled:opacity-50"
+            >
+              <FlagIcon className="size-[18px]" aria-hidden="true" />
+              Flag a discrepancy
+            </button>
+          </div>
         </div>
       )}
 
@@ -332,8 +343,12 @@ export function ProofCard({
         <form
           onSubmit={submitCorrection}
           noValidate
-          className="mt-5 grid animate-arrive gap-4 border-t border-line pt-4"
+          className="mt-5 grid animate-arrive gap-4 border-t border-(--glass-border) pt-4"
         >
+          <p className="flex items-center gap-2 text-base font-semibold text-pending">
+            <FlagIcon className="size-4" aria-hidden="true" />
+            What does your document say?
+          </p>
           <div className="grid gap-1.5">
             <Label htmlFor={`${ids}-value`}>Correct value</Label>
             <p id={`${ids}-value-hint`} className="text-sm text-fg-3">
@@ -355,11 +370,7 @@ export function ProofCard({
                 id={`${ids}-value-err`}
                 className="flex items-start gap-1.5 text-sm font-medium text-blocker"
               >
-                <WarningCircleIcon
-                  weight="bold"
-                  className="mt-0.5 size-4 shrink-0"
-                  aria-hidden="true"
-                />
+                <CircleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 {fieldErrors.value}
               </p>
             )}
@@ -380,11 +391,7 @@ export function ProofCard({
                 id={`${ids}-reason-err`}
                 className="flex items-start gap-1.5 text-sm font-medium text-blocker"
               >
-                <WarningCircleIcon
-                  weight="bold"
-                  className="mt-0.5 size-4 shrink-0"
-                  aria-hidden="true"
-                />
+                <CircleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 {fieldErrors.reason}
               </p>
             )}
@@ -405,7 +412,7 @@ export function ProofCard({
           role="alert"
           className="mt-3 flex animate-settle items-start gap-1.5 text-sm font-medium text-blocker"
         >
-          <WarningCircleIcon weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <CircleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}
@@ -413,5 +420,29 @@ export function ProofCard({
         {announce}
       </span>
     </article>
+  );
+}
+
+/**
+ * A read-only data card for a detail that needs nothing from the client:
+ * label, value and the grounded confidence line. Used by the inspector next
+ * to the full proof cards.
+ */
+export function FieldDataCard({ field }: { field: ExtractedField }) {
+  const shown = field.reviewStatus === "corrected" ? field.correctedValue : field.value;
+  return (
+    <div className="panel vault-card h-full p-4">
+      <p className="text-sm text-fg-3">{field.label}</p>
+      <p
+        className={cn(
+          "tnum mt-1 text-lg font-medium break-words text-fg",
+          IDENTIFIER_KEYS.has(field.fieldKey) && "font-mono text-base tracking-[-0.01em]",
+          shown === null && "text-fg-2",
+        )}
+      >
+        {shown ?? "Not found"}
+      </p>
+      <GroundingLine field={field} />
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { m } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
@@ -12,9 +13,9 @@ export interface SegmentedTab {
 
 /**
  * Tabs as a segmented control (WAI-ARIA tabs pattern: arrow keys move, Home/End
- * jump, automatic activation). The selected pill slides between options with
- * transform only. Only the active panel is mounted, so its entrance plays each
- * time it is chosen.
+ * jump, automatic activation). The selected pill is one shared layout element
+ * that springs between options. Only the active panel is mounted, so its
+ * entrance plays each time it is chosen.
  */
 export function SegmentedTabs({
   label,
@@ -35,25 +36,12 @@ export function SegmentedTabs({
   const [active, setActive] = useState(defaultTab ?? tabs[0].id);
   const ids = useId();
   const listRef = useRef<HTMLDivElement>(null);
-  const pillRef = useRef<HTMLSpanElement>(null);
-  const [measured, setMeasured] = useState(false);
   // Panels only animate after a real switch, never on first paint.
   const [switched, setSwitched] = useState(false);
   const choose = (id: string) => {
     setActive(id);
     setSwitched(true);
   };
-
-  useLayoutEffect(() => {
-    const list = listRef.current;
-    const pill = pillRef.current;
-    if (!list || !pill) return;
-    const btn = list.querySelector<HTMLElement>(`[data-tab="${active}"]`);
-    if (!btn) return;
-    pill.style.width = `${btn.offsetWidth}px`;
-    pill.style.transform = `translateX(${btn.offsetLeft}px)`;
-    if (!measured) requestAnimationFrame(() => setMeasured(true));
-  }, [active, measured]);
 
   function onKeyDown(e: React.KeyboardEvent) {
     const i = tabs.findIndex((t) => t.id === active);
@@ -79,18 +67,8 @@ export function SegmentedTabs({
           role="tablist"
           aria-label={label}
           onKeyDown={onKeyDown}
-          className="relative inline-flex rounded-full border border-line bg-ink-900 p-0.5"
+          className="relative inline-flex rounded-full border border-(--glass-border) bg-(--glass-panel) p-0.5 shadow-(--glass-rim)"
         >
-          <span
-            ref={pillRef}
-            aria-hidden="true"
-            className={cn(
-              "absolute top-0.5 bottom-0.5 left-0 rounded-full bg-ink-800 shadow-[inset_0_0_0_1px_var(--color-control)]",
-              measured
-                ? "transition-[transform,width] duration-[240ms] ease-(--ease-out)"
-                : "transition-none",
-            )}
-          />
           {tabs.map((t) => {
             const selected = t.id === active;
             return (
@@ -105,11 +83,18 @@ export function SegmentedTabs({
                 tabIndex={selected ? 0 : -1}
                 onClick={() => choose(t.id)}
                 className={cn(
-                  "relative z-10 inline-flex min-h-10 items-center rounded-full px-3.5 text-sm font-medium transition-colors duration-[160ms]",
+                  "relative inline-flex min-h-10 items-center rounded-full px-3.5 text-sm font-medium transition-colors duration-[160ms]",
                   selected ? "text-fg" : "text-fg-3 hover:text-fg-2",
                 )}
               >
-                {t.label}
+                {selected && (
+                  <m.span
+                    layoutId={`${ids}-pill`}
+                    aria-hidden="true"
+                    className="absolute inset-0 rounded-full bg-ink-800 shadow-[inset_0_0_0_1px_var(--color-vault-border-highlight)]"
+                  />
+                )}
+                <span className="relative">{t.label}</span>
               </button>
             );
           })}

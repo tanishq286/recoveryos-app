@@ -5,12 +5,12 @@ import {
   ArrowRightIcon,
   ArrowUpRightIcon,
   CheckIcon,
-  FileMagnifyingGlassIcon,
+  CircleAlertIcon,
+  CircleMinusIcon,
+  FileSearchIcon,
   InfoIcon,
-  MinusCircleIcon,
-  PlugsIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react/dist/ssr";
+  UnplugIcon,
+} from "lucide-react";
 
 import type { EligibilityAssessment, SourceCheckStatus } from "@/lib/types";
 import { formatReceiptTime } from "@/lib/format";
@@ -25,14 +25,14 @@ const SOURCE_STATUS: Record<
 > = {
   checked: { label: "Checked", Icon: CheckIcon, tone: "text-confirmed" },
   match_found: { label: "Record found", Icon: CheckIcon, tone: "text-confirmed" },
-  no_match: { label: "No record found", Icon: MinusCircleIcon, tone: "text-fg" },
-  not_connected: { label: "Not queried", Icon: PlugsIcon, tone: "text-fg-3" },
+  no_match: { label: "No record found", Icon: CircleMinusIcon, tone: "text-fg" },
+  not_connected: { label: "Not queried", Icon: UnplugIcon, tone: "text-fg-3" },
   insufficient_evidence: {
     label: "Insufficient evidence",
-    Icon: WarningCircleIcon,
-    tone: "text-signal",
+    Icon: CircleAlertIcon,
+    tone: "text-pending",
   },
-  error: { label: "Check failed", Icon: WarningCircleIcon, tone: "text-blocker" },
+  error: { label: "Check failed", Icon: CircleAlertIcon, tone: "text-blocker" },
 };
 
 const CONFIDENCE_BADGE: Record<
@@ -62,13 +62,13 @@ export function AssessmentResult({
           id="result-heading"
           ref={headingRef}
           tabIndex={-1}
-          className="text-3xl leading-tight text-fg focus:outline-none sm:text-4xl sm:leading-[1.1]"
+          className="text-gradient-cyan text-3xl leading-tight focus:outline-none sm:text-[2.75rem] sm:leading-[1.08]"
         >
           {a.headline}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Badge variant={conf.variant}>Confidence: {conf.label}</Badge>
-          <Badge variant="outline">{a.routeLabel}</Badge>
+          <Badge variant={a.routeLabel.includes("IEPF") ? "iepf" : "outline"}>{a.routeLabel}</Badge>
         </div>
         <p className="mt-5 max-w-2xl text-base text-fg-2">
           This suggests a route. It does not confirm that a holding exists, and nobody, including
@@ -78,7 +78,7 @@ export function AssessmentResult({
 
       {a.missing.length > 0 && (
         <Alert variant="info">
-          <FileMagnifyingGlassIcon aria-hidden="true" />
+          <FileSearchIcon aria-hidden="true" />
           <AlertTitle>Insufficient evidence: here is exactly what&apos;s missing</AlertTitle>
           <AlertDescription>
             <ul className="space-y-3">
@@ -136,7 +136,7 @@ export function AssessmentResult({
         <h2 id="routes-heading" className="sr-only">
           Your options
         </h2>
-        <div className="panel p-5 sm:p-6">
+        <div className="panel vault-card p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-lg text-fg">Do it yourself</h3>
             <Badge variant="outline">Free</Badge>
@@ -159,7 +159,7 @@ export function AssessmentResult({
             ))}
           </ul>
         </div>
-        <div className="panel p-5 sm:p-6">
+        <div className="panel vault-card border-signal/30 p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-lg text-fg">With RecoveryOS</h3>
             <Badge variant="progress">Paid only on success</Badge>
@@ -176,7 +176,7 @@ export function AssessmentResult({
               <Button asChild variant="outline" className="mt-5">
                 <Link href="/cases/rc-2026-0147">
                   See a sample case
-                  <ArrowRightIcon weight="bold" aria-hidden="true" />
+                  <ArrowRightIcon aria-hidden="true" />
                 </Link>
               </Button>
             </>
@@ -190,7 +190,7 @@ export function AssessmentResult({
       </section>
 
       <section aria-labelledby="receipt-heading" className="panel panel-lift overflow-hidden">
-        <div className="border-b border-dashed border-line px-5 py-5 sm:px-6">
+        <div className="border-b border-dashed border-(--glass-border) px-5 py-5 sm:px-6">
           <h2 id="receipt-heading" className="text-xl text-fg">
             Sources checked
           </h2>
@@ -204,7 +204,7 @@ export function AssessmentResult({
             {a.ruleVersion.status === "demo" ? ", demo rule set" : ""}
           </p>
         </div>
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-(--glass-border)">
           {a.sources.map((s, i) => {
             const st = SOURCE_STATUS[s.status];
             return (
@@ -233,7 +233,7 @@ export function AssessmentResult({
                 </div>
                 <div className="min-w-0">
                   <p className={cn("flex items-center gap-1.5 font-semibold", st.tone)}>
-                    <st.Icon weight="bold" className="size-4 shrink-0" aria-hidden="true" />
+                    <st.Icon className="size-4 shrink-0" aria-hidden="true" />
                     {st.label}
                   </p>
                   <p className="mt-0.5 text-sm text-fg-2">{s.statusDetail}</p>
@@ -246,7 +246,7 @@ export function AssessmentResult({
             );
           })}
         </ul>
-        <p className="border-t border-dashed border-line px-5 py-4 text-sm text-fg-3 sm:px-6">
+        <p className="border-t border-dashed border-(--glass-border) px-5 py-4 text-sm text-fg-3 sm:px-6">
           We only show a match when a source actually returned one. Nothing here is inferred or
           filled in.
         </p>

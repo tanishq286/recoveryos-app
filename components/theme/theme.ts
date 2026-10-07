@@ -6,7 +6,7 @@ export type Theme = "dark" | "light";
 
 const KEY = "recoveryos:theme";
 const EVENT = "recoveryos:theme-change";
-const CHROME: Record<Theme, string> = { dark: "#0B1114", light: "#F3F5F6" };
+const CHROME: Record<Theme, string> = { dark: "#05080E", light: "#F3F6FA" };
 
 export function readTheme(): Theme {
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";

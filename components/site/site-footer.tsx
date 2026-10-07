@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRightIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRightIcon } from "lucide-react";
 
 import { Wordmark } from "@/components/brand/wordmark";
 import { OFFICIAL_LINKS } from "@/lib/sources";
@@ -10,7 +10,7 @@ function shortName(label: string) {
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-line bg-ink-950">
+    <footer className="mt-auto border-t border-(--glass-border) bg-ink-950/60">
       <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="space-y-4">
           <Wordmark />
@@ -75,7 +75,7 @@ export function SiteFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-line">
+      <div className="border-t border-(--glass-border)">
         <p className="mx-auto max-w-[1200px] px-4 py-5 text-sm text-fg-3 sm:px-6">
           Product demo, September 2026. All cases shown are fictional.
         </p>

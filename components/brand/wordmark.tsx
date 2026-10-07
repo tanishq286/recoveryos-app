@@ -26,7 +26,12 @@ export function Mark({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="18.5" cy="20" r="1.75" className="fill-signal" />
+      <circle
+        cx="18.5"
+        cy="20"
+        r="1.75"
+        className="fill-signal drop-shadow-[0_0_4px_var(--color-signal)]"
+      />
     </svg>
   );
 }

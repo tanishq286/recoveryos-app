@@ -1,18 +1,16 @@
-import { CheckIcon, InfoIcon } from "@phosphor-icons/react/dist/ssr";
+import { InfoIcon } from "lucide-react";
 
 import type { Quote } from "@/lib/types";
 import { formatBps, formatDate, formatPaise, shareOfPaise } from "@/lib/format";
 import { PROTECTION_STATUS_NOTE } from "@/lib/pricing";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { ValueWaterfall } from "@/components/viz/value-waterfall";
 
-const STATUS: Record<
-  Quote["status"],
-  { label: string; variant: "neutral" | "progress" | "confirmed" }
-> = {
-  not_shared: { label: "Not shared yet", variant: "neutral" },
-  shared: { label: "Shared, awaiting your acceptance", variant: "progress" },
-  accepted: { label: "Accepted", variant: "confirmed" },
+const STATUS: Record<Quote["status"], { label: string; tone: StatusTone }> = {
+  not_shared: { label: "Not shared yet", tone: "neutral" },
+  shared: { label: "Shared, awaiting your acceptance", tone: "active" },
+  accepted: { label: "Accepted", tone: "success" },
 };
 
 function optInText(optIn: boolean | null): string {
@@ -37,10 +35,7 @@ export function QuoteCard({ quote }: { quote: Quote }) {
         <h2 id="quote-heading" className="text-xl text-fg">
           Your quote
         </h2>
-        <Badge variant={s.variant}>
-          {quote.status === "accepted" && <CheckIcon weight="bold" aria-hidden="true" />}
-          {s.label}
-        </Badge>
+        <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
       </div>
       {quote.status === "accepted" && quote.acceptedAt && (
         <p className="tnum mt-1 text-sm text-fg-3">Accepted on {formatDate(quote.acceptedAt)}</p>

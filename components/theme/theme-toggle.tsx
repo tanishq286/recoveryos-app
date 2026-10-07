@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { MoonIcon, SunIcon } from "@phosphor-icons/react/dist/ssr";
+import { MoonIcon, SunIcon } from "lucide-react";
 
 import { setTheme, THEME_CHROME, useTheme } from "@/components/theme/theme";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label={`Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
       className={cn(
-        "group inline-grid size-11 place-items-center rounded-[var(--radius-control)] border border-line bg-ink-900/60 text-fg-2 transition-[border-color,color,transform] duration-[160ms] ease-(--ease-out) hover:border-control hover:text-fg active:scale-[0.97]",
+        "group inline-grid size-11 place-items-center rounded-[var(--radius-control)] border border-(--glass-border) bg-(--glass-elevated) text-fg-2 shadow-(--glass-rim) transition-[border-color,color,transform] duration-[160ms] ease-(--ease-out) hover:border-(--glass-border-hover) hover:text-fg active:scale-[0.97]",
         className,
       )}
     >

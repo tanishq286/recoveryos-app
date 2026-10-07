@@ -6,7 +6,10 @@ function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="skeleton"
       aria-hidden="true"
-      className={cn("skeleton-sweep rounded-[var(--radius-control)] bg-ink-800", className)}
+      className={cn(
+        "skeleton-sweep rounded-[var(--radius-control)] bg-(--glass-elevated)",
+        className,
+      )}
       {...props}
     />
   );

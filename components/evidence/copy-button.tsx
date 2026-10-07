@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckIcon, CopyIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,6 @@ export function CopyButton({
         {state === "copied" ? (
           <CheckIcon
             key="copied"
-            weight="bold"
             className={cn("size-4 text-confirmed", touched && "animate-settle")}
             aria-hidden="true"
           />

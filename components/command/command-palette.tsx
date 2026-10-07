@@ -12,17 +12,19 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog as DialogPrimitive } from "radix-ui";
+import { m } from "framer-motion";
 import {
   ArrowRightIcon,
   ArrowUpRightIcon,
-  ClockCounterClockwiseIcon,
   CompassIcon,
   FileTextIcon,
   FolderOpenIcon,
-  MagnifyingGlassIcon,
-  PathIcon,
-} from "@phosphor-icons/react/dist/ssr";
-import type { Icon } from "@phosphor-icons/react";
+  HistoryIcon,
+  RouteIcon,
+  SearchIcon,
+  ShieldAlertIcon,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import type { CommandItem, CommandKind } from "@/lib/command-index";
 import { cn } from "@/lib/utils";
@@ -31,10 +33,10 @@ export const OPEN_EVENT = "recoveryos:command-palette";
 const RECENT_KEY = "recoveryos:recent-commands";
 const MAX_RECENT = 4;
 
-const KIND_ICON: Record<CommandKind, Icon> = {
+const KIND_ICON: Record<CommandKind, LucideIcon> = {
   action: ArrowRightIcon,
   page: CompassIcon,
-  case: PathIcon,
+  case: RouteIcon,
   room: FolderOpenIcon,
   document: FileTextIcon,
   external: ArrowUpRightIcon,
@@ -122,7 +124,6 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
   const [active, setActive] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
-  const highlightRef = useRef<HTMLDivElement>(null);
   const ids = useId();
 
   const openPalette = useCallback(() => {
@@ -174,20 +175,11 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
 
   const safeActive = rows.length === 0 ? -1 : Math.min(active, rows.length - 1);
 
-  // The highlight slides to the active row instead of jumping.
+  // Keep the active row in view while arrowing through the list.
   useLayoutEffect(() => {
-    const list = listRef.current;
-    const hl = highlightRef.current;
-    if (!list || !hl) return;
-    const el = list.querySelector<HTMLElement>(`[data-index="${safeActive}"]`);
-    if (!el) {
-      hl.style.opacity = "0";
-      return;
-    }
-    hl.style.opacity = "1";
-    hl.style.height = `${el.offsetHeight}px`;
-    hl.style.transform = `translateY(${el.offsetTop}px)`;
-    el.scrollIntoView({ block: "nearest" });
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${safeActive}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   }, [safeActive, rows, open]);
 
   function run(item: CommandItem) {
@@ -227,18 +219,22 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-(--scrim) backdrop-blur-[2px] data-[state=open]:animate-[settle_200ms_var(--ease-out)_both]" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-(--scrim) backdrop-blur-xl data-[state=open]:animate-[settle_200ms_var(--ease-out)_both]" />
         <DialogPrimitive.Content
           aria-describedby={`${ids}-help`}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             document.getElementById(`${ids}-input`)?.focus();
           }}
-          className="fixed top-[max(1rem,12vh)] left-1/2 z-[var(--z-overlay)] w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-ink-850 shadow-(--overlay) data-[state=open]:animate-rise"
+          className="vault-glass fixed top-[max(1rem,12vh)] left-1/2 z-[var(--z-overlay)] w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[20px] shadow-(--overlay) data-[state=open]:animate-rise"
         >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-(image:--specular)"
+          />
           <DialogPrimitive.Title className="sr-only">Search RecoveryOS</DialogPrimitive.Title>
-          <div className="flex items-center gap-3 border-b border-line px-4">
-            <MagnifyingGlassIcon className="size-5 shrink-0 text-fg-3" aria-hidden="true" />
+          <div className="flex items-center gap-3 border-b border-(--glass-border) px-4">
+            <SearchIcon className="size-5 shrink-0 text-signal" aria-hidden="true" />
             <input
               id={`${ids}-input`}
               role="combobox"
@@ -258,23 +254,19 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
               onKeyDown={onKeyDown}
               className="h-14 min-w-0 flex-1 bg-transparent text-base text-fg placeholder:text-fg-3 focus:outline-none"
             />
-            <kbd className="hidden rounded-[6px] border border-line px-1.5 py-0.5 font-sans text-xs text-fg-3 sm:inline">
+            <kbd className="hidden rounded-[6px] border border-(--glass-border) bg-(--glass-elevated) px-1.5 py-0.5 font-sans text-xs text-fg-3 sm:inline">
               Esc
             </kbd>
           </div>
 
-          <div
+          <m.div
             ref={listRef}
+            layoutScroll
             id={listId}
             role="listbox"
             aria-label="Results"
             className="relative max-h-[min(26rem,60vh)] overflow-y-auto overscroll-contain p-2"
           >
-            <div
-              ref={highlightRef}
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-2 top-0 rounded-[var(--radius-control)] bg-signal-wash opacity-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-signal)_22%,transparent)] transition-[transform,height,opacity] duration-[160ms] ease-(--ease-out)"
-            />
             {rows.length === 0 ? (
               <p className="relative px-3 py-8 text-center text-base text-fg-3">
                 Nothing matches &ldquo;{query}&rdquo;. Try a case reference such as RC-2026-0147, or
@@ -282,8 +274,14 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
               </p>
             ) : (
               rows.map((row, i) => {
+                // Fraud reporting reads as a safety action, not just another link.
+                const isFraud = row.item.id === "action:fraud";
                 const Icon =
-                  row.group === "Recent" ? ClockCounterClockwiseIcon : KIND_ICON[row.item.kind];
+                  row.group === "Recent"
+                    ? HistoryIcon
+                    : isFraud
+                      ? ShieldAlertIcon
+                      : KIND_ICON[row.item.kind];
                 const isActive = i === safeActive;
                 const showHeading = i === 0 || rows[i - 1].group !== row.group;
                 return (
@@ -305,14 +303,22 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
                       onClick={() => run(row.item)}
                       className="relative flex min-h-12 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 py-2"
                     >
+                      {/* One highlight that springs from row to row. */}
+                      {isActive && (
+                        <m.span
+                          layoutId={`${ids}-highlight`}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 rounded-[var(--radius-control)] bg-signal-wash shadow-[inset_0_0_0_1px_var(--color-vault-border-highlight)]"
+                        />
+                      )}
                       <Icon
                         className={cn(
-                          "size-[1.125rem] shrink-0 transition-colors duration-[160ms]",
-                          isActive ? "text-signal" : "text-fg-3",
+                          "relative size-[1.125rem] shrink-0 transition-colors duration-[160ms]",
+                          isFraud ? "text-blocker" : isActive ? "text-signal" : "text-fg-3",
                         )}
                         aria-hidden="true"
                       />
-                      <span className="min-w-0 flex-1">
+                      <span className="relative min-w-0 flex-1">
                         <span className="block truncate text-[0.9375rem] text-fg">
                           {row.item.title}
                         </span>
@@ -323,9 +329,8 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
                       <span className="sr-only">, {row.group}</span>
                       <ArrowRightIcon
                         aria-hidden="true"
-                        weight="bold"
                         className={cn(
-                          "size-4 shrink-0 text-fg-3 transition-[opacity,transform] duration-[160ms] ease-(--ease-out)",
+                          "relative size-4 shrink-0 text-signal transition-[opacity,transform] duration-[160ms] ease-(--ease-out)",
                           isActive ? "translate-x-0 opacity-100" : "-translate-x-1 opacity-0",
                         )}
                       />
@@ -334,11 +339,11 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
                 );
               })
             )}
-          </div>
+          </m.div>
 
           <p
             id={`${ids}-help`}
-            className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2.5 text-xs text-fg-3"
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-(--glass-border) px-4 py-2.5 text-xs text-fg-3"
           >
             <span>
               <Kbd>↑</Kbd> <Kbd>↓</Kbd> to move
@@ -363,7 +368,7 @@ const GROUP_ORDER = ["Recent", "Actions", "Sample cases", "Evidence rooms", "Doc
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded-[5px] border border-line px-1.5 py-px font-sans text-xs text-fg-2">
+    <kbd className="rounded-[5px] border border-(--glass-border) bg-(--glass-elevated) px-1.5 py-px font-sans text-xs text-fg-2">
       {children}
     </kbd>
   );

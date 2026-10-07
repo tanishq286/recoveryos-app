@@ -117,3 +117,30 @@ markers; 16/20/24px. One family only.
   checksum fingerprint glyphs, directional page transitions with an anchored header.
 - **Motion budget.** Micro 160ms, UI 240ms, scene 560ms; page slides 340ms over 36px;
   chart bars grow from their baseline once (560ms, staggered under 500ms in total).
+
+## Sovereign Vault (third pass, supersedes the values above where they differ)
+
+The canonical values for this pass live in `DESIGN.md` and `app/globals.css`. In short:
+
+- **Canvas and glass.** Abyss `#05080E` under a radial mesh; `.panel` is translucent glass
+  (`rgb(13 20 36 / 0.62)`, `1px rgb(255 255 255 / 0.08)` rim, lit top edge) with no blur;
+  `.vault-glass` adds `blur(24px)` for floating surfaces only (HUD, quick-scan bar, chrome).
+- **Colour.** One action gradient (`#00F2FE` to `#4FACFE`, dark text in both themes). Status
+  hues with fixed meanings: emerald success, amber pending, red error, purple IEPF. Mapping
+  from case data to tone lives in `components/case/status-tone.ts`.
+- **Icons.** Lucide (`lucide-react`), one stroke weight (1.75) set globally in CSS. This
+  replaces the Phosphor rule above.
+- **Radii.** Controls 10px, panels 16px, overlays 20px.
+- **Motion.** Framer Motion springs from `lib/motion/springs.ts` via `<MotionProvider>`
+  (`m.*` only). CSS for hover and press. GSAP for the hero and scroll scenes.
+- **Primitives.** `VaultCard`, `StatusBadge`, `StepBreadcrumb`, `MetricCounter` in
+  `components/ui/`; `LifecycleTracker`, `CasePanes` in `components/case/`;
+  `DiagnosticReceipt` in `components/triage/`; `QuickScanBar` in `components/marketing/`.
+- **Data honesty.** The six lifecycle stages are a display grouping
+  (`lib/rules/lifecycle.ts`); dates come from status history and no duration is estimated.
+  Confidence lines on proof cards are built only from the extraction record.
+- **Superseded bans.** The interaction thesis above forbade glows and gradient text. This
+  pass allows them in named places only: the cyan glow on the primary action and the
+  current step, the cursor glow on vault cards, and gradient text on the landing headline,
+  hero figures and section closers (`.text-gradient-cyan`). Everything else in the thesis
+  stands.
