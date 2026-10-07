@@ -2,11 +2,13 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { CHECK_CTA } from "@/components/site/cta";
+import { RouteMark } from "@/components/brand/route-mark";
 
 export default function CaseNotFound() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6 sm:py-28">
-      <h1 className="text-3xl leading-tight text-fg sm:text-4xl">
+      <RouteMark variant="lost" className="w-56" />
+      <h1 className="mt-10 text-3xl leading-tight text-fg sm:text-4xl">
         We couldn&apos;t find that case
       </h1>
       <p className="mt-4 text-lg text-fg-2">

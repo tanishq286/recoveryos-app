@@ -5,6 +5,7 @@ import { formatDate, shortHash } from "@/lib/format";
 import { CATEGORY_LABELS } from "@/lib/labels";
 import { ExtractionBadge } from "@/components/evidence/extraction-badge";
 import { CopyButton } from "@/components/evidence/copy-button";
+import { HashGlyph } from "@/components/viz/hash-glyph";
 import { cn } from "@/lib/utils";
 
 function pendingFor(fileId: string, fields: ExtractedField[]) {
@@ -66,15 +67,20 @@ export function EvidenceList({
                   )}
                 >
                   <td className="px-4 py-4">
-                    <Link
-                      href={hrefFor(f.id)}
-                      scroll={false}
-                      aria-current={selected ? "true" : undefined}
-                      className="link font-medium"
-                    >
-                      {f.fileName}
-                    </Link>
-                    <p className="mt-0.5 text-sm text-fg-3">{CATEGORY_LABELS[f.category]}</p>
+                    <div className="flex items-start gap-3">
+                      <HashGlyph sha256={f.sha256} className="mt-0.5 size-7" />
+                      <div className="min-w-0">
+                        <Link
+                          href={hrefFor(f.id)}
+                          scroll={false}
+                          aria-current={selected ? "true" : undefined}
+                          className="link font-medium"
+                        >
+                          {f.fileName}
+                        </Link>
+                        <p className="mt-0.5 text-sm text-fg-3">{CATEGORY_LABELS[f.category]}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="tnum px-4 py-4 text-sm whitespace-nowrap text-fg-2">
                     {formatDate(f.uploadedAt)}

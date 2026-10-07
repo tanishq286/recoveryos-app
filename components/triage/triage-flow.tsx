@@ -299,7 +299,7 @@ function OptionCards<T extends string>({
             key={o.value}
             htmlFor={id}
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-[var(--radius-panel)] border p-4 transition-[border-color,background-color,box-shadow,transform] duration-[160ms] ease-(--ease-out) active:scale-[0.99]",
+              "spotlight flex cursor-pointer items-start gap-3 rounded-[var(--radius-panel)] border p-4 transition-[border-color,background-color,box-shadow,transform] duration-[160ms] ease-(--ease-out) active:scale-[0.99]",
               checked
                 ? "border-signal bg-signal-wash/60 shadow-[inset_0_0_0_1px_var(--color-signal)]"
                 : "border-line bg-ink-850 shadow-(--highlight) hover:border-control",

@@ -16,6 +16,12 @@ import { HeroReveal } from "@/components/marketing/hero-reveal";
 import { RouteField } from "@/components/marketing/route-field";
 import { LedgerPrint, RevealBatch, Stages, type Stage } from "@/components/marketing/scroll-choreo";
 import { OFFICIAL_LINKS } from "@/lib/sources";
+import { getDataSource } from "@/lib/data";
+import { stateInfo } from "@/lib/rules/case-states";
+import { Magnetic } from "@/components/motion/magnetic";
+import { PageTransition } from "@/components/motion/page-transition";
+import { RouteTimeline } from "@/components/viz/route-timeline";
+import { RouteProgress } from "@/components/viz/route-progress";
 import { formatBps, formatPaise, shareOfPaise } from "@/lib/format";
 import { PROTECTION_ALLOCATION_BPS, SUCCESS_FEE_BPS, VALUATION_RULE } from "@/lib/pricing";
 
@@ -123,6 +129,7 @@ const FRAUD_RULES = [
   "We never ask you to pay into a personal bank account or UPI ID. Every genuine message from us also appears in your case room.",
 ];
 
+const SAMPLE_CASE_ID = "rc-2026-0147";
 const EXAMPLE_PAISE = 2_00_000 * 100;
 
 function ExternalA({ href, children }: { href: string; children: React.ReactNode }) {
@@ -140,12 +147,14 @@ function ExternalA({ href, children }: { href: string; children: React.ReactNode
   );
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
   const fee = shareOfPaise(EXAMPLE_PAISE, SUCCESS_FEE_BPS);
   const protection = shareOfPaise(EXAMPLE_PAISE, PROTECTION_ALLOCATION_BPS);
+  // The product preview is the real sample case, read through the same data layer.
+  const sample = await getDataSource().getCase(SAMPLE_CASE_ID);
 
   return (
-    <>
+    <PageTransition>
       {/* The first viewport: the promise, one action, and the route drawing. */}
       <section
         aria-labelledby="hero-heading"
@@ -174,14 +183,17 @@ export default function LandingPage() {
               data-hero-follow
               className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3"
             >
-              <Button asChild size="lg">
-                <Link href="/check">
-                  {CHECK_CTA}
-                  <ArrowRightIcon aria-hidden="true" />
-                </Link>
-              </Button>
+              <Magnetic>
+                <Button asChild size="lg" className="sheen">
+                  <Link href="/check" transitionTypes={["nav-forward"]}>
+                    {CHECK_CTA}
+                    <ArrowRightIcon aria-hidden="true" />
+                  </Link>
+                </Button>
+              </Magnetic>
               <Link
-                href="/cases/rc-2026-0147"
+                href={`/cases/${SAMPLE_CASE_ID}`}
+                transitionTypes={["nav-forward"]}
                 className="inline-flex min-h-11 items-center text-base font-medium text-fg-2 underline decoration-fg/30 underline-offset-[0.22em] transition-[color,text-decoration-color] duration-150 hover:text-fg hover:decoration-signal"
               >
                 See a sample case
@@ -250,6 +262,76 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Inside a case: the real sample case, not a mock-up. */}
+      {sample && (
+        <section aria-labelledby="inside-heading" className="border-t border-line">
+          <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-24 sm:px-6 md:py-32 lg:grid-cols-12 lg:gap-10">
+            <div className="lg:col-span-5">
+              <h2
+                id="inside-heading"
+                className="max-w-[18ch] text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.1] text-fg"
+              >
+                Every step has an owner and a date. Here is one case.
+              </h2>
+              <p className="mt-6 max-w-[44ch] text-lg leading-relaxed text-fg-2">
+                This is the sample case exactly as its claimant sees it: where the time went, what
+                is next, and who holds it. The people and company are fictional.
+              </p>
+              <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-line pt-8">
+                <div className="col-span-2">
+                  <dt className="text-sm text-fg-3">Indicative value at stake</dt>
+                  <dd className="display mt-1 text-[clamp(2.25rem,4vw,3rem)] text-fg">
+                    {sample.quote.indicativeValuePaise !== null
+                      ? formatPaise(sample.quote.indicativeValuePaise)
+                      : "Not estimated yet"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-fg-3">Stage</dt>
+                  <dd className="mt-1 text-base text-fg">{stateInfo(sample.status).label}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-fg-3">Waiting for</dt>
+                  <dd className="mt-1 text-base text-fg">
+                    {sample.nextStep.owner.role === "client"
+                      ? "The claimant"
+                      : sample.nextStep.owner.name}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-10">
+                <Button asChild variant="outline" size="lg">
+                  <Link href={`/cases/${sample.id}`} transitionTypes={["nav-forward"]}>
+                    Open the sample case
+                    <ArrowRightIcon aria-hidden="true" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <div className="panel panel-lift spotlight p-5 sm:p-7 lg:col-span-7">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-base font-semibold text-fg">{sample.title}</p>
+                <Badge variant="neutral">Sample case</Badge>
+              </div>
+              <p className="mt-3 text-[0.9375rem] text-fg-2">
+                We are waiting for {sample.nextStep.waitingFor}.
+              </p>
+              <RouteProgress status={sample.status} className="mt-6" />
+              <RouteTimeline
+                history={sample.statusHistory}
+                status={sample.status}
+                updatedAt={sample.updatedAt}
+                next={{
+                  date: sample.nextStep.nextDate,
+                  meaning: sample.nextStep.dateMeaning,
+                  waitingFor: sample.nextStep.waitingFor,
+                }}
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* What we don't do. */}
       <section
@@ -544,14 +626,16 @@ export default function LandingPage() {
               wasn&apos;t.
             </p>
           </div>
-          <Button asChild size="lg">
-            <Link href="/check">
-              {CHECK_CTA}
-              <ArrowRightIcon aria-hidden="true" />
-            </Link>
-          </Button>
+          <Magnetic>
+            <Button asChild size="lg" className="sheen">
+              <Link href="/check" transitionTypes={["nav-forward"]}>
+                {CHECK_CTA}
+                <ArrowRightIcon aria-hidden="true" />
+              </Link>
+            </Button>
+          </Magnetic>
         </div>
       </section>
-    </>
+    </PageTransition>
   );
 }

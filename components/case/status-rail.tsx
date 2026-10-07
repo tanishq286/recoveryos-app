@@ -1,9 +1,11 @@
 import { CheckIcon, WarningCircleIcon, MinusIcon } from "@phosphor-icons/react/dist/ssr";
 
-import type { CaseStatus } from "@/lib/types";
+import type { CaseStatus, NextStep } from "@/lib/types";
 import { railProgress, railStates, stateInfo, type RailStepState } from "@/lib/rules/case-states";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { RouteTimeline } from "@/components/viz/route-timeline";
 
 const SR_STATE: Record<RailStepState, string> = {
   done: "Completed",
@@ -61,9 +63,13 @@ function stateCaption(state: RailStepState, branch?: boolean): string | null {
 export function StatusRail({
   status,
   history,
+  updatedAt,
+  nextStep,
 }: {
   status: CaseStatus;
   history: { status: CaseStatus; at: string }[];
+  updatedAt: string;
+  nextStep: NextStep;
 }) {
   const steps = railStates(status, history);
   const { step, total } = railProgress(status);
@@ -71,25 +77,8 @@ export function StatusRail({
   const reachedAt = new Map(history.map((h) => [h.status, h.at]));
   const isBlocked = status === "query_deficiency";
 
-  return (
-    <section aria-labelledby="rail-heading" className="panel p-5 sm:p-7">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2
-          id="rail-heading"
-          className="text-base font-semibold tracking-[-0.005em] text-fg [font-stretch:100%]"
-        >
-          Evidence to credit
-        </h2>
-        <p className="text-sm text-fg-3">
-          <span className="tnum">
-            Step {step} of {total}:
-          </span>{" "}
-          <span className={cn("font-semibold", isBlocked ? "text-blocker" : "text-fg")}>
-            {current.label}
-          </span>
-        </p>
-      </div>
-
+  const stepsView = (
+    <>
       {/* Narrow screens: summary bar plus an expandable vertical list */}
       <div className="mt-5 lg:hidden">
         <div className="flex gap-1" aria-hidden="true">
@@ -230,6 +219,51 @@ export function StatusRail({
       <p className="mt-7 hidden border-t border-line pt-5 text-base text-fg-2 lg:block">
         {current.description}
       </p>
+    </>
+  );
+
+  return (
+    <section aria-labelledby="rail-heading" className="panel p-5 sm:p-7">
+      <SegmentedTabs
+        label="View the case route as"
+        heading={
+          <div className="min-w-0">
+            <h2
+              id="rail-heading"
+              className="text-base font-semibold tracking-[-0.005em] text-fg [font-stretch:100%]"
+            >
+              Evidence to credit
+            </h2>
+            <p className="mt-0.5 text-sm text-fg-3">
+              <span className="tnum">
+                Step {step} of {total}:
+              </span>{" "}
+              <span className={cn("font-semibold", isBlocked ? "text-blocker" : "text-fg")}>
+                {current.label}
+              </span>
+            </p>
+          </div>
+        }
+        tabs={[
+          { id: "steps", label: "Steps", content: stepsView },
+          {
+            id: "timeline",
+            label: "Timeline",
+            content: (
+              <RouteTimeline
+                history={history}
+                status={status}
+                updatedAt={updatedAt}
+                next={{
+                  date: nextStep.nextDate,
+                  meaning: nextStep.dateMeaning,
+                  waitingFor: nextStep.waitingFor,
+                }}
+              />
+            ),
+          },
+        ]}
+      />
     </section>
   );
 }

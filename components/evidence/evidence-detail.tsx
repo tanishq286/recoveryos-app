@@ -14,6 +14,7 @@ import { ExtractionBadge } from "@/components/evidence/extraction-badge";
 import { DocumentPreview } from "@/components/evidence/document-preview";
 import { ProofCard } from "@/components/evidence/proof-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HashGlyph } from "@/components/viz/hash-glyph";
 
 /** Fields that need the client first, then the rest, in document order. */
 export function orderFields(fields: ExtractedField[]): ExtractedField[] {
@@ -63,10 +64,17 @@ export function EvidenceDetail({ file, fields }: { file: EvidenceFile; fields: E
           </div>
           <div className="sm:col-span-2">
             <dt className="text-sm text-fg-3">SHA-256 checksum, taken on arrival</dt>
-            <dd className="mt-1">
-              <code className="tnum block font-mono text-sm break-all text-fg-2">
-                {file.sha256}
-              </code>
+            <dd className="mt-2 flex items-start gap-4">
+              <HashGlyph sha256={file.sha256} className="size-14" />
+              <div className="min-w-0">
+                <code className="tnum block font-mono text-sm break-all text-fg-2">
+                  {file.sha256}
+                </code>
+                <p className="mt-1.5 text-sm text-fg-3">
+                  The mark is drawn from this checksum. Change one byte of the file and both change
+                  completely.
+                </p>
+              </div>
             </dd>
           </div>
         </dl>

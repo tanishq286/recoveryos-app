@@ -4,6 +4,7 @@ import type { Quote } from "@/lib/types";
 import { formatBps, formatDate, formatPaise, shareOfPaise } from "@/lib/format";
 import { PROTECTION_STATUS_NOTE } from "@/lib/pricing";
 import { Badge } from "@/components/ui/badge";
+import { ValueWaterfall } from "@/components/viz/value-waterfall";
 
 const STATUS: Record<
   Quote["status"],
@@ -24,8 +25,11 @@ function optInText(optIn: boolean | null): string {
 export function QuoteCard({ quote }: { quote: Quote }) {
   const s = STATUS[quote.status];
   const value = quote.indicativeValuePaise;
+  // Amounts are drawn by the waterfall when there is a value; the rows below
+  // then carry only the terms. With no value yet, the rows say so plainly.
   const fee = value !== null ? shareOfPaise(value, quote.successFeeBps) : null;
   const protection = value !== null ? shareOfPaise(value, quote.protectionAllocationBps) : null;
+  const showAmounts = value === null;
 
   return (
     <section aria-labelledby="quote-heading" className="panel p-5 sm:p-7">
@@ -45,44 +49,43 @@ export function QuoteCard({ quote }: { quote: Quote }) {
         <p className="tnum mt-1 text-sm text-fg-3">Shared on {formatDate(quote.sharedAt)}</p>
       )}
 
-      <div className="mt-6 border-t border-line pt-6">
-        <p className="text-sm text-fg-3">Indicative value</p>
-        {value !== null ? (
-          <>
-            <p className="display tnum mt-1 text-[2.5rem] text-fg">{formatPaise(value)}</p>
-            <p className="mt-2 text-sm text-fg-3">{quote.indicativeValueBasis}</p>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-2xl font-[560] tracking-[-0.02em] text-fg [font-stretch:106%]">
-              Not estimated yet
-            </p>
-            <p className="mt-2 text-base text-fg-2">
-              We don&apos;t yet know how many shares or how much in dividends. We won&apos;t put a
-              number here until a document shows it.
-            </p>
-          </>
-        )}
-        {quote.excludedFromEstimate.length > 0 && (
-          <ul className="mt-4 space-y-1 rounded-[var(--radius-control)] bg-ink-900 p-3">
-            {quote.excludedFromEstimate.map((x) => (
-              <li key={x} className="text-sm text-fg-2">
-                <span className="font-semibold text-fg">Left out: </span>
-                {x}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {value !== null ? (
+        <ValueWaterfall quote={quote} value={value} basis={quote.indicativeValueBasis} />
+      ) : (
+        <div className="mt-6 border-t border-line pt-6">
+          <p className="text-sm text-fg-3">Indicative value</p>
+          <p className="mt-1 text-2xl font-[560] tracking-[-0.02em] text-fg [font-stretch:106%]">
+            Not estimated yet
+          </p>
+          <p className="mt-2 text-base text-fg-2">
+            We don&apos;t yet know how many shares or how much in dividends. We won&apos;t put a
+            number here until a document shows it.
+          </p>
+        </div>
+      )}
+      {quote.excludedFromEstimate.length > 0 && (
+        <ul className="mt-5 space-y-1 rounded-[var(--radius-control)] bg-ink-900 p-3">
+          {quote.excludedFromEstimate.map((x) => (
+            <li key={x} className="text-sm text-fg-2">
+              <span className="font-semibold text-fg">Left out: </span>
+              {x}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <dl className="mt-6 border-t border-line">
         <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-5">
           <dt className="font-semibold text-fg">
             Success fee, <span className="tnum">{formatBps(quote.successFeeBps)}</span>
           </dt>
-          <dd className="tnum text-right font-semibold text-fg">
-            {fee !== null ? `≈ ${formatPaise(fee)}` : "Not yet"}
-          </dd>
+          {showAmounts ? (
+            <dd className="tnum text-right font-semibold text-fg">
+              {fee !== null ? `≈ ${formatPaise(fee)}` : "Not yet"}
+            </dd>
+          ) : (
+            <dd aria-hidden="true" />
+          )}
           <dd className="col-span-2 text-base text-fg-2">
             Of the value actually credited to you. Paid only after credit, plus GST.
           </dd>
@@ -95,9 +98,13 @@ export function QuoteCard({ quote }: { quote: Quote }) {
             </span>
             <Badge variant="outline">Planned</Badge>
           </dt>
-          <dd className="tnum text-right font-semibold text-fg-2">
-            {protection !== null ? `≈ ${formatPaise(protection)}` : "Not yet"}
-          </dd>
+          {showAmounts ? (
+            <dd className="tnum text-right font-semibold text-fg-2">
+              {protection !== null ? `≈ ${formatPaise(protection)}` : "Not yet"}
+            </dd>
+          ) : (
+            <dd aria-hidden="true" />
+          )}
           <dd className="col-span-2 text-base text-fg-2">
             Set aside toward a life or health insurance policy in your name, subject to licensed
             partner availability, your choice and policy issuance.
