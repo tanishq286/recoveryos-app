@@ -78,6 +78,11 @@ components/
   case/                       status rail, next-step card, tasks, timeline, quote, consents, holdings
   evidence/                   evidence list, detail, proof card, document preview, copy button
   triage/                     triage flow + assessment result
+  command/                    ⌘K palette (client) + server index wrapper
+  viz/                        route timeline, value waterfall, reading summary, route progress, hash glyph
+  motion/                     page transitions, spotlight, magnetic CTA, count interpolation
+  theme/                      theme store + toggle
+  brand/                      wordmark, route loader, route illustrations
   marketing/, site/, brand/
 lib/
   data.ts                     ← the only door to data: RecoveryDataSource interface + getDataSource()
@@ -111,14 +116,22 @@ call the same data source, and `revalidatePath` the affected pages. `lib/data.ts
 - Quotes carry an indicative value only with a stated basis (`value_needs_basis` in SQL).
   Unconfirmed amounts are listed as "left out", not guessed.
 
-**Design system.** "The Precision Statement": a deep-ink, dark-only interface with one cool
-accent. Tokens live in `app/globals.css` (`@theme`): ink ladder `#0B1114` to `#1A262C`,
+**Design system.** "The Precision Statement": a deep-ink interface with one cool accent. Dark
+is the default; a cool, editorial light theme restates the same tokens (toggle in the header,
+remembered per browser, restored before first paint so it never flashes). Tokens live in `app/globals.css` (`@theme`): ink ladder `#0B1114` to `#1A262C`,
 foreground `#E6EDEF` / `#A3B3B9` / `#8699A0`, signal blue `#7CB8FF` (the only accent),
 confirmed mint `#5CD3B4` and blocker coral `#FF7A72` (semantic only). Every text pair is AA on
 its ground; the contrast values are noted in the CSS. Mona Sans Variable (display and body,
 with width and tracking tuned per size) and Geist Mono (real identifiers only) are
 self-hosted through `@fontsource-variable`, so the build never fetches fonts from the
 network. Icons are Phosphor. Dates, amounts, IDs and checksums use tabular numerals.
+
+Charts draw from dedicated fills (`--color-chart-signal`, `--color-chart-credit`,
+`--color-chart-muted`), stepped into the categorical lightness band for each theme and checked
+with a colour-vision validator (adjacent CVD ΔE 14.1 dark, 15.8 light). Text never wears a
+series colour. A semantic layer (`--surface`, `--surface-raised`, `--text-secondary`,
+`--success`, `--danger`, `--chart-1..3`, `--gradient-route`, durations and z-index) sits on
+top of the ink ladder for new components.
 
 Where the system is written down:
 
@@ -144,6 +157,26 @@ Where the system is written down:
   change, receipt lines printing in). Everything animates `transform` and `opacity`.
 - An inline `<head>` script sets `data-motion="on"` only without a reduced-motion preference,
   and a CSS failsafe reveals hidden hero text after 2.4s, so content is never stuck hidden.
+
+**Interface layer.** Also presentation only, built on the same data the pages already read:
+
+- **Command palette** (`components/command/`): ⌘K / Ctrl+K anywhere, or the header Search
+  button. Searches pages, sample cases, evidence rooms and documents (by name, reference,
+  category or checksum prefix), remembers recent picks, and follows the WAI-ARIA combobox
+  pattern. The index (`lib/command-index.ts`) is built on the server from the data source;
+  with real data it must be scoped to the signed-in viewer.
+- **Visualizations** (`components/viz/`), every one drawn from real case data with its
+  numbers also in text: the time-scaled route timeline (Steps / Timeline tabs on the case
+  page), the "what reaches you" waterfall in the quote (value, fee, planned protection, net
+  before GST), the evidence reading summary (confirmed / waiting / no check needed / not
+  found), route progress on the cases list, and each document's checksum drawn as a
+  fingerprint mark.
+- **Page transitions**: React `<ViewTransition>` with typed navigations. Deeper links slide
+  forward, breadcrumbs slide back, the header stays fixed, and case titles carry a shared
+  name between list, case and evidence room. Browsers without the API simply swap pages.
+- **Signature surfaces**: a fixed light field and grain behind every page, a cursor spotlight
+  on interactive cards (fine pointers only), a sheen and a 3px magnetic lean on the main
+  CTA, a branded route loader, and route illustrations on 404, error and empty states.
 
 **shadcn/ui.** `components.json` is configured (new-york style, CSS variables, Phosphor).
 The primitives in `components/ui/` were added by hand in shadcn's current source style,

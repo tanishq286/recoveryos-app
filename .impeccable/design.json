@@ -63,6 +63,21 @@
           "oklch(86% 0.02 230)",
           "oklch(95% 0.02 230)"
         ]
+      },
+      "chart-signal": {
+        "role": "secondary",
+        "displayName": "Chart Signal",
+        "canonical": "#4f93dc"
+      },
+      "chart-credit": {
+        "role": "secondary",
+        "displayName": "Chart Credit",
+        "canonical": "#2ea98a"
+      },
+      "chart-muted": {
+        "role": "neutral",
+        "displayName": "Chart Muted",
+        "canonical": "#5a6c75"
       }
     },
     "typographyMeta": {
@@ -120,6 +135,11 @@
         "name": "hero-reveal",
         "value": "1.05s expo.out, 0.09s line stagger",
         "purpose": "GSAP SplitText line masks on the landing hero."
+      },
+      {
+        "name": "page-transition",
+        "value": "340ms slide 36px + 220ms blur fade",
+        "purpose": "Typed navigations: forward deeper, back via breadcrumbs; header anchored."
       }
     ],
     "breakpoints": [
@@ -185,7 +205,7 @@
   ],
   "narrative": {
     "northStar": "The Precision Statement",
-    "overview": "A depository holding statement rendered as software: ruled, exact, unhurried. Deep ink base, one signal-blue accent, richness from motion and craft rather than density. Dark-only by brief.",
+    "overview": "A depository holding statement rendered as software: ruled, exact, unhurried. Deep ink base, one signal-blue accent, richness from motion and craft rather than density. Dark by default, with a cool editorial light theme on the same tokens.",
     "keyCharacteristics": [
       "Tonal layering on deep ink",
       "One locked accent; mint and coral are semantic only",
@@ -207,6 +227,11 @@
         "name": "The One Lift Rule",
         "body": "At most one lifted panel per screen.",
         "section": "elevation"
+      },
+      {
+        "name": "The Route Gradient Rule",
+        "body": "The signal-to-mint gradient belongs to routes and progress only.",
+        "section": "colors"
       }
     ],
     "dos": [
@@ -219,7 +244,8 @@
       "Don't add warm tones or a second accent",
       "Don't use eyebrows, em or en dashes, or decorative dots",
       "Don't build fake product UI from divs in marketing",
-      "Don't animate layout properties or add scroll reveals to product screens"
+      "Don't animate layout properties or add scroll reveals to product screens",
+      "Don't draw a chart from invented numbers; every mark comes from case data and appears as text too"
     ]
   }
 }

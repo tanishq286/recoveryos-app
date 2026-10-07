@@ -99,3 +99,21 @@ draws only while a value is changing and stops offscreen or in a hidden tab.
 
 Phosphor (`@phosphor-icons/react`), regular weight in UI, bold for status
 markers; 16/20/24px. One family only.
+
+## Interface layer (second pass)
+
+- **Light theme.** `:root[data-theme="light"]` restates the ink ladder, text, signal,
+  semantic and chart tokens (values and contrast in `app/globals.css` and `DESIGN.md`). Dark
+  stays the default. A head script restores the visitor's choice before first paint; the
+  switch crossfades through the View Transitions API.
+- **Semantic layer.** `--surface`, `--surface-raised`, `--surface-sunken`, `--surface-hover`,
+  `--border-highlight`, `--text-primary|secondary|tertiary`, `--accent-hover`, `--success`,
+  `--info`, `--warning` (borrows the blocker hue: there is no warm hue), `--danger`,
+  `--chart-1..3`, `--gradient-route`, `--duration-micro|ui|scene`, `--z-chrome|overlay|toast`.
+- **Chart fills.** Dedicated in-band steps of signal and confirmed plus a neutral, validated
+  for colour-vision separation in both themes. Fills only; text keeps text tokens.
+- **Signatures.** Route gradient (routes and progress only), grain plus a two-point light
+  field, card spotlight, CTA sheen and magnetic lean, route loader, route illustrations,
+  checksum fingerprint glyphs, directional page transitions with an anchored header.
+- **Motion budget.** Micro 160ms, UI 240ms, scene 560ms; page slides 340ms over 36px;
+  chart bars grow from their baseline once (560ms, staggered under 500ms in total).

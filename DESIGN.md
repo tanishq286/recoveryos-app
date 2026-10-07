@@ -19,6 +19,9 @@ colors:
   confirmed-wash: "#10281f"
   blocker: "#ff7a72"
   blocker-wash: "#2c1515"
+  chart-signal: "#4f93dc"
+  chart-credit: "#2ea98a"
+  chart-muted: "#5a6c75"
 typography:
   display:
     fontFamily: "Mona Sans Variable, ui-sans-serif, system-ui, sans-serif"
@@ -111,7 +114,7 @@ components:
 
 RecoveryOS reads like a depository holding statement rendered as software: ruled, exact, unhurried. The base is deep ink, never pure black. A single cool accent, signal blue, marks what is live or actionable. Everything else is quiet text on layered ink. Richness comes from motion and craft (a route drawn through a field of records, line masks, a receipt that prints in), never from density or decoration.
 
-The system is dark-only by brief. It is minimalist on purpose: generous whitespace, one idea per section, hairlines instead of boxes where possible. Trust is the product, so nothing in the interface claims more than the product can deliver.
+Dark is the default and the cinematic register; a cool editorial light theme restates every token (never cream). It is minimalist on purpose: generous whitespace, one idea per section, hairlines instead of boxes where possible. Trust is the product, so nothing in the interface claims more than the product can deliver.
 
 **Key Characteristics:**
 
@@ -140,7 +143,17 @@ A near-monochrome ink ladder with one cool accent and two semantic colors. All t
 - **Foreground** (#e6edef, 16:1), **Foreground 2** (#a3b3b9, 8.8:1), **Foreground 3** (#8699a0, 6.4:1): primary, supporting and metadata text.
 - Washes (#13263a, #10281f, #2c1515) fill badges and alerts behind their semantic color.
 
+### Chart steps
+
+- **Chart Signal / Chart Credit / Chart Muted** (#4f93dc / #2ea98a / #5a6c75 dark; #3f7fd0 / #1f9a7c / #8796a0 light): fills only, stepped into the categorical lightness band and validated for colour-vision deficiency. Text never wears them.
+
+### Light theme
+
+Page #f3f5f6, wells #eaeef0, panels #ffffff, line #d6dde1, control #6f7e85, text #0b1114 / #3b4950 / #56656c, signal #1f5fcc (white text on it), confirmed #08705a, blocker #b3332a. Shadows replace the inset highlight; the WebGL route switches to normal blending.
+
 ### Named Rules
+
+**The Route Gradient Rule.** The signal-to-mint gradient (`--gradient-route`) belongs to routes and progress only: in progress becoming credited. Never on text, buttons or backgrounds.
 
 **The One Voice Rule.** Signal blue is the only accent. Mint and coral carry state, never decoration.
 **The No-Warm Rule.** No cream, beige or yellow anywhere. The palette stays cool.
@@ -208,6 +221,22 @@ Pill, always a word plus an icon, never color alone. Variants: neutral, progress
 
 - **Style:** ink-900 fill, control border, 8px radius, 48px min height. **Focus:** 2px signal outline, 3px offset. **Error:** coral border plus an icon and message.
 
+### Command palette
+
+Centred sheet at 12vh, panel surface with the overlay shadow, rises 8px over 320ms. Combobox input, grouped results (Recent, Actions, Sample cases, Evidence rooms, Documents, Pages), a single highlight that slides between rows, keys shown in the footer.
+
+### Segmented tabs
+
+Pill track on the well colour; the selected pill slides with transform. Arrow keys, Home and End move between tabs. Panels animate only after a real switch.
+
+### Data visualization
+
+Bars no taller than 12px with 3 to 4px rounded ends and 2px surface gaps; one hairline baseline; values printed beside every bar, never inside it; the list or legend beside a chart is its accessible table. Signature charts: route timeline (time-scaled stages, a "you are here" node, dashed projection to the next date), value waterfall, reading summary (textured "not found" slice), route progress, checksum fingerprint.
+
+### Signature surfaces
+
+Grain and a two-point light field behind the page; cursor spotlight (1px lit edge plus a 5% wash) on interactive cards; one sheen sweep and a 3px magnetic lean on the primary CTA; the route loader (a short route draws, credit lands, repeat).
+
 ### Status rail and receipt (signature)
 
 The case status rail draws done steps in mint with a check, the current step as a ringed signal marker, blockers in coral. The assessment receipt prints its lines in order with a clip-path reveal and states "never, not queried" for sources not connected.
@@ -227,5 +256,7 @@ The case status rail draws done steps in mint with a check, the current step as 
 - **Don't** put an eyebrow above a heading, use em or en dashes in visible copy, or use decorative dots.
 - **Don't** build fake product UI out of divs in marketing, or three equal feature cards in a row.
 - **Don't** animate layout properties or add scroll reveals to functional product screens.
+- **Don't** draw a chart from invented or illustrative numbers; every mark comes from the case data, and every value also appears as text.
+- **Don't** colour text with a chart fill or use the route gradient outside routes and progress.
 
 Not canonized (defects carried by the build, not rules): none recorded at the craft-floor level; the landing "How it works" index uses small dot nodes as scroll-progress markers, which is functional state, not decoration.
