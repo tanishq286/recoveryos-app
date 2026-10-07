@@ -1,4 +1,4 @@
-import type { CaseStatus, TaskStatus } from "@/lib/types";
+import type { CaseStatus, ExtractionStatus, TaskStatus } from "@/lib/types";
 import type { StatusTone } from "@/components/ui/status-badge";
 
 /*
@@ -30,4 +30,13 @@ export const TASK_TONE: Record<TaskStatus, StatusTone> = {
   waiting: "pending",
   blocked: "error",
   done: "success",
+};
+
+export const EXTRACTION_TONE: Record<ExtractionStatus, StatusTone> = {
+  queued: "neutral",
+  extracting: "active",
+  extracted: "success",
+  needs_review: "pending",
+  failed: "error",
+  not_applicable: "neutral",
 };

@@ -26,6 +26,11 @@ const TONE: Record<
   neutral: { badge: "neutral", dot: "bg-fg-3" },
 };
 
+/** The tone's dot fill, for places that show a status as a dot beside other text. */
+export function toneDot(tone: StatusTone): string {
+  return TONE[tone].dot;
+}
+
 /**
  * A status pill with a dot. Statuses that are still moving (pending, in
  * review) get a live ping; under reduced motion the ping simply doesn't play.

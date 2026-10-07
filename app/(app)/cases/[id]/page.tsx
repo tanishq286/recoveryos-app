@@ -7,7 +7,7 @@ import { getDataSource } from "@/lib/data";
 import { ROUTE_LABELS, stateInfo } from "@/lib/rules/case-states";
 import { lifecycleStages } from "@/lib/rules/lifecycle";
 import { byNewest, daysBetween, formatDate, formatDateTime } from "@/lib/format";
-import { CATEGORY_LABELS } from "@/lib/labels";
+import { CATEGORY_LABELS, EXTRACTION_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricCounter } from "@/components/ui/metric-counter";
@@ -16,6 +16,7 @@ import { VaultCard } from "@/components/ui/vault-card";
 import { NextStepCard } from "@/components/case/next-step-card";
 import { LifecycleTracker } from "@/components/case/lifecycle-tracker";
 import { CasePanes } from "@/components/case/case-panes";
+import { DocumentSwitcher } from "@/components/case/document-switcher";
 import { caseStatusTone } from "@/components/case/status-tone";
 import { TaskList } from "@/components/case/task-list";
 import { Timeline } from "@/components/case/timeline";
@@ -38,7 +39,7 @@ export async function generateMetadata(props: PageProps<"/cases/[id]">): Promise
 }
 
 export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) {
-  const { id } = await props.params;
+  const [{ id }, query] = await Promise.all([props.params, props.searchParams]);
   const data = getDataSource();
   const [c, room] = await Promise.all([data.getCase(id), data.getEvidenceRoom(id)]);
   if (!c || !room) notFound();
@@ -46,7 +47,11 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
   const needsYou = room.fields.filter(
     (f) => f.reviewStatus === "pending" && f.needsClientCheck && f.value !== null,
   );
+  // ?doc= picks the inspected document from the switcher; otherwise the one
+  // with something waiting for the client, then the first readable one.
+  const requestedDoc = typeof query.doc === "string" ? query.doc : null;
   const previewFile =
+    room.files.find((f) => f.id === requestedDoc) ??
     room.files.find((f) => needsYou.some((n) => n.evidenceFileId === f.id)) ??
     room.files.find(
       (f) => f.extractionStatus === "extracted" || f.extractionStatus === "needs_review",
@@ -160,8 +165,17 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
           </Button>
         </div>
 
+        {room.files.length > 1 && (
+          <DocumentSwitcher
+            caseId={c.id}
+            files={room.files}
+            fields={room.fields}
+            selectedId={previewFile?.id ?? null}
+          />
+        )}
+
         {previewFile ? (
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 space-y-4">
             <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-control)] border border-(--glass-border) bg-(--glass-elevated) p-3">
               <HashGlyph sha256={previewFile.sha256} className="size-10 shrink-0" />
               <div className="min-w-0 flex-1">
@@ -170,12 +184,19 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
               </div>
               <ExtractionBadge status={previewFile.extractionStatus} />
             </div>
-            <DocumentPreview
-              file={previewFile}
-              fields={previewFields}
-              page={previewPage}
-              highlightFieldId={actionCards[0]?.id}
-            />
+            {ordered.some((f) => f.sourceSnippet) ? (
+              <DocumentPreview
+                file={previewFile}
+                fields={previewFields}
+                page={previewPage}
+                highlightFieldId={actionCards[0]?.id}
+              />
+            ) : (
+              <p className="rounded-[var(--radius-control)] border border-dashed border-control/60 px-4 py-3 text-base text-fg-2">
+                {previewFile.extractionNote ??
+                  EXTRACTION_LABELS[previewFile.extractionStatus].explain}
+              </p>
+            )}
             {actionCards.length > 0 && (
               <ul className="space-y-3">
                 {actionCards.map((f) => (
@@ -201,9 +222,11 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
                 </ul>
               </div>
             )}
-            {ordered.length === 0 && (
-              <p className="text-base text-fg-3">Nothing on this document needs your check.</p>
-            )}
+            {ordered.length === 0 &&
+              (previewFile.extractionStatus === "extracted" ||
+                previewFile.extractionStatus === "not_applicable") && (
+                <p className="text-base text-fg-3">Nothing on this document needs your check.</p>
+              )}
             <Link
               href={`${evidenceHref}?doc=${previewFile.id}#doc-detail`}
               transitionTypes={["nav-forward"]}
