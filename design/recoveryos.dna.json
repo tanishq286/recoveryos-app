@@ -1,0 +1,252 @@
+{
+  "meta": {
+    "name": "RecoveryOS: Precision Statement",
+    "description": "A calm, precise, clinical-tech recovery room. Deep cool ink, one electric-blue signal, mint-teal for confirmed facts, coral only for real blockers. Reads like a meticulously typeset holding statement on a dark instrument panel. Richness comes from motion and craft, not density.",
+    "source_references": [
+      "Owner redesign brief (2026-09): deep ink/charcoal base, cool teal/electric-blue accent, no warm cream/yellow, premium-minimal, motion-led",
+      "Grounded direction #3 (impeccable concept-seed 7658c88c, degraded roll): the depository holding statement (NSDL/CDSL client master list)",
+      "No image reference: DNA derived from the written brief (design-dna Phase 2 from description)"
+    ],
+    "created_at": "2026-09-27"
+  },
+  "design_system": {
+    "color": {
+      "palette_type": "analogous",
+      "primary": { "hex": "#7CB8FF", "role": "Signal blue: primary action, active progress, links, focus. The only accent." },
+      "secondary": { "hex": "#5CD3B4", "role": "Confirmed state only (approved details, completed milestones, active consent)." },
+      "accent": { "hex": "#7CB8FF", "role": "Same as primary; one accent locked for the whole product." },
+      "neutral": {
+        "scale": ["#E6EDEF", "#A3B3B9", "#8699A0", "#5E717A", "#223038", "#1A262C", "#141E23", "#10181C", "#0B1114"],
+        "usage": "Lightest to darkest: primary text, secondary text, metadata text, control borders, hairlines, elevated surface, panel, raised surface, page ground. Foreground text uses the light end against the ink ground."
+      },
+      "semantic": { "success": "#5CD3B4", "warning": "#A3B3B9", "error": "#FF7A72", "info": "#7CB8FF" },
+      "surface": { "background": "#0B1114", "card": "#141E23", "elevated": "#1A262C" },
+      "contrast_strategy": "Light-on-ink. Body 14-16:1, secondary 7.8:1+, metadata 5.2:1+, controls 3:1+. Primary button ink-on-blue 9.1:1."
+    },
+    "typography": {
+      "type_scale": {
+        "display": { "size": "clamp(2.5rem, 6vw, 4.75rem)", "weight": "560", "line_height": "1.02", "tracking": "-0.035em" },
+        "heading_1": { "size": "clamp(2rem, 4vw, 3rem)", "weight": "560", "line_height": "1.08", "tracking": "-0.03em" },
+        "heading_2": { "size": "clamp(1.5rem, 2.6vw, 2rem)", "weight": "560", "line_height": "1.15", "tracking": "-0.02em" },
+        "heading_3": { "size": "1.1875rem", "weight": "600", "line_height": "1.3", "tracking": "-0.01em" },
+        "body": { "size": "1rem", "weight": "400", "line_height": "1.6", "tracking": "0" },
+        "body_small": { "size": "0.9375rem", "weight": "400", "line_height": "1.5", "tracking": "0.003em" },
+        "caption": { "size": "0.875rem", "weight": "450", "line_height": "1.4", "tracking": "0.005em" },
+        "overline": { "size": "0.875rem", "weight": "500", "line_height": "1.4", "tracking": "0.01em" }
+      },
+      "font_families": {
+        "heading": "Mona Sans Variable (font-stretch 112%)",
+        "body": "Mona Sans Variable (font-stretch 100%)",
+        "mono": "Geist Mono Variable (identifiers, checksums, folio and reference numbers only)"
+      },
+      "font_style_notes": "One grotesk family carries everything; hierarchy comes from width (display at 112% stretch), weight and size, never from a second display family. Mono is reserved for real identifiers. Tabular lining numerals for every date, amount and count. No eyebrows, no tracked uppercase labels above headings."
+    },
+    "spacing": {
+      "base_unit": "4px",
+      "scale": ["4px", "8px", "12px", "16px", "24px", "32px", "48px", "64px", "96px", "128px"],
+      "content_density": "spacious",
+      "section_rhythm": "Marketing sections breathe at 96-128px desktop / 72px mobile; product screens use 24-40px between blocks. More space above a heading than below it."
+    },
+    "layout": {
+      "grid_system": "12-column CSS grid, asymmetric splits (7/5, 5/7), single column under 768px",
+      "max_content_width": "1200px marketing, 1280px product, 65ch reading measure",
+      "columns": "12",
+      "gutter": "24px desktop, 16px mobile",
+      "breakpoints": ["640px", "768px", "1024px", "1280px"],
+      "alignment_tendency": "asymmetric"
+    },
+    "shape": {
+      "border_radius": { "small": "6px", "medium": "8px", "large": "12px", "pill": "9999px" },
+      "border_usage": "subtle 1px hairlines (#223038); controls get a 3:1 border (#5E717A)",
+      "divider_style": "1px hairline, used between groups, never on every row"
+    },
+    "elevation": {
+      "shadow_style": "soft diffused, offset, tinted to ink",
+      "levels": {
+        "low": "inset 0 1px 0 rgb(230 237 239 / 0.04)",
+        "medium": "inset 0 1px 0 rgb(230 237 239 / 0.05), 0 12px 32px -16px rgb(2 6 8 / 0.7)",
+        "high": "inset 0 1px 0 rgb(230 237 239 / 0.06), 0 32px 64px -24px rgb(2 6 8 / 0.85)"
+      },
+      "depth_cues": "surface lightness steps + 1px top highlight + translucent sticky chrome"
+    },
+    "iconography": {
+      "style": "Phosphor regular/bold, one family",
+      "stroke_weight": "regular (1.5px equivalent) for UI, bold for status markers",
+      "size_scale": ["16px", "20px", "24px"],
+      "preferred_set": "@phosphor-icons/react"
+    },
+    "motion": {
+      "easing": "cubic-bezier(0.23, 1, 0.32, 1)",
+      "duration_scale": { "micro": "160ms", "normal": "220ms", "macro": "800ms" },
+      "entrance_pattern": "Masked rise: lines settle up out of a clip, like a statement being printed and verified",
+      "exit_pattern": "Opacity 150ms, ease-out, no travel",
+      "philosophy": "cinematic on the marketing page (one authored focal sequence + scroll-scrubbed route), minimal functional in the product (feedback, state, continuity only)"
+    },
+    "components": {
+      "button_style": "Primary: solid signal blue, ink label, 8px radius, press scale 0.97. Secondary: 1px control border on transparent. Ghost: text only.",
+      "input_style": "Panel-toned field, 1px control border, 8px radius, label above, error below, focus ring in signal blue",
+      "card_style": "Flat panel #141E23, 12px radius, 1px hairline, top highlight; cards only where hierarchy is real",
+      "navigation_pattern": "Translucent sticky bar (backdrop blur), single line, one CTA",
+      "modal_style": "Not used in this slice",
+      "list_style": "Ledger rows separated by hairlines between groups; identifiers in mono, amounts right-aligned tabular",
+      "component_notes": "Badges are full pills with an icon and a text label (never colour alone). Proof cards read like statement entries: label, value, provenance line, confidence line."
+    }
+  },
+  "design_style": {
+    "aesthetic": {
+      "mood": ["calm", "precise", "clinical", "assured", "quiet"],
+      "visual_metaphor": "A holding statement on an instrument panel: every value has a source line, every step has an owner",
+      "era_influence": "Contemporary Swiss-informed interface design",
+      "genre": "trust-first fintech / legal-ops",
+      "personality_traits": ["meticulous", "candid", "unhurried", "exact"],
+      "adjectives": ["precise", "cool", "spacious", "traceable", "composed"]
+    },
+    "visual_language": {
+      "complexity": "minimal",
+      "ornamentation": "none",
+      "whitespace_usage": "generous macro-whitespace; dense only inside data tables",
+      "visual_weight_distribution": "Weight sits on headlines and one focal visual; everything else recedes into hairlines",
+      "focal_strategy": "single hero element (the route field), then progressive reveal",
+      "contrast_level": "high for text, low for structure",
+      "texture_usage": "none; depth from light, not grain"
+    },
+    "composition": {
+      "hierarchy_method": "typographic hierarchy (width + weight + size)",
+      "balance_type": "asymmetric",
+      "flow_direction": "top-to-bottom, left-anchored",
+      "grouping_strategy": "negative space and hairlines, cards only for real hierarchy",
+      "negative_space_role": "active: it is the calm"
+    },
+    "imagery": {
+      "photo_treatment": "none",
+      "illustration_style": "generative point field and single route line (WebGL), no illustrations",
+      "graphic_elements": "one route line motif, hairline rules",
+      "pattern_usage": "none",
+      "image_shape": "none"
+    },
+    "interaction_feel": {
+      "feedback_style": "immediate press feedback, state morphs with a brief blur-masked crossfade",
+      "hover_behavior": "colour/opacity shift only, gated to fine pointers",
+      "transition_personality": "smooth glide",
+      "loading_style": "static skeletons shaped like the final layout, no shimmer",
+      "microinteraction_density": "low"
+    },
+    "brand_voice_in_ui": {
+      "tone": "plain, candid, specific",
+      "formality": "polite, direct",
+      "cta_style": "direct imperative",
+      "empty_state_approach": "explain what will appear and how to get it there",
+      "error_tone": "name the problem, say nothing changed, give the recovery"
+    }
+  },
+  "visual_effects": {
+    "overview": {
+      "effect_intensity": "subtle-accent",
+      "performance_tier": "heavy",
+      "fallback_strategy": "reduce to static: one rendered frame under reduced motion; SVG route when WebGL is unavailable",
+      "primary_technology": "WebGL/Three.js + GSAP"
+    },
+    "background_effects": {
+      "type": "none",
+      "description": "Flat ink ground; no animated gradients or mesh",
+      "technology": "CSS",
+      "params": { "color_palette": ["#0B1114"], "speed": "0", "density": "0", "opacity": "1", "blend_mode": "normal" }
+    },
+    "particle_systems": {
+      "enabled": true,
+      "type": "custom",
+      "description": "A still field of record points (the registry) in gentle perspective. Points near the route brighten; nothing drifts on its own.",
+      "technology": "Three.js Points + ShaderMaterial",
+      "params": {
+        "count": "~2200 desktop / ~900 mobile",
+        "shape": "round, soft 1px edge",
+        "size_range": "1.2-2.4px",
+        "movement_pattern": "static; camera moves only with scroll and pointer",
+        "color_behavior": "slate at low alpha, signal blue within the route's reach",
+        "interaction": "none (pointer drives camera parallax only)",
+        "spawn_area": "jittered grid on a curved sheet"
+      }
+    },
+    "3d_elements": {
+      "enabled": true,
+      "type": "abstract-geometry",
+      "description": "The route: a curve through the record field that draws itself from the client's holding to credit, scrubbed by scroll.",
+      "technology": "Three.js r186",
+      "params": {
+        "renderer": "WebGLRenderer, alpha, antialias off on DPR>1, DPR capped at 1.75",
+        "lighting": "none (unlit shader)",
+        "camera": "PerspectiveCamera fov 35, slight tilt, critically damped pointer parallax",
+        "materials": "ShaderMaterial (points), additive off",
+        "geometry": "BufferGeometry points + CatmullRomCurve3 sampled route",
+        "post_processing": [],
+        "interaction_model": "render on demand: frames only while scroll, pointer or tween values are changing"
+      }
+    },
+    "shader_effects": {
+      "enabled": true,
+      "type": "custom-GLSL",
+      "description": "Point shader: size attenuation, distance-to-route highlight, draw-progress mask on route points",
+      "technology": "GLSL ES 1.0 via ShaderMaterial",
+      "params": {
+        "uniforms": ["uDraw", "uPixelRatio", "uAccent", "uBase", "uFade"],
+        "vertex_manipulation": "none beyond projection and size attenuation",
+        "fragment_output": "round point with 1px smooth edge, alpha by highlight",
+        "noise_type": "none",
+        "distortion": "none"
+      }
+    },
+    "scroll_effects": {
+      "parallax": { "enabled": false, "layers": "0", "depth_range": "0", "speed_curve": "none" },
+      "scroll_triggered_animations": {
+        "enabled": true,
+        "trigger_points": ["hero leave", "how-it-works pin (lg+)", "pricing ledger once"],
+        "animation_type": "clip-reveal",
+        "scrub_behavior": "scrubbed for the route and the pinned sequence; triggered once for the ledger"
+      },
+      "scroll_morphing": { "enabled": false, "description": "none" }
+    },
+    "text_effects": {
+      "type": "split-letter-animate",
+      "description": "Hero headline lines rise out of a mask once, in step with the route drawing",
+      "technology": "GSAP SplitText (lines, mask)",
+      "params": { "split_strategy": "by-line", "animation_per_unit": "yPercent 105 -> 0", "stagger": "0.09s", "effect_style": "masked rise, expo.out 0.9s" }
+    },
+    "cursor_effects": {
+      "enabled": false,
+      "type": "none",
+      "description": "No custom cursor",
+      "params": { "shape": "default", "size": "default", "blend_mode": "normal", "trail": "none", "interaction_zone": "none" }
+    },
+    "image_effects": {
+      "type": "none",
+      "description": "No imagery",
+      "technology": "none",
+      "params": { "filter_pipeline": "none", "hover_transform": "none", "reveal_animation": "none", "distortion_type": "none" }
+    },
+    "glassmorphism_neumorphism": {
+      "enabled": true,
+      "style": "frosted-layers",
+      "params": {
+        "blur_radius": "16px",
+        "transparency": "0.72",
+        "border_treatment": "1px hairline bottom, appears only once content scrolls under",
+        "shadow_type": "none",
+        "light_source_angle": "top"
+      }
+    },
+    "canvas_drawings": {
+      "enabled": false,
+      "type": "none",
+      "description": "WebGL covers the only canvas",
+      "technology": "none",
+      "params": { "draw_method": "none", "animation_loop": "none", "color_scheme": "none", "responsiveness": "none", "interaction": "none" }
+    },
+    "svg_animations": {
+      "enabled": true,
+      "type": "path-draw",
+      "description": "The route motif drawn by scroll through the three-stage sequence; also the WebGL fallback",
+      "params": { "animation_method": "GSAP DrawSVGPlugin", "path_morphing": "none", "stroke_animation": "drawSVG 0% -> 100%", "filter_effects": "none" }
+    },
+    "composite_notes": "One authored moment: the route draws through the record field while the headline settles, then scroll carries the same route through the three stages. Everything else is quiet. Product screens (Operate) get no scroll reveals: only press feedback, state morphs, and the milestone marker arriving on the rail."
+  }
+}
