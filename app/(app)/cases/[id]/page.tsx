@@ -6,7 +6,7 @@ import { ArrowRightIcon, FolderOpenIcon, ScanSearchIcon } from "lucide-react";
 import { getDataSource } from "@/lib/data";
 import { ROUTE_LABELS, stateInfo } from "@/lib/rules/case-states";
 import { lifecycleStages } from "@/lib/rules/lifecycle";
-import { byNewest, daysBetween, formatDate, formatDateTime } from "@/lib/format";
+import { byNewest, daysBetween, formatDate, formatDateTime, formatDayMonth } from "@/lib/format";
 import { CATEGORY_LABELS, EXTRACTION_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,9 +102,10 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
       lit: needsYou.length > 0,
     },
     {
-      label: "Days since the check",
+      // Counted to the case's last update (not today), so the range is stated.
+      label: "Days in progress",
       value: daysBetween(startedAt, c.updatedAt),
-      note: `Started ${formatDate(startedAt)}`,
+      note: `${formatDayMonth(startedAt)} to ${formatDayMonth(c.updatedAt)}`,
     },
   ];
 
