@@ -227,9 +227,10 @@ export function ProofCard({
 
   return (
     <article
+      id={`field-${field.id}`}
       aria-labelledby={`${ids}-label`}
       className={cn(
-        "panel vault-card p-4 transition-[border-color,box-shadow] duration-300 ease-(--ease-out) sm:p-5",
+        "panel vault-card scroll-mt-32 p-4 transition-[border-color,box-shadow] duration-300 ease-(--ease-out) sm:p-5",
         canReview &&
           "border-signal/45 shadow-[var(--glass-rim),0_18px_40px_-24px_var(--color-signal)]",
       )}
@@ -450,7 +451,7 @@ export function ProofCard({
 export function FieldDataCard({ field }: { field: ExtractedField }) {
   const shown = field.reviewStatus === "corrected" ? field.correctedValue : field.value;
   return (
-    <div className="panel vault-card h-full p-4">
+    <div id={`field-${field.id}`} className="panel vault-card h-full scroll-mt-32 p-4">
       <p className="text-sm text-fg-3">{field.label}</p>
       <p
         className={cn(

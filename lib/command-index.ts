@@ -5,8 +5,9 @@ import { CATEGORY_LABELS } from "@/lib/labels";
 import { stateInfo } from "@/lib/rules/case-states";
 import { OFFICIAL_LINKS } from "@/lib/sources";
 
-export type CommandGroup = "Actions" | "Pages" | "Sample cases" | "Evidence rooms" | "Documents";
-export type CommandKind = "action" | "page" | "case" | "room" | "document" | "external";
+export type CommandGroup =
+  "Actions" | "Pages" | "Sample cases" | "Evidence rooms" | "Documents" | "Details";
+export type CommandKind = "action" | "page" | "case" | "room" | "document" | "detail" | "external";
 
 export interface CommandItem {
   id: string;
@@ -136,6 +137,23 @@ export async function buildCommandIndex(): Promise<CommandItem[]> {
         hint: `${CATEGORY_LABELS[f.category]}, ${c.reference}`,
         href: `/cases/${c.id}/evidence?doc=${f.id}#doc-detail`,
         keywords: [CATEGORY_LABELS[f.category], c.reference, f.sha256.slice(0, 8)],
+      });
+    }
+    // Each detail read from a document, by its label only. Values (folio
+    // numbers, PAN and the like) stay out of the index, which every page
+    // carries; the link opens the detail beside its proof.
+    const names = new Map(room.files.map((f) => [f.id, f.fileName]));
+    for (const field of room.fields) {
+      const fileName = names.get(field.evidenceFileId);
+      if (!fileName) continue;
+      items.push({
+        id: `field:${field.id}`,
+        group: "Details",
+        kind: "detail",
+        title: field.label,
+        hint: `${fileName}, ${c.reference}`,
+        href: `/cases/${c.id}?doc=${field.evidenceFileId}#field-${field.id}`,
+        keywords: [fileName, c.reference, c.title],
       });
     }
   });

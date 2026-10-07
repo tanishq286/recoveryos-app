@@ -21,6 +21,7 @@ import {
   FolderOpenIcon,
   HistoryIcon,
   RouteIcon,
+  ScanTextIcon,
   SearchIcon,
   ShieldAlertIcon,
 } from "lucide-react";
@@ -30,6 +31,8 @@ import type { CommandItem, CommandKind } from "@/lib/command-index";
 import { cn } from "@/lib/utils";
 
 export const OPEN_EVENT = "recoveryos:command-palette";
+/** Asks the page to reveal and scroll to an element id (see CasePanes). */
+export const REVEAL_EVENT = "recoveryos:reveal";
 const RECENT_KEY = "recoveryos:recent-commands";
 const MAX_RECENT = 4;
 
@@ -39,6 +42,7 @@ const KIND_ICON: Record<CommandKind, LucideIcon> = {
   case: RouteIcon,
   room: FolderOpenIcon,
   document: FileTextIcon,
+  detail: ScanTextIcon,
   external: ArrowUpRightIcon,
 };
 
@@ -159,18 +163,28 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
       return [
         ...recents.map((item) => ({ item, group: "Recent" })),
         ...items
-          .filter((i) => !recentIds.has(i.id) && i.kind !== "document")
+          .filter((i) => !recentIds.has(i.id) && i.kind !== "document" && i.kind !== "detail")
           .map((item) => ({ item, group: item.group }))
           .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)),
       ];
     }
-    return items
+    const hits = items
       .map((item) => ({ item, s: score(item, terms) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
-      .slice(0, 24)
-      .map(({ item }) => ({ item, group: item.group }))
-      .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group));
+      .slice(0, 24);
+    // Groups follow their best hit, so an exact match is never listed below a
+    // weaker one only because its group comes later; ties keep GROUP_ORDER.
+    const best = new Map<string, number>();
+    for (const h of hits) best.set(h.item.group, Math.max(best.get(h.item.group) ?? 0, h.s));
+    return hits
+      .sort(
+        (a, b) =>
+          best.get(b.item.group)! - best.get(a.item.group)! ||
+          GROUP_ORDER.indexOf(a.item.group) - GROUP_ORDER.indexOf(b.item.group) ||
+          b.s - a.s,
+      )
+      .map(({ item }) => ({ item, group: item.group }));
   }, [items, query, recent]);
 
   const safeActive = rows.length === 0 ? -1 : Math.min(active, rows.length - 1);
@@ -190,6 +204,10 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
       return;
     }
     router.push(item.href);
+    // A same-page jump to a detail may need its pane opened first; the case
+    // page listens for this (a fresh page reads the hash when it mounts).
+    const hash = item.href.split("#")[1];
+    if (hash) window.dispatchEvent(new CustomEvent(REVEAL_EVENT, { detail: hash }));
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -243,7 +261,7 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
               aria-autocomplete="list"
               aria-activedescendant={safeActive >= 0 ? optionId(safeActive) : undefined}
               aria-label="Search pages, cases and documents"
-              placeholder="Search pages, cases, documents"
+              placeholder="Search cases, documents, details"
               autoComplete="off"
               spellCheck={false}
               value={query}
@@ -269,8 +287,8 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
           >
             {rows.length === 0 ? (
               <p className="relative px-3 py-8 text-center text-base text-fg-3">
-                Nothing matches &ldquo;{query}&rdquo;. Try a case reference such as RC-2026-0147, or
-                a document name.
+                Nothing matches &ldquo;{query}&rdquo;. Try a case reference such as RC-2026-0147, a
+                document name, or a detail such as &ldquo;folio number&rdquo;.
               </p>
             ) : (
               rows.map((row, i) => {
@@ -364,7 +382,15 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
   );
 }
 
-const GROUP_ORDER = ["Recent", "Actions", "Sample cases", "Evidence rooms", "Documents", "Pages"];
+const GROUP_ORDER = [
+  "Recent",
+  "Actions",
+  "Sample cases",
+  "Evidence rooms",
+  "Documents",
+  "Details",
+  "Pages",
+];
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (

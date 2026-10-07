@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { m } from "framer-motion";
 
+import { REVEAL_EVENT } from "@/components/command/command-palette";
 import { cn } from "@/lib/utils";
 
 type PaneId = "milestones" | "documents";
@@ -29,25 +30,59 @@ export function CasePanes({
 
   // Open the right pane for any same-page anchor before the jump happens.
   useEffect(() => {
+    /** Open the pane holding `id`; returns the target, or null if not here. */
+    const open = (id: string) => {
+      const target = document.getElementById(id);
+      if (!target) return null;
+      if (docsRef.current?.contains(target)) setActive("documents");
+      else if (milestonesRef.current?.contains(target)) setActive("milestones");
+      else return null;
+      return target;
+    };
+    const afterPaint = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
+
     const onClick = (e: MouseEvent) => {
       const a = (e.target as Element | null)?.closest?.<HTMLAnchorElement>('a[href^="#"]');
       const id = a?.getAttribute("href")?.slice(1);
       if (!id) return;
-      const target = document.getElementById(id);
-      if (!target) return;
       // Hidden targets can't be scrolled to; reveal the pane, then jump.
-      const hidden = target.offsetParent === null;
-      if (docsRef.current?.contains(target)) setActive("documents");
-      else if (milestonesRef.current?.contains(target)) setActive("milestones");
-      else return;
-      if (hidden) {
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => target.scrollIntoView({ block: "start" })),
-        );
-      }
+      const hidden = document.getElementById(id)?.offsetParent === null;
+      const target = open(id);
+      if (target && hidden) afterPaint(() => target.scrollIntoView({ block: "start" }));
     };
+
+    // Arrivals from the command palette or a shared link: open the pane, bring
+    // the detail into view and mark it briefly so the eye lands on it.
+    const reveal = (id: string) => {
+      const target = open(id);
+      if (!target) return;
+      afterPaint(() => {
+        const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        target.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+        if (!still) {
+          target.animate(
+            [
+              { boxShadow: "0 0 0 2px var(--color-signal), 0 0 32px -6px var(--color-signal)" },
+              { boxShadow: "0 0 0 2px transparent, 0 0 0 0 transparent" },
+            ],
+            { duration: 1800, delay: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+          );
+        }
+      });
+    };
+    const onReveal = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      // Give a same-page navigation (new ?doc=) a moment to render the target.
+      if (typeof id === "string") setTimeout(() => reveal(id), 120);
+    };
+    if (location.hash.length > 1) reveal(decodeURIComponent(location.hash.slice(1)));
+
     document.addEventListener("click", onClick, { capture: true });
-    return () => document.removeEventListener("click", onClick, { capture: true });
+    window.addEventListener(REVEAL_EVENT, onReveal);
+    return () => {
+      document.removeEventListener("click", onClick, { capture: true });
+      window.removeEventListener(REVEAL_EVENT, onReveal);
+    };
   }, []);
 
   const options: { id: PaneId; label: string; count?: number }[] = [
