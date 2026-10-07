@@ -18,8 +18,8 @@ const buttonVariants = cva(
           "border border-control bg-transparent px-5 py-2.5 text-fg hover:border-fg-2 hover:bg-ink-800",
         secondary: "bg-ink-800 px-5 py-2.5 text-fg hover:bg-line",
         ghost: "px-3 py-2 text-fg-2 hover:bg-ink-800 hover:text-fg",
-        confirm: "bg-confirmed px-5 py-2.5 text-on-signal hover:bg-[#7fe0c6]",
-        destructive: "bg-blocker px-5 py-2.5 text-on-signal hover:bg-[#ff968f]",
+        confirm: "bg-confirmed px-5 py-2.5 text-on-signal hover:brightness-110",
+        destructive: "bg-blocker px-5 py-2.5 text-on-signal hover:brightness-110",
         link: "min-h-0 px-0 py-0 text-fg underline decoration-fg/35 underline-offset-[0.22em] active:scale-100 hover:decoration-signal",
       },
       size: {

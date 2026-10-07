@@ -3,6 +3,9 @@ import "@fontsource-variable/mona-sans/wdth.css";
 import "@fontsource-variable/geist-mono";
 import "./globals.css";
 
+import { CommandMenu } from "@/components/command/command-menu";
+import { Spotlight } from "@/components/motion/spotlight";
+
 export const metadata: Metadata = {
   title: {
     default: "RecoveryOS: find the path back to your assets",
@@ -24,11 +27,14 @@ export const viewport: Viewport = {
 // visitor has no reduced-motion preference, so entrance states never flash.
 const motionFlag = `try{if(matchMedia('(prefers-reduced-motion: no-preference)').matches)document.documentElement.dataset.motion='on'}catch(e){}`;
 
+// Also before first paint: restore a theme the visitor chose, so it never flashes.
+const themeFlag = `try{var t=localStorage.getItem('recoveryos:theme');document.documentElement.dataset.theme=t==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-IN" suppressHydrationWarning>
+    <html lang="en-IN" data-theme="dark" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: motionFlag }} />
+        <script dangerouslySetInnerHTML={{ __html: themeFlag + ";" + motionFlag }} />
       </head>
       <body className="min-h-dvh bg-ink-950 text-fg">
         <a
@@ -38,6 +44,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Skip to main content
         </a>
         {children}
+        <CommandMenu />
+        <Spotlight />
       </body>
     </html>
   );

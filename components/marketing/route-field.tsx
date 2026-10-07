@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { gsap, ScrollTrigger, useGSAP, MOTION_QUERIES } from "@/lib/motion/gsap";
 import type { RouteFieldScene } from "@/components/marketing/route-field-scene";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/theme/theme";
 
 type Mode = "pending" | "webgl" | "svg";
 
@@ -43,6 +44,9 @@ export function RouteField({ className }: { className?: string }) {
   const scene = useRef<RouteFieldScene | null>(null);
   const state = useRef({ intro: 0, scroll: 0 });
   const mode = useSyncExternalStore(noSubscribe, readMode, readServerMode);
+  // A theme change rebuilds the scene on a fresh canvas (a disposed WebGL
+  // context can't be reused), so the canvas is keyed by theme.
+  const theme = useTheme();
   const [ready, setReady] = useState(false);
 
   // Decide the rendering path, then load the scene when the browser is idle.
@@ -63,7 +67,7 @@ export function RouteField({ className }: { className?: string }) {
           if (cancelled || !canvas.current || !wrap.current) return;
           const compact =
             matchMedia("(max-width: 767px)").matches || matchMedia("(pointer: coarse)").matches;
-          const s = new RouteFieldScene(canvas.current, { compact, still: reduce });
+          const s = new RouteFieldScene(canvas.current, { compact, still: reduce, theme });
           scene.current = s;
           const r = wrap.current.getBoundingClientRect();
           s.resize(r.width, r.height);
@@ -79,7 +83,7 @@ export function RouteField({ className }: { className?: string }) {
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [mode]);
+  }, [mode, theme]);
 
   // Keep the canvas sized, and pause rendering offscreen or in a hidden tab.
   useEffect(() => {
@@ -161,6 +165,7 @@ export function RouteField({ className }: { className?: string }) {
     <div ref={wrap} aria-hidden="true" className={cn("relative", className)}>
       {mode !== "svg" && (
         <canvas
+          key={theme}
           ref={canvas}
           className={cn(
             "absolute inset-0 size-full transition-opacity duration-700 ease-(--ease-out)",

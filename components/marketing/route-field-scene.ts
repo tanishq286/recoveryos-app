@@ -33,10 +33,29 @@ import {
  * frame and never animates.
  */
 
-const INK = new Color("#8699a0");
-const SIGNAL = new Color("#7cb8ff");
-const SIGNAL_HOT = new Color("#d6e9ff");
-const CONFIRMED = new Color("#5cd3b4");
+/*
+ * Scene palettes, one per theme. Dark adds light (additive blending, a pale
+ * hot core); light lays ink down (normal blending, a brighter hot core and a
+ * thinner halo), because additive light disappears against a white page.
+ */
+const PALETTES = {
+  dark: {
+    ink: new Color("#8699a0"),
+    signal: new Color("#7cb8ff"),
+    hot: new Color("#d6e9ff"),
+    confirmed: new Color("#5cd3b4"),
+    glow: AdditiveBlending,
+    halo: 0.11,
+  },
+  light: {
+    ink: new Color("#7d8c93"),
+    signal: new Color("#1f5fcc"),
+    hot: new Color("#5c9cff"),
+    confirmed: new Color("#08705a"),
+    glow: NormalBlending,
+    halo: 0.045,
+  },
+} as const;
 
 /* Pulse rhythm: travel time along the route, then rest, in seconds. */
 const PULSE_TRAVEL = 2.8;
@@ -180,6 +199,8 @@ const RIPPLE_FRAG = /* glsl */ `
 `;
 
 export interface RouteFieldOptions {
+  /** Which palette to paint with. */
+  theme: "dark" | "light";
   /** Fewer points and a lower pixel-ratio cap on small or low-power screens. */
   compact: boolean;
   /** Render a single, complete frame and never animate. */
@@ -224,10 +245,20 @@ export class RouteFieldScene {
     uDraw: { value: number };
   };
 
+  private ink: Color;
+  private confirmed: Color;
+
   constructor(
     private canvas: HTMLCanvasElement,
     private opts: RouteFieldOptions,
   ) {
+    const pal = PALETTES[opts.theme];
+    const INK = pal.ink;
+    const SIGNAL = pal.signal;
+    const SIGNAL_HOT = pal.hot;
+    const CONFIRMED = pal.confirmed;
+    this.ink = INK;
+    this.confirmed = CONFIRMED;
     this.renderer = new WebGLRenderer({
       canvas,
       alpha: true,
@@ -352,10 +383,10 @@ export class RouteFieldScene {
         },
         transparent: true,
         depthWrite: false,
-        blending: AdditiveBlending,
+        blending: pal.glow,
       });
     // Halo first, so the crisp core sits on top of its own glow.
-    this.haloMat = routeLayer(opts.compact ? 11 : 15, 1, 0.11);
+    this.haloMat = routeLayer(opts.compact ? 11 : 15, 1, pal.halo);
     this.routeMat = routeLayer(2.6, 0, 0.95);
     this.group.add(new Points(routeGeo, this.haloMat));
     this.group.add(new Points(routeGeo, this.routeMat));
@@ -405,7 +436,7 @@ export class RouteFieldScene {
       },
       transparent: true,
       depthWrite: false,
-      blending: AdditiveBlending,
+      blending: pal.glow,
     });
     this.group.add(new Points(rippleGeo, this.rippleMat));
 
@@ -490,7 +521,7 @@ export class RouteFieldScene {
     const draw = still ? 1 : this.intro;
     this.shared.uDraw.value = draw;
     const arrived = Math.max(0, Math.min(1, (draw - 0.97) / 0.03));
-    (this.endMat.uniforms.uColor.value as Color).copy(INK).lerp(CONFIRMED, arrived);
+    (this.endMat.uniforms.uColor.value as Color).copy(this.ink).lerp(this.confirmed, arrived);
 
     this.group.rotation.y = -0.2 + this.current.x * 0.07 + this.scroll * 0.06;
     this.group.rotation.x = this.current.y * 0.035;
