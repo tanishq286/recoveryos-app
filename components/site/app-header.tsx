@@ -19,7 +19,12 @@ export function AppHeader() {
       <div role="note" className="border-b border-(--glass-border) bg-signal-wash/50">
         <p className="mx-auto flex max-w-[84rem] items-start gap-2 px-4 py-2 text-sm text-fg-2 sm:px-6">
           <InfoIcon className="mt-0.5 size-4 shrink-0 text-signal" aria-hidden="true" />
-          <span>
+          {/* Same three facts; the phone version keeps the banner to two lines. */}
+          <span className="sm:hidden">
+            <strong className="font-semibold text-fg">Demo.</strong> All cases are fictional.
+            Nothing you enter is stored or sent to a registry.
+          </span>
+          <span className="hidden sm:inline">
             <strong className="font-semibold text-fg">Demo.</strong> Every case, person and company
             here is fictional. Nothing you enter is stored, and no real registry is contacted.
           </span>
