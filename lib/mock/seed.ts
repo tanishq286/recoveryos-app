@@ -41,7 +41,7 @@ const C1 = "rc-2026-0147";
 const case1: CaseDetail = {
   id: C1,
   reference: "RC-2026-0147",
-  title: "Konkan Coastal Industries — 400 shares and unclaimed dividends",
+  title: "Konkan Coastal Industries: 400 shares and unclaimed dividends",
   status: "evidence_review",
   statusChangedAt: "2026-09-12T11:20:00+05:30",
   statusHistory: [
@@ -78,7 +78,7 @@ const case1: CaseDetail = {
       transferredToIepfOn: "2019-11-14",
       financialYears: ["2011-12", "2012-13", "2013-14", "2014-15", "2015-16", "2016-17", "2017-18"],
       sourceNote:
-        "Share count and transfer date from the registrar's entitlement letter. Dividend amount not yet confirmed — requested from the registrar on 24 Sep 2026.",
+        "Share count and transfer date from the registrar's entitlement letter. Dividend amount not yet confirmed; requested from the registrar on 24 Sep 2026.",
     },
   ],
   nextStep: {
@@ -89,7 +89,7 @@ const case1: CaseDetail = {
     whyItMatters:
       "IEPF-5 must match your share certificate exactly. A single wrong digit in a folio or certificate number is one of the most common reasons a claim comes back.",
     afterThat:
-      "Anjali Deshmukh, your case lead, prepares the IEPF-5 draft, indemnity bond and advance receipt for your approval — expected by 8 Oct 2026, once your name-change proof and the registrar's dividend statement are in.",
+      "Anjali Deshmukh, your case lead, prepares the IEPF-5 draft, indemnity bond and advance receipt for your approval, expected by 8 Oct 2026, once your name-change proof and the registrar's dividend statement are in.",
     blocker: null,
   },
   tasks: [
@@ -306,7 +306,7 @@ const case1: CaseDetail = {
     indicativeValuePaise: 400 * 21240 * 100,
     indicativeValueBasis: "400 shares × ₹212.40, sample closing price on 25 Sep 2026",
     excludedFromEstimate: [
-      "Unclaimed dividends — amount not yet confirmed by the registrar, so it is left out rather than guessed.",
+      "Unclaimed dividends: amount not yet confirmed by the registrar, so it is left out rather than guessed.",
     ],
     valuationRule: VALUATION_RULE,
     conditions: standardConditions,
@@ -361,7 +361,7 @@ const case1Files: EvidenceFile[] = [
     sha256: "bffe4e8e14ab97719b3b9fad3139bebe146a05ccdd71e617e0126a25a68a13be",
     extractionStatus: "needs_review",
     extractionNote:
-      "Read in full. The holder name does not match your PAN — see “Holder name”. Three details are waiting for you to confirm.",
+      "Read in full. The holder name does not match your PAN (see “Holder name”). Three details are waiting for you to confirm.",
   },
   {
     id: "doc-0147-02",
@@ -735,7 +735,7 @@ const C2 = "rc-2026-0132";
 const case2: CaseDetail = {
   id: C2,
   reference: "RC-2026-0132",
-  title: "Sahyadri Polymers — 250 shares",
+  title: "Sahyadri Polymers: 250 shares",
   status: "query_deficiency",
   statusChangedAt: "2026-09-18T15:30:00+05:30",
   statusHistory: [
@@ -785,11 +785,11 @@ const case2: CaseDetail = {
     nextDate: "2026-10-06",
     dateMeaning: "due",
     whyItMatters:
-      "The company says the signature on your claim does not match the specimen it has on file from 1996. Signatures change over 30 years — this is common and fixable.",
+      "The company says the signature on your claim does not match the specimen it has on file from 1996. Signatures change over 30 years. This is common and fixable.",
     afterThat:
       "Anjali Deshmukh sends the attested signature and your affidavit to the company's nodal officer by 9 Oct 2026. The company then re-verifies and reports to the IEPF Authority.",
     blocker: {
-      title: "Signature mismatch — query from the company",
+      title: "Signature mismatch: query from the company",
       detail:
         "Our reply is due by 16 Oct 2026. If there is no reply by then, the claim can be rejected and would have to be filed again.",
     },
@@ -891,7 +891,7 @@ const case2: CaseDetail = {
       occurredAt: "2026-06-12T17:05:00+05:30",
       kind: "status_change",
       title: "Filing pack sent for your approval",
-      detail: "IEPF-5 draft, indemnity bond and advance receipt — 11 pages.",
+      detail: "IEPF-5 draft, indemnity bond and advance receipt: 11 pages.",
       actor: anjali,
       toStatus: "client_approval",
     },
@@ -1180,7 +1180,7 @@ const C3 = "rc-2026-0161";
 const case3: CaseDetail = {
   id: C3,
   reference: "RC-2026-0161",
-  title: "Late Anwar Siddiqui's shares — heir claim",
+  title: "Late Anwar Siddiqui's shares: heir claim",
   status: "awaiting_documents",
   statusChangedAt: "2026-09-22T16:45:00+05:30",
   statusHistory: [
@@ -1227,7 +1227,7 @@ const case3: CaseDetail = {
     whyItMatters:
       "Nothing can be transmitted to you without it, and it tells us which heirship documents the company will ask for next.",
     afterThat:
-      "Rohan Mehta, your case lead, reviews it and tells you exactly which documents this company accepts — expected by 8 Oct 2026.",
+      "Rohan Mehta, your case lead, reviews it and tells you exactly which documents this company accepts, expected by 8 Oct 2026.",
     blocker: null,
   },
   tasks: [
@@ -1247,7 +1247,7 @@ const case3: CaseDetail = {
       caseId: C3,
       title: "Look for share certificates or dividend letters",
       detail:
-        "Old files, bank lockers and annual reports often have them. Anything showing a folio number helps. No deadline — upload whatever you find.",
+        "Old files, bank lockers and annual reports often have them. Anything showing a folio number helps. No deadline: upload whatever you find.",
       owner: farah,
       dueOn: null,
       dueMeaning: "due",

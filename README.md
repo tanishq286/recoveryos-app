@@ -78,6 +78,11 @@ components/
   case/                       status rail, next-step card, tasks, timeline, quote, consents, holdings
   evidence/                   evidence list, detail, proof card, document preview, copy button
   triage/                     triage flow + assessment result
+  command/                    ⌘K palette (client) + server index wrapper
+  viz/                        route timeline, value waterfall, reading summary, route progress, hash glyph
+  motion/                     page transitions, spotlight, magnetic CTA, count interpolation
+  theme/                      theme store + toggle
+  brand/                      wordmark, route loader, route illustrations
   marketing/, site/, brand/
 lib/
   data.ts                     ← the only door to data: RecoveryDataSource interface + getDataSource()
@@ -102,27 +107,81 @@ call the same data source, and `revalidatePath` the affected pages. `lib/data.ts
 
 **Honesty is structural, not just copy.**
 
-- An extracted field's `value` is `null` when it was not found. The UI says "Not found —
-  left blank, not estimated". The database enforces the same rule (`not_found_means_no_value`,
+- An extracted field's `value` is `null` when it was not found. The UI says "Not found.
+  Left blank, not estimated." The database enforces the same rule (`not_found_means_no_value`,
   `value_has_provenance`).
 - The triage never claims a match. Registries without a live connector report
-  `not_connected` with `checkedAt: null` ("Last checked: never — not queried"). Only the rules
+  `not_connected` with `checkedAt: null` ("Last checked: never, not queried"). Only the rules
   engine reports `checked`, with a real timestamp and the rule version.
 - Quotes carry an indicative value only with a stated basis (`value_needs_basis` in SQL).
   Unconfirmed amounts are listed as "left out", not guessed.
 
-**Design system.** Tokens are in `app/globals.css`: ink `#14232B`, ivory `#F7F5EF`,
-pearl `#FFFFFF`, brass `#A58354` (active progress only), teal `#267F77` (confirmed states
-only), and red `#B3261E` for real blockers only. Brass and teal fail 4.5:1 as small text on
-ivory, so text uses darker variants (`brass-ink` `#7D6238`, `teal-ink` `#1F6B64`); the
-contrast of each is noted in the CSS. Fraunces (display) and Inter (body/data) are
+**Design system.** "The Precision Statement": a deep-ink interface with one cool accent. Dark
+is the default; a cool, editorial light theme restates the same tokens (toggle in the header,
+remembered per browser, restored before first paint so it never flashes). Tokens live in `app/globals.css` (`@theme`): ink ladder `#0B1114` to `#1A262C`,
+foreground `#E6EDEF` / `#A3B3B9` / `#8699A0`, signal blue `#7CB8FF` (the only accent),
+confirmed mint `#5CD3B4` and blocker coral `#FF7A72` (semantic only). Every text pair is AA on
+its ground; the contrast values are noted in the CSS. Mona Sans Variable (display and body,
+with width and tracking tuned per size) and Geist Mono (real identifiers only) are
 self-hosted through `@fontsource-variable`, so the build never fetches fonts from the
-network. Dates, amounts, IDs and checksums use tabular numerals.
+network. Icons are Phosphor. Dates, amounts, IDs and checksums use tabular numerals.
 
-**shadcn/ui.** `components.json` is configured (new-york style, CSS variables, lucide). The
-primitives in `components/ui/` were added by hand in shadcn's current source style, because
-the shadcn registry was not reachable from the build environment. `npx shadcn add <component>`
-works as normal from here.
+Charts draw from dedicated fills (`--color-chart-signal`, `--color-chart-credit`,
+`--color-chart-muted`), stepped into the categorical lightness band for each theme and checked
+with a colour-vision validator (adjacent CVD ΔE 14.1 dark, 15.8 light). Text never wears a
+series colour. A semantic layer (`--surface`, `--surface-raised`, `--text-secondary`,
+`--success`, `--danger`, `--chart-1..3`, `--gradient-route`, durations and z-index) sits on
+top of the ink ladder for new components.
+
+Where the system is written down:
+
+- `MASTER.md`: canonical tokens, motion rules and components.
+- `DESIGN.md` and `.impeccable/design.json`: the system as built, in the DESIGN.md format.
+- `design/recoveryos.dna.json`: the structured Design DNA (system, style, visual effects).
+- `PRODUCT.md`: product truth and principles, including the trust rule (only copy the
+  product can fully deliver).
+
+**Motion layer.** Design layer only; no logic, routes or data flow depend on it.
+
+- Landing: GSAP (`lib/motion/gsap.ts`) drives a SplitText line-mask hero reveal, batched
+  ScrollTrigger reveals, a scroll-drawn staged route (DrawSVG) and the pricing ledger print.
+- The hero's route field (`components/marketing/route-field*.ts(x)`) is vanilla three.js with
+  custom shaders, loaded on idle after first paint. The route draws in, then signal pulses
+  travel it and wake nearby records, the field swells slowly, a cursor lens lifts records
+  on fine pointers, and the credit mark ripples when a pulse arrives. The route glow is a
+  second additive point layer, not a post-processing pass. The loop runs only while the
+  canvas is on screen and the tab is visible, caps pixel ratio, and falls back to an SVG
+  route when WebGL is unavailable, Save-Data is on, or the device is low-end. Reduced
+  motion renders one still frame.
+- Product screens use short CSS transitions only (press, state morph, direction-aware step
+  change, receipt lines printing in). Everything animates `transform` and `opacity`.
+- An inline `<head>` script sets `data-motion="on"` only without a reduced-motion preference,
+  and a CSS failsafe reveals hidden hero text after 2.4s, so content is never stuck hidden.
+
+**Interface layer.** Also presentation only, built on the same data the pages already read:
+
+- **Command palette** (`components/command/`): ⌘K / Ctrl+K anywhere, or the header Search
+  button. Searches pages, sample cases, evidence rooms and documents (by name, reference,
+  category or checksum prefix), remembers recent picks, and follows the WAI-ARIA combobox
+  pattern. The index (`lib/command-index.ts`) is built on the server from the data source;
+  with real data it must be scoped to the signed-in viewer.
+- **Visualizations** (`components/viz/`), every one drawn from real case data with its
+  numbers also in text: the time-scaled route timeline (Steps / Timeline tabs on the case
+  page), the "what reaches you" waterfall in the quote (value, fee, planned protection, net
+  before GST), the evidence reading summary (confirmed / waiting / no check needed / not
+  found), route progress on the cases list, and each document's checksum drawn as a
+  fingerprint mark.
+- **Page transitions**: React `<ViewTransition>` with typed navigations. Deeper links slide
+  forward, breadcrumbs slide back, the header stays fixed, and case titles carry a shared
+  name between list, case and evidence room. Browsers without the API simply swap pages.
+- **Signature surfaces**: a fixed light field and grain behind every page, a cursor spotlight
+  on interactive cards (fine pointers only), a sheen and a 3px magnetic lean on the main
+  CTA, a branded route loader, and route illustrations on 404, error and empty states.
+
+**shadcn/ui.** `components.json` is configured (new-york style, CSS variables, Phosphor).
+The primitives in `components/ui/` were added by hand in shadcn's current source style,
+because the shadcn registry was not reachable from the build environment.
+`npx shadcn add <component>` works as normal from here.
 
 ## What is mocked vs real
 
@@ -196,7 +255,7 @@ No page or component changes.
 
 ## Quality gates
 
-- **WCAG 2.2 AA.** Focus is visible everywhere: one global 2px ink outline, never removed.
+- **WCAG 2.2 AA.** Focus is visible everywhere: one global 2px signal-blue outline, never removed.
   Other measures:
   - A skip link, one `h1` per page, landmarks, and breadcrumbs with `aria-current`.
   - Status is never shown by colour alone. Every badge has a text label and icon, and the
@@ -206,12 +265,13 @@ No page or component changes.
   - Body text is 16px or larger; `text-sm` (15px) is used only for metadata. Touch targets
     are at least 44px.
   - axe-core (WCAG 2.0/2.1/2.2 A + AA, plus best practice) reports **0 violations** on every
-    route at 1280px and at 320px.
+    route at 1440px, 390px and 320px.
 - **320px layout.** No horizontal page scroll on any route at 320px (checked in Chromium).
   The rail collapses to a progress bar plus an expandable list, and tables become cards.
-- **Motion.** Only milestone transitions animate: the current rail step, the triage step
-  change and the result. Each is a single 200–220ms entrance, nothing loops, and skeletons
-  do not shimmer. `prefers-reduced-motion` turns animation off.
+- **Motion.** UI transitions are 160 to 260ms on one easing family and animate `transform`
+  and `opacity` only; nothing loops and skeletons do not shimmer. Functional product screens
+  have no scroll reveals. `prefers-reduced-motion` collapses animation, and
+  `prefers-reduced-transparency` and `prefers-contrast: more` are handled.
 - **States.** Every data route has a `loading.tsx` with static skeletons. There are error
   boundaries (`error.tsx`, `global-error.tsx`) and `not-found` pages, including one for a
   case you may not see ("we don't say which").

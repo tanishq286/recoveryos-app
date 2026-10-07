@@ -2,16 +2,15 @@
 
 import Link from "next/link";
 import {
-  ArrowRight,
-  Check,
-  CircleAlert,
-  CircleSlash,
-  ExternalLink,
-  FileSearch,
-  Info,
-  Unplug,
-  type LucideIcon,
-} from "lucide-react";
+  ArrowRightIcon,
+  ArrowUpRightIcon,
+  CheckIcon,
+  FileMagnifyingGlassIcon,
+  InfoIcon,
+  MinusCircleIcon,
+  PlugsIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 import type { EligibilityAssessment, SourceCheckStatus } from "@/lib/types";
 import { formatReceiptTime } from "@/lib/format";
@@ -20,19 +19,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const SOURCE_STATUS: Record<SourceCheckStatus, { label: string; Icon: LucideIcon; tone: string }> =
-  {
-    checked: { label: "Checked", Icon: Check, tone: "text-teal-ink" },
-    match_found: { label: "Record found", Icon: Check, tone: "text-teal-ink" },
-    no_match: { label: "No record found", Icon: CircleSlash, tone: "text-ink" },
-    not_connected: { label: "Not queried", Icon: Unplug, tone: "text-slate" },
-    insufficient_evidence: {
-      label: "Insufficient evidence",
-      Icon: CircleAlert,
-      tone: "text-brass-ink",
-    },
-    error: { label: "Check failed", Icon: CircleAlert, tone: "text-alert" },
-  };
+const SOURCE_STATUS: Record<
+  SourceCheckStatus,
+  { label: string; Icon: typeof CheckIcon; tone: string }
+> = {
+  checked: { label: "Checked", Icon: CheckIcon, tone: "text-confirmed" },
+  match_found: { label: "Record found", Icon: CheckIcon, tone: "text-confirmed" },
+  no_match: { label: "No record found", Icon: MinusCircleIcon, tone: "text-fg" },
+  not_connected: { label: "Not queried", Icon: PlugsIcon, tone: "text-fg-3" },
+  insufficient_evidence: {
+    label: "Insufficient evidence",
+    Icon: WarningCircleIcon,
+    tone: "text-signal",
+  },
+  error: { label: "Check failed", Icon: WarningCircleIcon, tone: "text-blocker" },
+};
 
 const CONFIDENCE_BADGE: Record<
   EligibilityAssessment["confidence"],
@@ -55,36 +56,35 @@ export function AssessmentResult({
   const conf = CONFIDENCE_BADGE[a.confidence];
 
   return (
-    <div className="animate-step-in space-y-8">
+    <div className="animate-arrive space-y-10">
       <section aria-labelledby="result-heading">
-        <p className="eyebrow text-brass-ink">Your route assessment</p>
         <h1
           id="result-heading"
           ref={headingRef}
           tabIndex={-1}
-          className="mt-2 font-display text-3xl leading-tight font-medium text-ink focus:outline-none sm:text-4xl"
+          className="text-3xl leading-tight text-fg focus:outline-none sm:text-4xl sm:leading-[1.1]"
         >
           {a.headline}
         </h1>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Badge variant={conf.variant}>Confidence: {conf.label}</Badge>
           <Badge variant="outline">{a.routeLabel}</Badge>
         </div>
-        <p className="mt-4 max-w-2xl text-base text-slate">
-          This suggests a route. It does not confirm that a holding exists, and nobody — including
-          us — can guarantee recovery.
+        <p className="mt-5 max-w-2xl text-base text-fg-2">
+          This suggests a route. It does not confirm that a holding exists, and nobody, including
+          us, can guarantee recovery.
         </p>
       </section>
 
       {a.missing.length > 0 && (
         <Alert variant="info">
-          <FileSearch aria-hidden="true" />
-          <AlertTitle>Insufficient evidence — here is exactly what&apos;s missing</AlertTitle>
+          <FileMagnifyingGlassIcon aria-hidden="true" />
+          <AlertTitle>Insufficient evidence: here is exactly what&apos;s missing</AlertTitle>
           <AlertDescription>
             <ul className="space-y-3">
               {a.missing.map((m) => (
                 <li key={m.field}>
-                  <p className="font-semibold text-ink">{m.field}</p>
+                  <p className="font-semibold text-fg">{m.field}</p>
                   <p>{m.why}</p>
                 </li>
               ))}
@@ -93,21 +93,24 @@ export function AssessmentResult({
         </Alert>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-10 lg:grid-cols-2">
         <section aria-labelledby="why-heading">
-          <h2 id="why-heading" className="font-display text-xl font-medium text-ink">
+          <h2 id="why-heading" className="text-xl text-fg">
             Why we think so
           </h2>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-base text-ink marker:text-brass">
+          <ul className="mt-4 space-y-2.5 text-base text-fg">
             {a.reasons.map((r) => (
-              <li key={r}>{r}</li>
+              <li key={r} className="flex gap-3">
+                <span aria-hidden="true" className="mt-[0.8em] h-px w-3 shrink-0 bg-signal" />
+                <span className="min-w-0">{r}</span>
+              </li>
             ))}
           </ul>
           {a.inputNotes.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-5 space-y-2">
               {a.inputNotes.map((n) => (
-                <p key={n} className="flex items-start gap-2 text-sm text-slate">
-                  <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <p key={n} className="flex items-start gap-2 text-sm text-fg-3">
+                  <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   {n}
                 </p>
               ))}
@@ -116,12 +119,14 @@ export function AssessmentResult({
         </section>
 
         <section aria-labelledby="now-heading">
-          <h2 id="now-heading" className="font-display text-xl font-medium text-ink">
+          <h2 id="now-heading" className="text-xl text-fg">
             What you can do now
           </h2>
-          <ol className="mt-3 list-decimal space-y-2 pl-5 text-base text-ink marker:font-semibold marker:text-brass-ink">
+          <ol className="tnum mt-4 list-decimal space-y-2.5 pl-5 text-base text-fg marker:font-medium marker:text-signal">
             {a.nextSteps.map((s) => (
-              <li key={s}>{s}</li>
+              <li key={s} className="pl-1">
+                {s}
+              </li>
             ))}
           </ol>
         </section>
@@ -131,46 +136,52 @@ export function AssessmentResult({
         <h2 id="routes-heading" className="sr-only">
           Your options
         </h2>
-        <div className="rounded-lg border border-line bg-pearl p-5">
-          <p className="eyebrow text-slate">Do it yourself · free</p>
-          <ul className="mt-3 space-y-3">
+        <div className="panel p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg text-fg">Do it yourself</h3>
+            <Badge variant="outline">Free</Badge>
+          </div>
+          <ul className="mt-4 space-y-4">
             {a.selfService.map((l) => (
               <li key={l.href}>
                 <a
                   href={l.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-start gap-1.5 font-medium text-ink underline decoration-ink/30 underline-offset-4 hover:decoration-ink"
+                  className="link inline-flex items-start gap-1.5 font-medium"
                 >
                   {l.label}
-                  <ExternalLink className="mt-1 size-4 shrink-0" aria-hidden="true" />
+                  <ArrowUpRightIcon className="mt-1 size-4 shrink-0" aria-hidden="true" />
                   <span className="sr-only"> (opens in a new tab)</span>
                 </a>
-                <p className="text-sm text-slate">{l.note}</p>
+                <p className="mt-0.5 text-sm text-fg-3">{l.note}</p>
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-lg border border-line bg-pearl p-5">
-          <p className="eyebrow text-slate">With RecoveryOS · paid only on success</p>
+        <div className="panel p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg text-fg">With RecoveryOS</h3>
+            <Badge variant="progress">Paid only on success</Badge>
+          </div>
           {a.inScope ? (
             <>
-              <p className="mt-3 text-base text-ink">
+              <p className="mt-4 text-base text-fg-2">
                 We gather the documents, prepare IEPF-5 for your approval, chase the company, and
                 show you who holds each step. 10% of what is actually credited, nothing upfront.
               </p>
-              <p className="mt-2 text-sm text-slate">
+              <p className="mt-2 text-sm text-fg-3">
                 Opening real cases is switched off in this demo.
               </p>
-              <Button asChild variant="outline" className="mt-4">
+              <Button asChild variant="outline" className="mt-5">
                 <Link href="/cases/rc-2026-0147">
                   See a sample case
-                  <ArrowRight aria-hidden="true" />
+                  <ArrowRightIcon weight="bold" aria-hidden="true" />
                 </Link>
               </Button>
             </>
           ) : (
-            <p className="mt-3 text-base text-ink">
+            <p className="mt-4 text-base text-fg-2">
               We are starting with IEPF shares and dividends only, so we can&apos;t take this case
               yet. The free route on the left is the right place to begin.
             </p>
@@ -178,39 +189,35 @@ export function AssessmentResult({
         </div>
       </section>
 
-      <section
-        aria-labelledby="receipt-heading"
-        className="rounded-lg border border-ink/20 bg-pearl"
-      >
-        <div className="border-b border-dashed border-line px-5 py-4">
-          <h2 id="receipt-heading" className="font-display text-xl font-medium text-ink">
+      <section aria-labelledby="receipt-heading" className="panel panel-lift overflow-hidden">
+        <div className="border-b border-dashed border-line px-5 py-5 sm:px-6">
+          <h2 id="receipt-heading" className="text-xl text-fg">
             Sources checked
           </h2>
-          <p className="tnum mt-1 text-sm text-slate">
-            Receipt {a.id} · generated {formatReceiptTime(a.assessedAt)}
+          <p className="tnum mt-1.5 text-sm text-fg-3">
+            Receipt <span className="font-mono text-fg-2">{a.id}</span>, generated{" "}
+            {formatReceiptTime(a.assessedAt)}
           </p>
-          <p className="tnum text-sm text-slate">
-            {a.ruleVersion.label} ({a.ruleVersion.id}), effective {a.ruleVersion.effectiveFrom}
-            {a.ruleVersion.status === "demo" ? " · demo rule set" : ""}
+          <p className="tnum text-sm text-fg-3">
+            {a.ruleVersion.label} (<span className="font-mono">{a.ruleVersion.id}</span>), effective{" "}
+            {a.ruleVersion.effectiveFrom}
+            {a.ruleVersion.status === "demo" ? ", demo rule set" : ""}
           </p>
         </div>
         <ul className="divide-y divide-line">
-          {a.sources.map((s) => {
+          {a.sources.map((s, i) => {
             const st = SOURCE_STATUS[s.status];
             return (
               <li
                 key={s.id}
-                className="grid gap-2 px-5 py-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
+                // Lines print in order, like a statement coming off the printer.
+                style={{ animationDelay: `${120 + i * 70}ms` }}
+                className="grid animate-print gap-2 px-5 py-4 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:gap-6"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-ink">
+                  <p className="font-semibold text-fg">
                     {s.url ? (
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline decoration-ink/30 underline-offset-4 hover:decoration-ink"
-                      >
+                      <a href={s.url} target="_blank" rel="noopener noreferrer" className="link">
                         {s.sourceName}
                         <span className="sr-only"> (opens in a new tab)</span>
                       </a>
@@ -218,28 +225,28 @@ export function AssessmentResult({
                       s.sourceName
                     )}
                   </p>
-                  <p className="text-sm text-slate">{s.operator}</p>
-                  <p className="mt-1 text-sm text-ink/85">
-                    <span className="font-medium">What we checked: </span>
+                  <p className="text-sm text-fg-3">{s.operator}</p>
+                  <p className="mt-1.5 text-sm text-fg-2">
+                    <span className="font-medium text-fg">What we checked: </span>
                     {s.whatWeChecked}
                   </p>
                 </div>
                 <div className="min-w-0">
                   <p className={cn("flex items-center gap-1.5 font-semibold", st.tone)}>
-                    <st.Icon className="size-4 shrink-0" aria-hidden="true" />
+                    <st.Icon weight="bold" className="size-4 shrink-0" aria-hidden="true" />
                     {st.label}
                   </p>
-                  <p className="mt-0.5 text-sm text-ink/85">{s.statusDetail}</p>
-                  <p className="tnum mt-1 text-sm text-slate">
+                  <p className="mt-0.5 text-sm text-fg-2">{s.statusDetail}</p>
+                  <p className="tnum mt-1.5 text-sm text-fg-3">
                     Last checked:{" "}
-                    {s.checkedAt ? formatReceiptTime(s.checkedAt) : "never — not queried"}
+                    {s.checkedAt ? formatReceiptTime(s.checkedAt) : "never, not queried"}
                   </p>
                 </div>
               </li>
             );
           })}
         </ul>
-        <p className="border-t border-dashed border-line px-5 py-3 text-sm text-slate">
+        <p className="border-t border-dashed border-line px-5 py-4 text-sm text-fg-3 sm:px-6">
           We only show a match when a source actually returned one. Nothing here is inferred or
           filled in.
         </p>

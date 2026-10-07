@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource-variable/fraunces/opsz.css";
-import "@fontsource-variable/inter/opsz.css";
+import "@fontsource-variable/mona-sans/wdth.css";
+import "@fontsource-variable/geist-mono";
 import "./globals.css";
+
+import { CommandMenu } from "@/components/command/command-menu";
+import { Spotlight } from "@/components/motion/spotlight";
 
 export const metadata: Metadata = {
   title: {
-    default: "RecoveryOS — find the path back to your assets",
+    default: "RecoveryOS: find the path back to your assets",
     template: "%s · RecoveryOS",
   },
   description:
@@ -13,22 +16,36 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F7F5EF",
+  themeColor: "#0B1114",
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
+
+// Runs before first paint: marks the document as motion-capable only when the
+// visitor has no reduced-motion preference, so entrance states never flash.
+const motionFlag = `try{if(matchMedia('(prefers-reduced-motion: no-preference)').matches)document.documentElement.dataset.motion='on'}catch(e){}`;
+
+// Also before first paint: restore a theme the visitor chose, so it never flashes.
+const themeFlag = `try{var t=localStorage.getItem('recoveryos:theme');document.documentElement.dataset.theme=t==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-IN">
-      <body className="min-h-dvh bg-background text-foreground">
+    <html lang="en-IN" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeFlag + ";" + motionFlag }} />
+      </head>
+      <body className="min-h-dvh bg-ink-950 text-fg">
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-ink focus:px-4 focus:py-3 focus:text-ivory"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-signal focus:px-4 focus:py-3 focus:font-medium focus:text-on-signal"
         >
           Skip to main content
         </a>
         {children}
+        <CommandMenu />
+        <Spotlight />
       </body>
     </html>
   );

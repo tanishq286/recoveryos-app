@@ -4,14 +4,14 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-lg border px-4 py-4 text-base has-[>svg]:grid-cols-[calc(var(--spacing)*5)_1fr] has-[>svg]:gap-x-3 [&>svg]:mt-0.5 [&>svg]:size-5 [&>svg]:text-current",
+  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-[var(--radius-panel)] border px-4 py-4 text-base has-[>svg]:grid-cols-[calc(var(--spacing)*5)_1fr] has-[>svg]:gap-x-3 [&>svg]:mt-0.5 [&>svg]:size-5",
   {
     variants: {
       variant: {
-        default: "border-line bg-pearl text-ink",
-        info: "border-brass/50 bg-brass-wash text-ink [&>svg]:text-brass-ink",
-        confirmed: "border-teal/50 bg-teal-wash text-ink [&>svg]:text-teal-ink",
-        blocker: "border-alert/60 bg-alert-wash text-ink [&>svg]:text-alert",
+        default: "border-line bg-ink-850 text-fg [&>svg]:text-fg-2",
+        info: "border-signal/30 bg-signal-wash text-fg [&>svg]:text-signal",
+        confirmed: "border-confirmed/30 bg-confirmed-wash text-fg [&>svg]:text-confirmed",
+        blocker: "border-blocker/50 bg-blocker-wash text-fg [&>svg]:text-blocker",
       },
     },
     defaultVariants: {
@@ -32,7 +32,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="alert-title"
-      className={cn("col-start-2 font-semibold leading-snug", className)}
+      className={cn("col-start-2 leading-snug font-semibold", className)}
       {...props}
     />
   );
@@ -42,10 +42,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   return (
     <div
       data-slot="alert-description"
-      className={cn(
-        "col-start-2 grid gap-2 text-base text-ink/90 [&_p]:leading-relaxed",
-        className,
-      )}
+      className={cn("col-start-2 grid gap-2 text-base text-fg-2 [&_p]:leading-relaxed", className)}
       {...props}
     />
   );

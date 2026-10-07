@@ -22,25 +22,25 @@ export function DocumentPreview({
     .filter((f, i, arr) => arr.findIndex((x) => x.sourceSnippet === f.sourceSnippet) === i);
 
   return (
-    <figure className="rounded-md border border-line bg-ivory p-3">
-      <div className="rounded-sm border border-line bg-pearl px-4 py-5 shadow-[0_1px_2px_rgba(20,35,43,0.06)] sm:px-6">
-        <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-line pb-2">
-          <p className="eyebrow text-slate">{CATEGORY_LABELS[file.category]}</p>
-          <p className="tnum text-xs text-slate">
+    <figure className="panel p-3">
+      <div className="rounded-[var(--radius-control)] border border-line bg-ink-900 px-4 py-5 sm:px-6">
+        <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-line pb-3">
+          <p className="text-sm text-fg-3">{CATEGORY_LABELS[file.category]}</p>
+          <p className="tnum text-sm text-fg-3">
             Page {page} of {file.pageCount}
           </p>
         </div>
         {lines.length === 0 ? (
-          <p className="py-6 text-center text-base text-slate">No lines read from this page.</p>
+          <p className="py-6 text-center text-base text-fg-3">No lines read from this page.</p>
         ) : (
-          <ul className="mt-3 space-y-2 font-mono text-[0.9375rem] leading-relaxed text-ink">
+          <ul className="mt-3 space-y-1.5 font-mono text-[0.9375rem] leading-relaxed text-fg">
             {lines.map((f) => (
               <li
                 key={f.id}
                 className={cn(
                   "rounded-sm px-2 py-1 break-words",
                   highlightFieldId === f.id
-                    ? "bg-brass-wash outline outline-1 outline-brass"
+                    ? "bg-signal-wash outline-1 outline-signal/60 outline-solid"
                     : "bg-transparent",
                 )}
               >
@@ -50,8 +50,8 @@ export function DocumentPreview({
           </ul>
         )}
       </div>
-      <figcaption className="mt-2 text-sm text-slate">
-        Lines as read from <span className="font-medium text-ink">{file.fileName}</span>, page{" "}
+      <figcaption className="mt-3 px-1 text-sm text-fg-3">
+        Lines as read from <span className="font-medium text-fg-2">{file.fileName}</span>, page{" "}
         <span className="tnum">{page}</span>. A text reconstruction, not an image of the original.
       </figcaption>
     </figure>

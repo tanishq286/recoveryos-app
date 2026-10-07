@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CircleAlert } from "lucide-react";
+import {
+  ArrowRightIcon,
+  CalendarBlankIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 import type { NextStep } from "@/lib/types";
 import { formatDate, formatDayShort } from "@/lib/format";
@@ -25,48 +29,44 @@ export function NextStepCard({
   return (
     <section
       aria-labelledby="next-step-heading"
-      className={cn(
-        "rounded-lg border bg-pearl p-5 shadow-[0_1px_0_rgba(20,35,43,0.04)] sm:p-7",
-        blocked ? "border-alert/60" : "border-line",
-      )}
+      className={cn("panel panel-lift p-6 sm:p-8", blocked && "border-blocker/50")}
     >
-      <p className="eyebrow text-brass-ink">What happens next</p>
       <h2
         id="next-step-heading"
-        className="mt-2 max-w-3xl font-display text-2xl leading-snug font-medium text-ink sm:text-[1.75rem]"
+        className="max-w-[28ch] text-[clamp(1.5rem,2.8vw,2.125rem)] leading-[1.15] text-fg"
       >
         We are waiting for {step.waitingFor}.
       </h2>
 
-      <dl className="mt-5 grid gap-5 sm:grid-cols-2 lg:max-w-2xl">
+      <dl className="mt-7 grid gap-6 sm:grid-cols-2 lg:max-w-2xl">
         <div>
-          <dt className="eyebrow text-slate">Who has it</dt>
+          <dt className="text-sm text-fg-3">Who has it</dt>
           <dd className="mt-2">
             <PartyLine party={step.owner} />
           </dd>
         </div>
         <div>
-          <dt className="eyebrow text-slate">{DATE_LABEL[step.dateMeaning]}</dt>
-          <dd className="mt-2 flex items-center gap-2.5">
+          <dt className="text-sm text-fg-3">{DATE_LABEL[step.dateMeaning]}</dt>
+          <dd className="mt-2 flex items-center gap-3">
             <span
               aria-hidden="true"
-              className="grid size-8 place-items-center rounded-full border border-line bg-mist"
+              className="grid size-9 place-items-center rounded-full border border-line bg-ink-800"
             >
-              <CalendarClock className="size-4 text-ink" />
+              <CalendarBlankIcon className="size-4 text-fg-2" />
             </span>
             <span>
-              <span className="tnum block font-medium text-ink">
+              <span className="tnum block font-medium text-fg">
                 {formatDayShort(step.nextDate)}
               </span>
-              <span className="tnum block text-sm text-slate">{formatDate(step.nextDate)}</span>
+              <span className="tnum block text-sm text-fg-3">{formatDate(step.nextDate)}</span>
             </span>
           </dd>
         </div>
       </dl>
 
       {step.blocker && (
-        <Alert variant="blocker" className="mt-6">
-          <CircleAlert aria-hidden="true" />
+        <Alert variant="blocker" className="mt-7">
+          <WarningCircleIcon weight="bold" aria-hidden="true" />
           <AlertTitle>
             <span className="sr-only">Blocker: </span>
             {step.blocker.title}
@@ -77,23 +77,23 @@ export function NextStepCard({
         </Alert>
       )}
 
-      <div className="mt-6 grid gap-4 border-t border-line pt-5 md:grid-cols-2">
+      <div className="mt-8 grid gap-6 border-t border-line pt-6 md:grid-cols-2">
         <div>
-          <h3 className="font-sans text-base font-semibold text-ink">Why it matters</h3>
-          <p className="mt-1 text-base text-ink/90">{step.whyItMatters}</p>
+          <h3 className="text-base font-semibold text-fg">Why it matters</h3>
+          <p className="mt-1.5 text-base text-fg-2">{step.whyItMatters}</p>
         </div>
         <div>
-          <h3 className="font-sans text-base font-semibold text-ink">After that</h3>
-          <p className="mt-1 text-base text-ink/90">{step.afterThat}</p>
+          <h3 className="text-base font-semibold text-fg">After that</h3>
+          <p className="mt-1.5 text-base text-fg-2">{step.afterThat}</p>
         </div>
       </div>
 
       {action && (
-        <div className="mt-6">
+        <div className="mt-8">
           <Button asChild>
             <Link href={action.href}>
               {action.label}
-              <ArrowRight aria-hidden="true" />
+              <ArrowRightIcon aria-hidden="true" />
             </Link>
           </Button>
         </div>

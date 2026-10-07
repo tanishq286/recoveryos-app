@@ -1,24 +1,30 @@
-import { Check, CircleAlert, Clock, Hourglass, Search } from "lucide-react";
+import {
+  CheckIcon,
+  ClockIcon,
+  HourglassIcon,
+  MagnifyingGlassIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 import type { ExtractionStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { EXTRACTION_LABELS } from "@/lib/labels";
 
 const ICONS = {
-  queued: Clock,
-  extracting: Hourglass,
-  extracted: Check,
-  needs_review: Search,
-  failed: CircleAlert,
-  not_applicable: Check,
-} satisfies Record<ExtractionStatus, typeof Check>;
+  queued: ClockIcon,
+  extracting: HourglassIcon,
+  extracted: CheckIcon,
+  needs_review: MagnifyingGlassIcon,
+  failed: WarningCircleIcon,
+  not_applicable: CheckIcon,
+} satisfies Record<ExtractionStatus, typeof CheckIcon>;
 
 export function ExtractionBadge({ status }: { status: ExtractionStatus }) {
   const s = EXTRACTION_LABELS[status];
   const Icon = ICONS[status];
   return (
     <Badge variant={s.variant}>
-      <Icon aria-hidden="true" />
+      <Icon weight="bold" aria-hidden="true" />
       {s.label}
     </Badge>
   );

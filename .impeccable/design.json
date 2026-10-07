@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T14:03:05Z",
+  "title": "Design System: RecoveryOS",
+  "extensions": {
+    "colorMeta": {
+      "signal": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "canonical": "#7cb8ff",
+        "tonalRamp": [
+          "oklch(18% 0.12 250)",
+          "oklch(28% 0.12 250)",
+          "oklch(38% 0.12 250)",
+          "oklch(50% 0.12 250)",
+          "oklch(62% 0.12 250)",
+          "oklch(74% 0.12 250)",
+          "oklch(86% 0.12 250)",
+          "oklch(95% 0.12 250)"
+        ]
+      },
+      "confirmed": {
+        "role": "secondary",
+        "displayName": "Confirmed Mint",
+        "canonical": "#5cd3b4",
+        "tonalRamp": [
+          "oklch(18% 0.1 175)",
+          "oklch(28% 0.1 175)",
+          "oklch(38% 0.1 175)",
+          "oklch(50% 0.1 175)",
+          "oklch(62% 0.1 175)",
+          "oklch(74% 0.1 175)",
+          "oklch(86% 0.1 175)",
+          "oklch(95% 0.1 175)"
+        ]
+      },
+      "blocker": {
+        "role": "tertiary",
+        "displayName": "Blocker Coral",
+        "canonical": "#ff7a72",
+        "tonalRamp": [
+          "oklch(18% 0.15 25)",
+          "oklch(28% 0.15 25)",
+          "oklch(38% 0.15 25)",
+          "oklch(50% 0.15 25)",
+          "oklch(62% 0.15 25)",
+          "oklch(74% 0.15 25)",
+          "oklch(86% 0.15 25)",
+          "oklch(95% 0.15 25)"
+        ]
+      },
+      "ink-950": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0b1114",
+        "tonalRamp": [
+          "oklch(18% 0.02 230)",
+          "oklch(28% 0.02 230)",
+          "oklch(38% 0.02 230)",
+          "oklch(50% 0.02 230)",
+          "oklch(62% 0.02 230)",
+          "oklch(74% 0.02 230)",
+          "oklch(86% 0.02 230)",
+          "oklch(95% 0.02 230)"
+        ]
+      },
+      "chart-signal": {
+        "role": "secondary",
+        "displayName": "Chart Signal",
+        "canonical": "#4f93dc"
+      },
+      "chart-credit": {
+        "role": "secondary",
+        "displayName": "Chart Credit",
+        "canonical": "#2ea98a"
+      },
+      "chart-muted": {
+        "role": "neutral",
+        "displayName": "Chart Muted",
+        "canonical": "#5a6c75"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section and page headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose, never below 16px."
+      },
+      "identifier": {
+        "displayName": "Identifier",
+        "purpose": "Folio numbers, checksums, receipt ids only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "highlight",
+        "value": "inset 0 1px 0 rgb(230 237 239 / 0.05)",
+        "purpose": "Top edge on every panel."
+      },
+      {
+        "name": "lift",
+        "value": "inset 0 1px 0 rgb(230 237 239 / 0.05), 0 32px 64px -24px rgb(2 6 8 / 0.85)",
+        "purpose": "One focal panel per screen."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Entrances and most UI transitions."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "On-screen movement."
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "Sheets and drawers."
+      },
+      {
+        "name": "press",
+        "value": "160ms scale(0.97)",
+        "purpose": "Button and card press feedback."
+      },
+      {
+        "name": "hero-reveal",
+        "value": "1.05s expo.out, 0.09s line stagger",
+        "purpose": "GSAP SplitText line masks on the landing hero."
+      },
+      {
+        "name": "page-transition",
+        "value": "340ms slide 36px + 220ms blur fade",
+        "purpose": "Typed navigations: forward deeper, back via breadcrumbs; header anchored."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action per view.",
+      "html": "<button class=\"ds-btn-primary\">Start the 3-minute check</button>",
+      "css": ".ds-btn-primary{background:var(--color-signal);color:var(--color-on-signal);padding:12px 20px;min-height:44px;border:0;border-radius:8px;font-weight:500;transition:transform 160ms cubic-bezier(.23,1,.32,1),background-color 160ms}.ds-btn-primary:hover{background:var(--color-signal-strong)}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:2px solid var(--color-signal);outline-offset:3px}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action.",
+      "html": "<button class=\"ds-btn-outline\">Open evidence room</button>",
+      "css": ".ds-btn-outline{background:var(--color-ink-900);color:var(--color-fg);padding:12px 20px;min-height:44px;border:1px solid var(--color-control);border-radius:8px;font-weight:500;transition:transform 160ms cubic-bezier(.23,1,.32,1),background-color 160ms}.ds-btn-outline:hover{background:var(--color-ink-800)}.ds-btn-outline:active{transform:scale(.97)}.ds-btn-outline:focus-visible{outline:2px solid var(--color-signal);outline-offset:3px}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Standard container.",
+      "html": "<div class=\"ds-panel\"><h3>Your quote</h3><p>Success fee 10% of the value credited.</p></div>",
+      "css": ".ds-panel{background:var(--color-ink-850);border:1px solid var(--color-line);border-radius:12px;padding:24px;box-shadow:inset 0 1px 0 rgb(230 237 239/.05);color:var(--color-fg)}.ds-panel h3{margin:0 0 8px;font-weight:560;font-size:1.25rem}.ds-panel p{margin:0;color:var(--color-fg-2)}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-confirmed",
+      "description": "Word plus icon, never color alone.",
+      "html": "<span class=\"ds-badge\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M229.7 77.7l-128 128a8 8 0 01-11.4 0l-56-56a8 8 0 0111.4-11.4L96 188.7l122.3-122.4a8 8 0 0111.4 11.4z\"/></svg>Confirmed</span>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:9999px;border:1px solid rgb(92 211 180/.35);background:var(--color-confirmed-wash);color:var(--color-confirmed);font-size:.9375rem;font-weight:500}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Dark well with a visible control border.",
+      "html": "<input class=\"ds-input\" value=\"Konkan Coastal Industries\" aria-label=\"Company name\">",
+      "css": ".ds-input{background:var(--color-ink-900);color:var(--color-fg);border:1px solid var(--color-control);border-radius:8px;padding:12px;min-height:48px;font:inherit;width:100%}.ds-input:focus-visible{outline:2px solid var(--color-signal);outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Statement",
+    "overview": "A depository holding statement rendered as software: ruled, exact, unhurried. Deep ink base, one signal-blue accent, richness from motion and craft rather than density. Dark by default, with a cool editorial light theme on the same tokens.",
+    "keyCharacteristics": [
+      "Tonal layering on deep ink",
+      "One locked accent; mint and coral are semantic only",
+      "Mona Sans Variable with size-specific width and tracking; mono only for identifiers",
+      "Transform and opacity motion on one easing family"
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Signal blue is the only accent. Mint and coral carry state, never decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Real Identifier Rule",
+        "body": "Mono is for strings a person might copy or compare.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Lift Rule",
+        "body": "At most one lifted panel per screen.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Route Gradient Rule",
+        "body": "The signal-to-mint gradient belongs to routes and progress only.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do keep one primary action and one CTA label per view",
+      "Do animate transform and opacity only",
+      "Do honor reduced motion, transparency and contrast preferences",
+      "Do write only copy the product can fully deliver"
+    ],
+    "donts": [
+      "Don't add warm tones or a second accent",
+      "Don't use eyebrows, em or en dashes, or decorative dots",
+      "Don't build fake product UI from divs in marketing",
+      "Don't animate layout properties or add scroll reveals to product screens",
+      "Don't draw a chart from invented numbers; every mark comes from case data and appears as text too"
+    ]
+  }
+}

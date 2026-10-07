@@ -1,98 +1,277 @@
 @import "tailwindcss";
 
 /*
- * RecoveryOS design tokens — "private wealth recovery room".
- *
- * Contrast notes (WCAG AA, measured against ivory #F7F5EF):
- *   ink        #14232B  ~15.6:1  body text
- *   slate      #4A5A62   ~6.5:1  secondary text
- *   brass      #A58354   ~3.2:1  NON-TEXT ONLY (progress markers, rules)
- *   brass-ink  #7D6238   ~5.2:1  brass-coloured text
- *   teal       #267F77   ~4.4:1  NON-TEXT ONLY (confirmed markers, icons)
- *   teal-ink   #1F6B64   ~5.7:1  confirmed-state text
- *   alert      #B3261E   ~6.0:1  real blockers only
- *   control    #7C8388   ~3.5:1  form control borders (1.4.11)
+ * RecoveryOS: "precision statement" system. Canonical values: MASTER.md.
+ * Contrast (WCAG, computed on ink-950 #0B1114):
+ *   fg #E6EDEF 16.1  fg-2 #A3B3B9 8.8  fg-3 #8699A0 6.4 (5.2 on ink-800)
+ *   signal #7CB8FF 9.2  confirmed #5CD3B4 10.4  blocker #FF7A72 7.5
+ *   control #5E717A 3.3-3.7 (UI boundaries, 1.4.11)  on-signal on signal 9.1
  */
 @theme {
-  --color-ink: #14232b;
-  --color-ivory: #f7f5ef;
-  --color-pearl: #ffffff;
-  --color-brass: #a58354;
-  --color-brass-ink: #7d6238;
-  --color-brass-wash: #f1eadc;
-  --color-teal: #267f77;
-  --color-teal-ink: #1f6b64;
-  --color-teal-wash: #e5f0ee;
-  --color-alert: #b3261e;
-  --color-alert-wash: #fbeceb;
-  --color-slate: #4a5a62;
-  --color-line: #ddd8cc;
-  --color-control: #7c8388;
-  --color-mist: #efece3;
+  --color-ink-950: #0b1114;
+  --color-ink-900: #10181c;
+  --color-ink-850: #141e23;
+  --color-ink-800: #1a262c;
+  --color-line: #223038;
+  --color-control: #5e717a;
+  --color-fg: #e6edef;
+  --color-fg-2: #a3b3b9;
+  --color-fg-3: #8699a0;
+  --color-signal: #7cb8ff;
+  --color-signal-strong: #9ccaff;
+  --color-on-signal: #07121c;
+  --color-signal-wash: #13263a;
+  --color-confirmed: #5cd3b4;
+  --color-confirmed-wash: #10281f;
+  --color-blocker: #ff7a72;
+  --color-blocker-wash: #2c1515;
+  /*
+   * Chart fills. Same hues as signal and confirmed, stepped into the dark-mode
+   * categorical band (OKLCH L 0.48-0.67), validated: CVD dE 14.1, normal 15.9.
+   * Context bars use the neutral; text never wears these.
+   */
+  --color-chart-signal: #4f93dc;
+  --color-chart-credit: #2ea98a;
+  --color-chart-muted: #5a6c75; /* 3.1:1 on panels (1.4.11) */
 
-  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-sans:
+    "Mona Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Mona Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  /* Body copy never drops below 16px. text-sm/xs are reserved for metadata. */
+  /* Body never drops below 16px. sm/xs are metadata only. */
   --text-xs: 0.875rem;
-  --text-xs--line-height: 1.35;
+  --text-xs--line-height: 1.4;
   --text-sm: 0.9375rem;
   --text-sm--line-height: 1.5;
   --text-base: 1rem;
   --text-base--line-height: 1.6;
   --text-lg: 1.0625rem;
-  --text-lg--line-height: 1.65;
+  --text-lg--line-height: 1.6;
 
-  --ease-calm: cubic-bezier(0.2, 0, 0, 1);
-  --animate-milestone: milestone 220ms var(--ease-calm) both;
-  --animate-step-in: step-in 200ms var(--ease-calm) both;
+  --radius-control: 8px;
+  --radius-panel: 12px;
 
-  @keyframes milestone {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-arrive: arrive 220ms var(--ease-out) both;
+  --animate-marker: marker 320ms var(--ease-out) both;
+  --animate-settle: settle 220ms var(--ease-out) both;
+  --animate-forward: forward 220ms var(--ease-out) both;
+  --animate-back: back 220ms var(--ease-out) both;
+  --animate-print: print 260ms var(--ease-out) both;
+  --animate-bar: bar 560ms var(--ease-out) both;
+  --animate-rise: rise 320ms var(--ease-out) both;
+
+  @keyframes arrive {
     from {
-      transform: scale(0.6);
       opacity: 0;
+      transform: translateY(6px);
     }
     to {
-      transform: scale(1);
       opacity: 1;
+      transform: translateY(0);
     }
   }
-
-  @keyframes step-in {
+  /* The current milestone arrives from a slightly smaller, softer state. */
+  @keyframes marker {
     from {
-      transform: translateY(6px);
       opacity: 0;
+      transform: scale(0.9);
+      filter: blur(2px);
     }
     to {
-      transform: translateY(0);
       opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+    }
+  }
+  /* State morph: a blur-masked crossfade so two states never double-expose. */
+  @keyframes settle {
+    from {
+      opacity: 0;
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+  /* Direction-aware step transitions in the guided check. */
+  @keyframes forward {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes back {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  /* Chart bars grow from their baseline, never from the middle. */
+  @keyframes bar {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  /* Overlays (palette, sheets) arrive from slightly below and smaller. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  /* Receipt lines settle in like a statement being printed. */
+  @keyframes print {
+    from {
+      opacity: 0;
+      clip-path: inset(0 0 100% 0);
+    }
+    to {
+      opacity: 1;
+      clip-path: inset(0 0 0 0);
     }
   }
 }
 
-/* shadcn/ui semantic tokens mapped onto the palette. Light theme only. */
+/* shadcn/ui semantic tokens, mapped onto the ink system. Dark by default; light restates the ink tokens. */
 :root {
-  color-scheme: light;
-  --background: var(--color-ivory);
-  --foreground: var(--color-ink);
-  --card: var(--color-pearl);
-  --card-foreground: var(--color-ink);
-  --popover: var(--color-pearl);
-  --popover-foreground: var(--color-ink);
-  --primary: var(--color-ink);
-  --primary-foreground: var(--color-ivory);
-  --secondary: var(--color-mist);
-  --secondary-foreground: var(--color-ink);
-  --muted: var(--color-mist);
-  --muted-foreground: var(--color-slate);
-  --accent: var(--color-brass-wash);
-  --accent-foreground: var(--color-ink);
-  --destructive: var(--color-alert);
+  color-scheme: dark;
+  --background: var(--color-ink-950);
+  --foreground: var(--color-fg);
+  --card: var(--color-ink-850);
+  --card-foreground: var(--color-fg);
+  --popover: var(--color-ink-850);
+  --popover-foreground: var(--color-fg);
+  --primary: var(--color-signal);
+  --primary-foreground: var(--color-on-signal);
+  --secondary: var(--color-ink-800);
+  --secondary-foreground: var(--color-fg);
+  --muted: var(--color-ink-800);
+  --muted-foreground: var(--color-fg-2);
+  --accent: var(--color-signal-wash);
+  --accent-foreground: var(--color-fg);
+  --destructive: var(--color-blocker);
   --border: var(--color-line);
   --input: var(--color-control);
-  --ring: var(--color-ink);
-  --radius: 0.5rem;
+  --ring: var(--color-signal);
+  --radius: 8px;
+
+  /* Effect tokens. Every rgb() literal lives here so a theme can restate it. */
+  --edge: rgb(230 237 239 / 0.05);
+  --edge-strong: rgb(230 237 239 / 0.09);
+  --shadow-deep: rgb(2 6 8 / 0.85);
+  --highlight: inset 0 1px 0 var(--edge);
+  --lift: inset 0 1px 0 var(--edge), 0 32px 64px -24px var(--shadow-deep);
+  --overlay: 0 0 0 1px var(--edge-strong), 0 40px 80px -20px var(--shadow-deep);
+  --chrome-bg: rgb(11 17 20 / 0.9);
+  --scrim: rgb(4 8 10 / 0.6);
+  --link-rule: rgb(230 237 239 / 0.35);
+  --selection: rgb(124 184 255 / 0.3);
+  --glow-signal: rgb(124 184 255 / 0.075);
+  --glow-confirmed: rgb(92 211 180 / 0.04);
+  --spot: rgb(124 184 255 / 0.55);
+  --spot-wash: rgb(124 184 255 / 0.05);
+  --sheen: rgb(255 255 255 / 0.32);
+  --grain-opacity: 0.05;
+
+  /*
+   * Semantic layer. New components read these names; the ink ladder underneath
+   * is the elevation scale (950 = page, 900 = well, 850 = panel, 800 = raised).
+   */
+  --surface: var(--color-ink-850);
+  --surface-raised: var(--color-ink-800);
+  --surface-sunken: var(--color-ink-900);
+  --surface-hover: var(--color-ink-800);
+  --border-highlight: var(--color-control);
+  --text-primary: var(--color-fg);
+  --text-secondary: var(--color-fg-2);
+  --text-tertiary: var(--color-fg-3);
+  --accent-hover: var(--color-signal-strong);
+  --success: var(--color-confirmed);
+  --info: var(--color-signal);
+  /* No warm hue in the system: warnings borrow the blocker colour at lower weight. */
+  --warning: var(--color-blocker);
+  --danger: var(--color-blocker);
+  /* Chart series, fixed order: accent, credit, then neutrals. */
+  --chart-1: var(--color-chart-signal);
+  --chart-2: var(--color-chart-credit);
+  --chart-3: var(--color-chart-muted);
+  /* The signature gradient: in progress (signal) to credited (mint). Routes and progress only. */
+  --gradient-route: linear-gradient(90deg, var(--color-signal), var(--color-confirmed));
+
+  --duration-micro: 160ms;
+  --duration-ui: 240ms;
+  --duration-scene: 560ms;
+  --z-chrome: 40;
+  --z-overlay: 60;
+  --z-toast: 70;
+}
+
+/*
+ * Light theme: editorial and cool, never cream. Same token names, restated.
+ * Contrast (WCAG): fg 19.0 / fg-2 9.3 / fg-3 6.1 on panels; signal 5.9,
+ * confirmed 6.0, blocker 6.1; white on signal 5.9; control 4.2 (1.4.11).
+ * Chart steps validated for light mode (CVD dE 15.8, normal 17.2).
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-ink-950: #f3f5f6;
+  --color-ink-900: #eaeef0;
+  --color-ink-850: #ffffff;
+  --color-ink-800: #e4e9ec;
+  --color-line: #d6dde1;
+  --color-control: #6f7e85;
+  --color-fg: #0b1114;
+  --color-fg-2: #3b4950;
+  --color-fg-3: #56656c;
+  --color-signal: #1f5fcc;
+  --color-signal-strong: #174ea9;
+  --color-on-signal: #ffffff;
+  --color-signal-wash: #e7effc;
+  --color-confirmed: #08705a;
+  --color-confirmed-wash: #e3f3ed;
+  --color-blocker: #b3332a;
+  --color-blocker-wash: #fbeceb;
+  --color-chart-signal: #3f7fd0;
+  --color-chart-credit: #1f9a7c;
+  --color-chart-muted: #8796a0;
+
+  --edge: rgb(255 255 255 / 0.8);
+  --edge-strong: rgb(11 17 20 / 0.07);
+  --shadow-deep: rgb(11 17 20 / 0.16);
+  --highlight: 0 1px 2px rgb(11 17 20 / 0.04);
+  --lift: 0 1px 2px rgb(11 17 20 / 0.04), 0 28px 56px -28px rgb(11 17 20 / 0.22);
+  --overlay: 0 0 0 1px rgb(11 17 20 / 0.06), 0 40px 80px -24px rgb(11 17 20 / 0.28);
+  --chrome-bg: rgb(243 245 246 / 0.88);
+  --scrim: rgb(11 17 20 / 0.28);
+  --link-rule: rgb(11 17 20 / 0.3);
+  --selection: rgb(31 95 204 / 0.18);
+  --glow-signal: rgb(31 95 204 / 0.07);
+  --glow-confirmed: rgb(8 112 90 / 0.05);
+  --spot: rgb(31 95 204 / 0.45);
+  --spot-wash: rgb(31 95 204 / 0.035);
+  --sheen: rgb(255 255 255 / 0.38);
+  --grain-opacity: 0.035;
 }
 
 @theme inline {
@@ -114,33 +293,69 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 4px);
+  --radius-sm: 6px;
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-panel);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-highlight: var(--border-highlight);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
 }
 
 @layer base {
   html {
+    /* Anchor jumps clear the sticky header (lg and up) with room to breathe. */
+    scroll-padding-top: 1rem;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    background-color: var(--color-ink-950);
+    scrollbar-color: var(--color-control) var(--color-ink-950);
+  }
+
+  @media (min-width: 64rem) {
+    html {
+      scroll-padding-top: 8rem;
+    }
   }
 
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: var(--color-ink-950);
+    color: var(--color-fg);
     font-family: var(--font-sans);
     font-size: 1rem;
     line-height: 1.6;
-    font-feature-settings: "cv11", "ss01";
+    font-feature-settings: "ss01";
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    caret-color: var(--color-signal);
+    accent-color: var(--color-signal);
   }
 
+  /* Size-specific tracking: tight as type grows, neutral for body. */
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
-    font-optical-sizing: auto;
+    font-weight: 560;
     text-wrap: balance;
+  }
+  h1 {
+    font-stretch: 108%;
+    letter-spacing: -0.03em;
+  }
+  h2 {
+    font-stretch: 106%;
+    letter-spacing: -0.02em;
+  }
+  h3 {
     letter-spacing: -0.01em;
   }
 
@@ -156,21 +371,23 @@
 
   /* One visible focus style everywhere. Never removed. */
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-signal);
     outline-offset: 3px;
   }
 
-  .on-ink :focus-visible {
-    outline-color: var(--color-ivory);
-  }
-
   ::selection {
-    background: var(--color-brass-wash);
-    color: var(--color-ink);
+    background: var(--selection);
+    color: var(--color-fg);
   }
 
   a {
-    text-underline-offset: 0.2em;
+    text-underline-offset: 0.22em;
+    text-decoration-thickness: 1px;
+  }
+
+  code,
+  kbd {
+    font-family: var(--font-mono);
   }
 }
 
@@ -180,23 +397,321 @@
     font-variant-numeric: tabular-nums lining-nums;
   }
 
-  .eyebrow {
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+  .display {
+    font-family: var(--font-display);
+    font-weight: 560;
+    font-stretch: 112%;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+  }
+
+  .panel {
+    background-color: var(--color-ink-850);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--highlight);
+  }
+
+  .panel-lift {
+    box-shadow: var(--lift);
+  }
+
+  .link {
+    color: var(--color-fg);
+    text-decoration-line: underline;
+    text-decoration-color: var(--link-rule);
+    transition: text-decoration-color 160ms ease;
+  }
+  .link:hover {
+    text-decoration-color: var(--color-signal);
+  }
+
+  /* Translucent sticky chrome; content scrolls underneath. */
+  .chrome {
+    background-color: var(--chrome-bg);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
   }
 }
 
-/* Motion: 150–250ms milestone transitions only; nothing loops. */
+/*
+ * Signature atmosphere. A faint light field (signal above, credit below) and
+ * a fine grain sit behind every page. Both are fixed, painted once, and never
+ * animate, so they cost nothing while scrolling.
+ */
+body {
+  position: relative;
+  isolation: isolate;
+}
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+body::before {
+  background:
+    radial-gradient(64rem 40rem at 82% -12%, var(--glow-signal), transparent 62%),
+    radial-gradient(52rem 34rem at -8% 112%, var(--glow-confirmed), transparent 60%);
+}
+body::after {
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .7 0 0 0 0 .75 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@layer components {
+  /*
+   * Spotlight: interactive cards catch the cursor with a 1px lit edge and a
+   * faint wash. Fine pointers only; position comes from <Spotlight /> as CSS
+   * custom properties, so nothing re-renders.
+   */
+  .spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .spotlight::before,
+    .spotlight::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      border-radius: inherit;
+      opacity: 0;
+      transition: opacity 260ms var(--ease-out);
+    }
+    .spotlight::before {
+      inset: 0;
+      z-index: -1;
+      background: radial-gradient(
+        22rem 22rem at var(--mx, 50%) var(--my, 0%),
+        var(--spot-wash),
+        transparent 65%
+      );
+    }
+    .spotlight::after {
+      inset: -1px;
+      padding: 1px;
+      background: radial-gradient(
+        16rem 16rem at var(--mx, 50%) var(--my, 0%),
+        var(--spot),
+        transparent 60%
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+    .spotlight:hover::before,
+    .spotlight:hover::after {
+      opacity: 1;
+    }
+  }
+
+  /* Sheen: one light sweep across the primary CTA on hover. */
+  .sheen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, var(--sheen) 50%, transparent 70%);
+    transform: translateX(-110%);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .sheen:hover::after {
+      transform: translateX(110%);
+      transition: transform 760ms var(--ease-in-out);
+    }
+  }
+
+  /* Skeleton sweep: a slow pass of light, like the route crossing the field. */
+  .skeleton-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+  .skeleton-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--edge-strong), transparent);
+    transform: translateX(-100%);
+    animation: sweep 1.8s var(--ease-in-out) infinite;
+  }
+}
+
+@keyframes sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* The branded loader: a short route that draws, arrives, and draws again. */
+@keyframes route-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes route-arrive {
+  0%,
+  50% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  62%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/*
+ * Motion-on flag is set in <head> only when the visitor has no reduced-motion
+ * preference. Hero lines start hidden only then, and a CSS failsafe reveals
+ * them after 2.4s if the script never runs. Content is never stuck hidden.
+ */
+[data-motion="on"] [data-hero-reveal] {
+  visibility: hidden;
+  animation: failsafe-reveal 0s 2.4s forwards;
+}
+@keyframes failsafe-reveal {
+  to {
+    visibility: visible;
+  }
+}
+
+/*
+ * Page transitions (React <ViewTransition> + the View Transitions API).
+ * Going deeper slides content left, going back slides it right; the header is
+ * the fixed reference and never moves. Unsupported browsers simply swap.
+ */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+::view-transition-old(.nav-forward) {
+  --slide: -36px;
+  animation:
+    140ms var(--ease-out) both vt-fade reverse,
+    340ms var(--ease-in-out) both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide: 36px;
+  animation:
+    220ms var(--ease-out) 120ms both vt-fade,
+    340ms var(--ease-in-out) both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --slide: 36px;
+  animation:
+    140ms var(--ease-out) both vt-fade reverse,
+    340ms var(--ease-in-out) both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide: -36px;
+  animation:
+    220ms var(--ease-out) 120ms both vt-fade,
+    340ms var(--ease-in-out) both vt-slide;
+}
+/* A case title that persists from the list to its page morphs, softly. */
+::view-transition-group(.morph) {
+  animation-duration: 380ms;
+  animation-timing-function: var(--ease-drawer);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: vt-via-blur;
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--slide) 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes vt-via-blur {
+  30% {
+    filter: blur(2px);
+  }
+}
+
+/* Motion: fewer and gentler, never zero feedback. */
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
   *,
   ::before,
   ::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .chrome {
+    background-color: var(--color-ink-950);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-theme="light"]) {
+    --color-line: #45565e;
+    --color-fg-2: #c3cfd3;
+    --color-fg-3: #b1bfc4;
+    --color-control: #8a9ca3;
+  }
+  :root[data-theme="light"] {
+    --color-line: #b9c4ca;
+    --color-fg-2: #26333a;
+    --color-fg-3: #3b4950;
+    --color-control: #55646b;
+  }
+  body::after {
+    display: none;
+  }
+}
+
+/* SplitText line masks: pad the clip so descenders (y, p, g) are never cut. */
+.hero-line-mask {
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
 }

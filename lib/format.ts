@@ -118,3 +118,33 @@ export function shortHash(hex: string): string {
 export function byNewest(a: string, b: string): number {
   return Date.parse(b) - Date.parse(a);
 }
+
+/** Milliseconds since the epoch for an ISO instant or calendar date (IST midday). */
+export function instant(value: string): number {
+  return toDate(value).getTime();
+}
+
+/** Whole calendar days between two instants, counted in IST. */
+export function daysBetween(from: string, to: string): number {
+  const day = (v: string) => {
+    const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: IST })
+      .format(toDate(v))
+      .split("-")
+      .map(Number);
+    return Date.UTC(y, m - 1, d) / 86_400_000;
+  };
+  return Math.max(0, Math.round(day(to) - day(from)));
+}
+
+/** 0 → "same day", 1 → "1 day", 22 → "22 days" */
+export function formatDays(days: number): string {
+  if (days === 0) return "same day";
+  return `${formatCount(days)} day${days === 1 ? "" : "s"}`;
+}
+
+/** "18 Aug" — short date for axis labels; the year is carried by the caption. */
+export function formatDayMonth(value: string): string {
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: IST }).format(
+    toDate(value),
+  );
+}

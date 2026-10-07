@@ -25,26 +25,26 @@ export function PartyLine({
   const isClient = party.role === "client";
   const secondary = isClient
     ? party.name
-    : [PARTY_ROLE_LABELS[party.role], party.organization].filter(Boolean).join(" · ");
+    : [PARTY_ROLE_LABELS[party.role], party.organization].filter(Boolean).join(", ");
 
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-2.5", className)}>
+    <span className={cn("inline-flex min-w-0 items-center gap-3", className)}>
       {showAvatar && (
         <span
           aria-hidden="true"
           className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-full border text-xs font-semibold",
+            "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-semibold tracking-[0.02em]",
             isClient
-              ? "border-brass/70 bg-brass-wash text-brass-ink"
-              : "border-line bg-mist text-ink",
+              ? "border-signal/50 bg-signal-wash text-signal"
+              : "border-line bg-ink-800 text-fg-2",
           )}
         >
           {isClient ? "You" : initials(party.name)}
         </span>
       )}
       <span className="min-w-0">
-        <span className="block font-medium text-ink">{isClient ? "You" : party.name}</span>
-        <span className="block text-sm text-slate">{secondary}</span>
+        <span className="block font-medium text-fg">{isClient ? "You" : party.name}</span>
+        <span className="block text-sm text-fg-3">{secondary}</span>
       </span>
     </span>
   );

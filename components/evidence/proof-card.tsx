@@ -2,14 +2,14 @@
 
 import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 import {
-  Check,
-  CircleAlert,
-  CircleHelp,
-  FileText,
-  Pencil,
-  SearchX,
-  ShieldCheck,
-} from "lucide-react";
+  CheckIcon,
+  FileTextIcon,
+  PencilSimpleIcon,
+  QuestionIcon,
+  SealCheckIcon,
+  WarningCircleIcon,
+  MagnifyingGlassIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 import type { ExtractedField } from "@/lib/types";
 import { reviewFieldAction } from "@/lib/actions";
@@ -23,25 +23,35 @@ import { CONFIDENCE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
 const CONFIDENCE_ICON = {
-  high: ShieldCheck,
-  medium: CircleHelp,
-  low: CircleAlert,
-  not_found: SearchX,
+  high: SealCheckIcon,
+  medium: QuestionIcon,
+  low: WarningCircleIcon,
+  not_found: MagnifyingGlassIcon,
 } as const;
+
+/** Real identifiers are set in mono; names, counts and dates are not. */
+const IDENTIFIER_KEYS = new Set([
+  "folio_number",
+  "certificate_number",
+  "distinctive_numbers",
+  "pan",
+  "dp_client_id",
+  "srn",
+]);
 
 function ReviewBadge({ field }: { field: ExtractedField }) {
   if (field.reviewStatus === "approved") {
     return (
-      <Badge variant="confirmed">
-        <Check aria-hidden="true" />
+      <Badge variant="confirmed" className="animate-settle">
+        <CheckIcon weight="bold" aria-hidden="true" />
         Confirmed
       </Badge>
     );
   }
   if (field.reviewStatus === "corrected") {
     return (
-      <Badge variant="confirmed">
-        <Pencil aria-hidden="true" />
+      <Badge variant="confirmed" className="animate-settle">
+        <PencilSimpleIcon weight="bold" aria-hidden="true" />
         Corrected
       </Badge>
     );
@@ -126,7 +136,7 @@ export function ProofCard({
     if (!correctedValue) errs.value = "Enter the value exactly as it appears on your document.";
     else if (correctedValue === field.value)
       errs.value = "This is the same as what we read. Use Approve instead, or change the value.";
-    if (!reason) errs.reason = "Tell us briefly what we got wrong — it helps the reviewer.";
+    if (!reason) errs.reason = "Tell us briefly what we got wrong. It helps the reviewer.";
     setFieldErrors(errs);
     if (errs.value || errs.reason) {
       requestAnimationFrame(() =>
@@ -154,51 +164,59 @@ export function ProofCard({
     });
   }
 
+  const isIdentifier = IDENTIFIER_KEYS.has(field.fieldKey);
+
   return (
     <article
       aria-labelledby={`${ids}-label`}
       className={cn(
-        "rounded-lg border bg-pearl p-4 transition-colors duration-200 sm:p-5",
-        canReview ? "border-brass/70" : "border-line",
+        "rounded-[var(--radius-panel)] border bg-ink-850 p-4 shadow-[var(--highlight)] transition-[border-color] duration-300 ease-(--ease-out) sm:p-5",
+        canReview ? "border-signal/45" : "border-line",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <Heading
           id={`${ids}-label`}
-          className="font-sans text-sm font-semibold tracking-wide text-slate uppercase"
+          className="text-sm font-medium tracking-normal text-fg-3 [font-stretch:100%]"
         >
           {field.label}
         </Heading>
         <ReviewBadge field={field} />
       </div>
 
-      {/* The value itself — or an explicit, honest gap */}
+      {/* The value itself, or an explicit, honest gap */}
       {shownValue !== null ? (
-        <p className="tnum mt-1.5 font-mono text-xl font-medium break-words text-ink">
+        <p
+          key={field.reviewStatus}
+          className={cn(
+            "tnum mt-1.5 animate-settle text-xl font-medium break-words text-fg",
+            isIdentifier ? "font-mono tracking-[-0.01em]" : "tracking-[-0.01em]",
+          )}
+        >
           {shownValue}
         </p>
       ) : (
-        <p className="mt-1.5 text-lg font-medium text-ink">Not found — left blank, not estimated</p>
+        <p className="mt-1.5 text-lg font-medium text-fg">Not found. Left blank, not estimated.</p>
       )}
       {field.reviewStatus === "corrected" && (
-        <p className="mt-1 text-sm text-slate">
+        <p className="mt-1 text-sm text-fg-3">
           We read: <s className="tnum font-mono">{field.value}</s>
-          {field.correctionReason ? ` — ${field.correctionReason}` : ""}
+          {field.correctionReason ? `. ${field.correctionReason}` : ""}
         </p>
       )}
 
-      <dl className="mt-3 grid gap-2 text-sm">
+      <dl className="mt-4 grid gap-2.5 text-sm">
         <div>
           <dt className="sr-only">Source</dt>
-          <dd className="flex min-w-0 items-start gap-2 text-ink">
-            <FileText className="mt-0.5 size-4 shrink-0 text-slate" aria-hidden="true" />
+          <dd className="flex min-w-0 items-start gap-2 text-fg-2">
+            <FileTextIcon className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden="true" />
             <span className="min-w-0">
               {field.sourcePage !== null ? (
                 <>
                   {fileName}, <span className="tnum">page {field.sourcePage}</span>
                 </>
               ) : (
-                <>{fileName} — no page contains it</>
+                <>{fileName}: no page contains it</>
               )}
             </span>
           </dd>
@@ -206,28 +224,31 @@ export function ProofCard({
         {field.sourceSnippet && (
           <div>
             <dt className="sr-only">Line as read</dt>
-            <dd className="rounded-sm border-l-2 border-brass bg-ivory px-3 py-1.5 font-mono text-[0.9375rem] break-words text-ink">
+            <dd className="rounded-[var(--radius-control)] border border-line bg-ink-900 px-3 py-2 font-mono text-[0.9375rem] break-words text-fg">
               {field.sourceSnippet}
             </dd>
           </div>
         )}
         <div>
           <dt className="sr-only">Confidence</dt>
-          <dd className="flex min-w-0 items-start gap-2 text-ink">
+          <dd className="flex min-w-0 items-start gap-2 text-fg-2">
             <ConfIcon
+              weight="bold"
               className={cn(
                 "mt-0.5 size-4 shrink-0",
                 field.confidence === "high"
-                  ? "text-teal-ink"
+                  ? "text-confirmed"
                   : field.confidence === "not_found"
-                    ? "text-slate"
-                    : "text-brass-ink",
+                    ? "text-fg-3"
+                    : "text-signal",
               )}
               aria-hidden="true"
             />
             <span className="min-w-0">
-              <span className="font-semibold">{CONFIDENCE_LABELS[field.confidence].label}.</span>{" "}
-              <span className="text-ink/85">{field.confidenceReason}</span>
+              <span className="font-semibold text-fg">
+                {CONFIDENCE_LABELS[field.confidence].label}.
+              </span>{" "}
+              {field.confidenceReason}
             </span>
           </dd>
         </div>
@@ -236,19 +257,32 @@ export function ProofCard({
             <dt className="sr-only">Cross-check</dt>
             <dd
               className={cn(
-                "flex min-w-0 items-start gap-2 rounded-sm px-2 py-1.5 text-ink",
-                field.crossCheck.outcome === "mismatch" && "bg-alert-wash",
+                "flex min-w-0 items-start gap-2 rounded-[var(--radius-control)] text-fg-2",
+                field.crossCheck.outcome === "mismatch" &&
+                  "border border-blocker/40 bg-blocker-wash px-2.5 py-2 text-fg",
               )}
             >
               {field.crossCheck.outcome === "match" ? (
-                <Check className="mt-0.5 size-4 shrink-0 text-teal-ink" aria-hidden="true" />
+                <CheckIcon
+                  weight="bold"
+                  className="mt-0.5 size-4 shrink-0 text-confirmed"
+                  aria-hidden="true"
+                />
               ) : field.crossCheck.outcome === "mismatch" ? (
-                <CircleAlert className="mt-0.5 size-4 shrink-0 text-alert" aria-hidden="true" />
+                <WarningCircleIcon
+                  weight="bold"
+                  className="mt-0.5 size-4 shrink-0 text-blocker"
+                  aria-hidden="true"
+                />
               ) : (
-                <CircleHelp className="mt-0.5 size-4 shrink-0 text-slate" aria-hidden="true" />
+                <QuestionIcon
+                  weight="bold"
+                  className="mt-0.5 size-4 shrink-0 text-fg-3"
+                  aria-hidden="true"
+                />
               )}
               <span className="min-w-0">
-                <span className="font-semibold">
+                <span className="font-semibold text-fg">
                   {field.crossCheck.outcome === "match"
                     ? "Cross-check passed."
                     : field.crossCheck.outcome === "mismatch"
@@ -267,24 +301,19 @@ export function ProofCard({
           <p
             ref={statusRef}
             tabIndex={-1}
-            className="tnum mt-3 border-t border-line pt-3 text-sm text-teal-ink"
+            className="tnum mt-4 animate-settle border-t border-line pt-3 text-sm text-confirmed"
           >
             {field.reviewStatus === "approved" ? "Confirmed" : "Corrected"} by{" "}
-            {field.reviewedBy ?? "you"} · {formatDateTime(field.reviewedAt)}
-            {local && " · written to the audit log"}
+            {field.reviewedBy ?? "you"}, {formatDateTime(field.reviewedAt)}
+            {local && ". Written to the audit log."}
           </p>
         )}
 
       {canReview && mode === "view" && (
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
-          <Button
-            variant="confirm"
-            onClick={approve}
-            disabled={pending}
-            aria-describedby={`${ids}-label`}
-          >
-            <Check aria-hidden="true" />
-            {pending ? "Saving…" : "Approve — this is correct"}
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
+          <Button onClick={approve} disabled={pending} aria-describedby={`${ids}-label`}>
+            <CheckIcon weight="bold" aria-hidden="true" />
+            {pending ? "Saving…" : "Approve, this is correct"}
           </Button>
           <Button
             ref={correctBtnRef}
@@ -293,7 +322,7 @@ export function ProofCard({
             disabled={pending}
             aria-describedby={`${ids}-label`}
           >
-            <Pencil aria-hidden="true" />
+            <PencilSimpleIcon aria-hidden="true" />
             Correct it
           </Button>
         </div>
@@ -303,11 +332,11 @@ export function ProofCard({
         <form
           onSubmit={submitCorrection}
           noValidate
-          className="mt-4 grid gap-4 border-t border-line pt-4"
+          className="mt-5 grid animate-arrive gap-4 border-t border-line pt-4"
         >
           <div className="grid gap-1.5">
             <Label htmlFor={`${ids}-value`}>Correct value</Label>
-            <p id={`${ids}-value-hint`} className="text-sm text-slate">
+            <p id={`${ids}-value-hint`} className="text-sm text-fg-3">
               Type it exactly as it appears on your document.
             </p>
             <Input
@@ -319,14 +348,18 @@ export function ProofCard({
               maxLength={200}
               aria-invalid={fieldErrors.value ? true : undefined}
               aria-describedby={`${ids}-value-hint${fieldErrors.value ? ` ${ids}-value-err` : ""}`}
-              className="font-mono"
+              className={isIdentifier ? "font-mono" : undefined}
             />
             {fieldErrors.value && (
               <p
                 id={`${ids}-value-err`}
-                className="flex items-start gap-1.5 text-sm font-medium text-alert"
+                className="flex items-start gap-1.5 text-sm font-medium text-blocker"
               >
-                <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <WarningCircleIcon
+                  weight="bold"
+                  className="mt-0.5 size-4 shrink-0"
+                  aria-hidden="true"
+                />
                 {fieldErrors.value}
               </p>
             )}
@@ -345,9 +378,13 @@ export function ProofCard({
             {fieldErrors.reason && (
               <p
                 id={`${ids}-reason-err`}
-                className="flex items-start gap-1.5 text-sm font-medium text-alert"
+                className="flex items-start gap-1.5 text-sm font-medium text-blocker"
               >
-                <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <WarningCircleIcon
+                  weight="bold"
+                  className="mt-0.5 size-4 shrink-0"
+                  aria-hidden="true"
+                />
                 {fieldErrors.reason}
               </p>
             )}
@@ -364,8 +401,11 @@ export function ProofCard({
       )}
 
       {error && (
-        <p role="alert" className="mt-3 flex items-start gap-1.5 text-sm font-medium text-alert">
-          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <p
+          role="alert"
+          className="mt-3 flex animate-settle items-start gap-1.5 text-sm font-medium text-blocker"
+        >
+          <WarningCircleIcon weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}
