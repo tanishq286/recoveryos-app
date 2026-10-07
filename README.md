@@ -134,8 +134,8 @@ steps of those hues are tuned so every pair is AA, noted in the CSS. Dark is the
 frosted light theme restates the same tokens (toggle in the header, remembered per browser,
 restored before first paint). Utilities: `.panel`, `.vault-glass`, `.vault-glass-hover`,
 `.vault-card` (cursor glow), `.text-gradient-cyan`, `.bg-brand`, `.font-tabular` (slashed
-zeros for IDs, money and dates). Mona Sans Variable and Geist Mono are self-hosted through
-`@fontsource-variable`. Icons are Lucide, at one stroke weight.
+zeros for IDs, money and dates). Mona Sans Variable is self-hosted from `public/fonts` and preloaded (no late font swap,
+no layout shift); Geist Mono comes through `@fontsource-variable`. Icons are Lucide, at one stroke weight.
 
 Charts draw from dedicated fills (`--color-chart-signal`, `--color-chart-credit`,
 `--color-chart-muted`), stepped into the categorical lightness band for each theme and checked

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource-variable/mona-sans/wdth.css";
 import "@fontsource-variable/geist-mono";
 import "./globals.css";
 
@@ -35,6 +34,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en-IN" data-theme="dark" suppressHydrationWarning>
       <head>
+        <link
+          rel="preload"
+          href="/fonts/mona-sans-latin-wdth-normal.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin=""
+        />
         <script dangerouslySetInnerHTML={{ __html: themeFlag + ";" + motionFlag }} />
       </head>
       <body className="min-h-dvh bg-ink-950 text-fg">
