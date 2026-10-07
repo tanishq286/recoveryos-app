@@ -303,7 +303,8 @@ const case1: CaseDetail = {
     successFeeBps: SUCCESS_FEE_BPS,
     protectionAllocationBps: PROTECTION_ALLOCATION_BPS,
     protectionOptIn: null,
-    indicativeValuePaise: 400 * 21240 * 100,
+    // 400 shares × 21,240 paise (₹212.40) = ₹84,960.
+    indicativeValuePaise: 400 * 21240,
     indicativeValueBasis: "400 shares × ₹212.40, sample closing price on 25 Sep 2026",
     excludedFromEstimate: [
       "Unclaimed dividends: amount not yet confirmed by the registrar, so it is left out rather than guessed.",
@@ -952,7 +953,8 @@ const case2: CaseDetail = {
     successFeeBps: SUCCESS_FEE_BPS,
     protectionAllocationBps: PROTECTION_ALLOCATION_BPS,
     protectionOptIn: false,
-    indicativeValuePaise: 250 * 38800 * 100 + 6_250 * 100,
+    // 250 shares × 38,800 paise (₹388.00) + ₹6,250 dividends = ₹1,03,250.
+    indicativeValuePaise: 250 * 38800 + 6_250 * 100,
     indicativeValueBasis:
       "250 shares × ₹388.00 (sample closing price, 25 Sep 2026) + ₹6,250 dividends",
     excludedFromEstimate: [],
