@@ -391,7 +391,7 @@ export default function LandingPage() {
           <div className="mt-14 grid gap-12 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-5">
               <p className="text-base font-medium text-fg-2">Success fee</p>
-              <p className="display tnum mt-3 text-[clamp(4.5rem,11vw,8rem)] leading-none text-fg">
+              <p className="display mt-3 text-[clamp(4.5rem,11vw,8rem)] leading-none text-fg">
                 {formatBps(SUCCESS_FEE_BPS)}
               </p>
               <p className="mt-4 max-w-[34ch] text-lg text-fg">
@@ -408,7 +408,7 @@ export default function LandingPage() {
                 <p className="text-base font-medium text-fg-2">Protection allocation</p>
                 <Badge variant="outline">Planned, conditional</Badge>
               </div>
-              <p className="display tnum mt-3 text-[clamp(3rem,6vw,4.5rem)] leading-none text-fg-2">
+              <p className="display mt-3 text-[clamp(3rem,6vw,4.5rem)] leading-none text-fg-2">
                 {formatBps(PROTECTION_ALLOCATION_BPS)}
               </p>
               <p className="mt-4 max-w-[46ch] text-lg text-fg">

@@ -21,22 +21,22 @@ product screens get no scroll reveals. Forbidden: bounce and elastic, `scale(0)`
 
 ## Colour
 
-| Token | Hex | Use | Contrast on page |
-| --- | --- | --- | --- |
-| `ink-950` | `#0B1114` | page ground | - |
-| `ink-900` | `#10181C` | raised band | - |
-| `ink-850` | `#141E23` | panel | - |
-| `ink-800` | `#1A262C` | elevated, hover | - |
-| `line` | `#223038` | hairlines (decorative) | 1.4 |
-| `control` | `#5E717A` | input and control borders | 3.3-3.7 |
-| `fg` | `#E6EDEF` | primary text | 16.1 |
-| `fg-2` | `#A3B3B9` | secondary text | 8.8 |
-| `fg-3` | `#8699A0` | metadata | 6.4 |
-| `signal` | `#7CB8FF` | action, active progress, links, focus | 9.2 |
-| `signal-strong` | `#9CCAFF` | signal hover | 11.1 |
-| `on-signal` | `#07121C` | text on signal fills | 9.1 on signal |
-| `confirmed` | `#5CD3B4` | confirmed states only | 10.4 |
-| `blocker` | `#FF7A72` | real blockers only | 7.5 |
+| Token           | Hex       | Use                                   | Contrast on page |
+| --------------- | --------- | ------------------------------------- | ---------------- |
+| `ink-950`       | `#0B1114` | page ground                           | -                |
+| `ink-900`       | `#10181C` | raised band                           | -                |
+| `ink-850`       | `#141E23` | panel                                 | -                |
+| `ink-800`       | `#1A262C` | elevated, hover                       | -                |
+| `line`          | `#223038` | hairlines (decorative)                | 1.4              |
+| `control`       | `#5E717A` | input and control borders             | 3.3-3.7          |
+| `fg`            | `#E6EDEF` | primary text                          | 16.1             |
+| `fg-2`          | `#A3B3B9` | secondary text                        | 8.8              |
+| `fg-3`          | `#8699A0` | metadata                              | 6.4              |
+| `signal`        | `#7CB8FF` | action, active progress, links, focus | 9.2              |
+| `signal-strong` | `#9CCAFF` | signal hover                          | 11.1             |
+| `on-signal`     | `#07121C` | text on signal fills                  | 9.1 on signal    |
+| `confirmed`     | `#5CD3B4` | confirmed states only                 | 10.4             |
+| `blocker`       | `#FF7A72` | real blockers only                    | 7.5              |
 
 One accent, locked. No warm, cream, brass or yellow values anywhere. Status is
 never colour alone: every badge carries an icon and a word.
@@ -65,15 +65,15 @@ never colour alone: every badge carries an icon and a word.
 
 ## Motion
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `--ease-out` | `cubic-bezier(0.23, 1, 0.32, 1)` | all UI enter and state |
-| `--ease-in-out` | `cubic-bezier(0.77, 0, 0.175, 1)` | on-screen moves, clip reveals |
-| `--ease-drawer` | `cubic-bezier(0.32, 0.72, 0, 1)` | panel swaps |
-| `--dur-press` | `160ms` | press feedback |
-| `--dur-state` | `220ms` | state changes, step changes |
-| `--dur-exit` | `150ms` | exits (opacity only) |
-| GSAP focal | `expo.out`, 0.9s lines, 1.6s route | marketing hero only |
+| Token           | Value                              | Use                           |
+| --------------- | ---------------------------------- | ----------------------------- |
+| `--ease-out`    | `cubic-bezier(0.23, 1, 0.32, 1)`   | all UI enter and state        |
+| `--ease-in-out` | `cubic-bezier(0.77, 0, 0.175, 1)`  | on-screen moves, clip reveals |
+| `--ease-drawer` | `cubic-bezier(0.32, 0.72, 0, 1)`   | panel swaps                   |
+| `--dur-press`   | `160ms`                            | press feedback                |
+| `--dur-state`   | `220ms`                            | state changes, step changes   |
+| `--dur-exit`    | `150ms`                            | exits (opacity only)          |
+| GSAP focal      | `expo.out`, 0.9s lines, 1.6s route | marketing hero only           |
 
 Vocabulary used: masked rise (reveal), line drawing, scroll-driven animation,
 stagger (30-60ms, capped 400ms), press feedback, direction-aware transition,

@@ -12,27 +12,86 @@
   "design_system": {
     "color": {
       "palette_type": "analogous",
-      "primary": { "hex": "#7CB8FF", "role": "Signal blue: primary action, active progress, links, focus. The only accent." },
-      "secondary": { "hex": "#5CD3B4", "role": "Confirmed state only (approved details, completed milestones, active consent)." },
-      "accent": { "hex": "#7CB8FF", "role": "Same as primary; one accent locked for the whole product." },
+      "primary": {
+        "hex": "#7CB8FF",
+        "role": "Signal blue: primary action, active progress, links, focus. The only accent."
+      },
+      "secondary": {
+        "hex": "#5CD3B4",
+        "role": "Confirmed state only (approved details, completed milestones, active consent)."
+      },
+      "accent": {
+        "hex": "#7CB8FF",
+        "role": "Same as primary; one accent locked for the whole product."
+      },
       "neutral": {
-        "scale": ["#E6EDEF", "#A3B3B9", "#8699A0", "#5E717A", "#223038", "#1A262C", "#141E23", "#10181C", "#0B1114"],
+        "scale": [
+          "#E6EDEF",
+          "#A3B3B9",
+          "#8699A0",
+          "#5E717A",
+          "#223038",
+          "#1A262C",
+          "#141E23",
+          "#10181C",
+          "#0B1114"
+        ],
         "usage": "Lightest to darkest: primary text, secondary text, metadata text, control borders, hairlines, elevated surface, panel, raised surface, page ground. Foreground text uses the light end against the ink ground."
       },
-      "semantic": { "success": "#5CD3B4", "warning": "#A3B3B9", "error": "#FF7A72", "info": "#7CB8FF" },
+      "semantic": {
+        "success": "#5CD3B4",
+        "warning": "#A3B3B9",
+        "error": "#FF7A72",
+        "info": "#7CB8FF"
+      },
       "surface": { "background": "#0B1114", "card": "#141E23", "elevated": "#1A262C" },
       "contrast_strategy": "Light-on-ink. Body 14-16:1, secondary 7.8:1+, metadata 5.2:1+, controls 3:1+. Primary button ink-on-blue 9.1:1."
     },
     "typography": {
       "type_scale": {
-        "display": { "size": "clamp(2.5rem, 6vw, 4.75rem)", "weight": "560", "line_height": "1.02", "tracking": "-0.035em" },
-        "heading_1": { "size": "clamp(2rem, 4vw, 3rem)", "weight": "560", "line_height": "1.08", "tracking": "-0.03em" },
-        "heading_2": { "size": "clamp(1.5rem, 2.6vw, 2rem)", "weight": "560", "line_height": "1.15", "tracking": "-0.02em" },
-        "heading_3": { "size": "1.1875rem", "weight": "600", "line_height": "1.3", "tracking": "-0.01em" },
+        "display": {
+          "size": "clamp(2.5rem, 6vw, 4.75rem)",
+          "weight": "560",
+          "line_height": "1.02",
+          "tracking": "-0.035em"
+        },
+        "heading_1": {
+          "size": "clamp(2rem, 4vw, 3rem)",
+          "weight": "560",
+          "line_height": "1.08",
+          "tracking": "-0.03em"
+        },
+        "heading_2": {
+          "size": "clamp(1.5rem, 2.6vw, 2rem)",
+          "weight": "560",
+          "line_height": "1.15",
+          "tracking": "-0.02em"
+        },
+        "heading_3": {
+          "size": "1.1875rem",
+          "weight": "600",
+          "line_height": "1.3",
+          "tracking": "-0.01em"
+        },
         "body": { "size": "1rem", "weight": "400", "line_height": "1.6", "tracking": "0" },
-        "body_small": { "size": "0.9375rem", "weight": "400", "line_height": "1.5", "tracking": "0.003em" },
-        "caption": { "size": "0.875rem", "weight": "450", "line_height": "1.4", "tracking": "0.005em" },
-        "overline": { "size": "0.875rem", "weight": "500", "line_height": "1.4", "tracking": "0.01em" }
+        "body_small": {
+          "size": "0.9375rem",
+          "weight": "400",
+          "line_height": "1.5",
+          "tracking": "0.003em"
+        },
+        "caption": {
+          "size": "0.875rem",
+          "weight": "450",
+          "line_height": "1.4",
+          "tracking": "0.005em"
+        },
+        "overline": {
+          "size": "0.875rem",
+          "weight": "500",
+          "line_height": "1.4",
+          "tracking": "0.01em"
+        }
       },
       "font_families": {
         "heading": "Mona Sans Variable (font-stretch 112%)",
@@ -150,7 +209,13 @@
       "type": "none",
       "description": "Flat ink ground; no animated gradients or mesh",
       "technology": "CSS",
-      "params": { "color_palette": ["#0B1114"], "speed": "0", "density": "0", "opacity": "1", "blend_mode": "normal" }
+      "params": {
+        "color_palette": ["#0B1114"],
+        "speed": "0",
+        "density": "0",
+        "opacity": "1",
+        "blend_mode": "normal"
+      }
     },
     "particle_systems": {
       "enabled": true,
@@ -209,19 +274,35 @@
       "type": "split-letter-animate",
       "description": "Hero headline lines rise out of a mask once, in step with the route drawing",
       "technology": "GSAP SplitText (lines, mask)",
-      "params": { "split_strategy": "by-line", "animation_per_unit": "yPercent 105 -> 0", "stagger": "0.09s", "effect_style": "masked rise, expo.out 0.9s" }
+      "params": {
+        "split_strategy": "by-line",
+        "animation_per_unit": "yPercent 105 -> 0",
+        "stagger": "0.09s",
+        "effect_style": "masked rise, expo.out 0.9s"
+      }
     },
     "cursor_effects": {
       "enabled": false,
       "type": "none",
       "description": "No custom cursor",
-      "params": { "shape": "default", "size": "default", "blend_mode": "normal", "trail": "none", "interaction_zone": "none" }
+      "params": {
+        "shape": "default",
+        "size": "default",
+        "blend_mode": "normal",
+        "trail": "none",
+        "interaction_zone": "none"
+      }
     },
     "image_effects": {
       "type": "none",
       "description": "No imagery",
       "technology": "none",
-      "params": { "filter_pipeline": "none", "hover_transform": "none", "reveal_animation": "none", "distortion_type": "none" }
+      "params": {
+        "filter_pipeline": "none",
+        "hover_transform": "none",
+        "reveal_animation": "none",
+        "distortion_type": "none"
+      }
     },
     "glassmorphism_neumorphism": {
       "enabled": true,
@@ -239,13 +320,24 @@
       "type": "none",
       "description": "WebGL covers the only canvas",
       "technology": "none",
-      "params": { "draw_method": "none", "animation_loop": "none", "color_scheme": "none", "responsiveness": "none", "interaction": "none" }
+      "params": {
+        "draw_method": "none",
+        "animation_loop": "none",
+        "color_scheme": "none",
+        "responsiveness": "none",
+        "interaction": "none"
+      }
     },
     "svg_animations": {
       "enabled": true,
       "type": "path-draw",
       "description": "The route motif drawn by scroll through the three-stage sequence; also the WebGL fallback",
-      "params": { "animation_method": "GSAP DrawSVGPlugin", "path_morphing": "none", "stroke_animation": "drawSVG 0% -> 100%", "filter_effects": "none" }
+      "params": {
+        "animation_method": "GSAP DrawSVGPlugin",
+        "path_morphing": "none",
+        "stroke_animation": "drawSVG 0% -> 100%",
+        "filter_effects": "none"
+      }
     },
     "composite_notes": "One authored moment: the route draws through the record field while the headline settles, then scroll carries the same route through the three stages. Everything else is quiet. Product screens (Operate) get no scroll reveals: only press feedback, state morphs, and the milestone marker arriving on the rail."
   }

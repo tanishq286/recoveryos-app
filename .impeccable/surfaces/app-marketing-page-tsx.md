@@ -2,7 +2,12 @@
 version: 1
 slug: "app-marketing-page-tsx"
 primary_target: "app/(marketing)/page.tsx"
-related_targets: ["app/(app)/check/page.tsx","app/(app)/cases/[id]/page.tsx","app/(app)/cases/[id]/evidence/page.tsx"]
+related_targets:
+  [
+    "app/(app)/check/page.tsx",
+    "app/(app)/cases/[id]/page.tsx",
+    "app/(app)/cases/[id]/evidence/page.tsx",
+  ]
 ---
 
 Scope: RecoveryOS marketing landing (Persuade) plus the product screens it leads to (Operate: /check, /cases, /cases/[id], /cases/[id]/evidence). Redesign overhaul: content, routes, anchors and behaviour preserved.
