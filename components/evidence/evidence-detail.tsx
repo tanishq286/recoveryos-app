@@ -8,6 +8,7 @@ import { CATEGORY_LABELS, EXTRACTION_LABELS } from "@/lib/labels";
 import { ExtractionBadge } from "@/components/evidence/extraction-badge";
 import { DocumentPreview } from "@/components/evidence/document-preview";
 import { ProofCard } from "@/components/evidence/proof-card";
+import { StableOrder } from "@/components/evidence/stable-order";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HashGlyph } from "@/components/viz/hash-glyph";
 
@@ -138,13 +139,13 @@ export function EvidenceDetail({ file, fields }: { file: EvidenceFile; fields: E
             ))}
             <div>
               <h3 className="text-xl text-fg">Details read from this document</h3>
-              <ul className="mt-4 space-y-3">
+              <StableOrder key={file.id} className="mt-4 space-y-3">
                 {orderFields(fields).map((f) => (
                   <li key={f.id}>
                     <ProofCard field={f} fileName={file.fileName} headingLevel="h4" />
                   </li>
                 ))}
-              </ul>
+              </StableOrder>
             </div>
           </>
         ))}
