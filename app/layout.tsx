@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   },
   description:
     "Guided recovery of unclaimed shares and dividends from India's IEPF. See every document, every step and who owns it. No upfront fee.",
+  // The share image itself is app/opengraph-image.tsx; these name the site
+  // and ask X for the large card.
+  openGraph: { siteName: "RecoveryOS", locale: "en_IN", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {
