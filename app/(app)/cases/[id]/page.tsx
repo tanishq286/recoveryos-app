@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, FolderOpen } from "lucide-react";
+import { ArrowRightIcon, FolderOpenIcon } from "@phosphor-icons/react/dist/ssr";
 
 import { getDataSource } from "@/lib/data";
 import { ROUTE_LABELS, stateInfo } from "@/lib/rules/case-states";
@@ -23,7 +23,7 @@ import { orderFields } from "@/components/evidence/evidence-detail";
 export async function generateMetadata(props: PageProps<"/cases/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const c = await getDataSource().getCase(id);
-  return { title: c ? `${c.reference} · Case overview` : "Case not found" };
+  return { title: c ? `Case ${c.reference}` : "Case not found" };
 }
 
 export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) {
@@ -56,40 +56,35 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
-      <nav aria-label="Breadcrumb" className="text-sm text-slate">
+      <nav aria-label="Breadcrumb" className="text-sm text-fg-3">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
-            <Link
-              href="/cases"
-              className="underline decoration-slate/40 underline-offset-4 hover:text-ink"
-            >
+            <Link href="/cases" className="link text-fg-2">
               Sample cases
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li aria-current="page" className="tnum text-ink">
+          <li aria-current="page" className="tnum font-mono text-fg-2">
             {c.reference}
           </li>
         </ol>
       </nav>
 
-      <header className="mt-4 flex flex-wrap items-end justify-between gap-6">
-        <div className="min-w-0 max-w-3xl">
-          <p className="eyebrow tnum text-brass-ink">Case {c.reference} · sample</p>
-          <h1 className="mt-2 font-display text-3xl leading-tight font-medium text-ink sm:text-4xl">
-            {c.title}
-          </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+      <header className="mt-6 flex flex-wrap items-end justify-between gap-6">
+        <div className="max-w-3xl min-w-0">
+          <h1 className="text-3xl leading-tight text-fg sm:text-4xl sm:leading-[1.1]">{c.title}</h1>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <Badge variant={c.status === "query_deficiency" ? "blocker" : "progress"}>
               {state.label}
             </Badge>
             <Badge variant="outline">{ROUTE_LABELS[c.route]}</Badge>
+            <Badge variant="neutral">Sample case</Badge>
           </div>
-          <p className="mt-3 text-base text-ink/85">{c.routeNote}</p>
+          <p className="mt-4 text-base text-fg-2">{c.routeNote}</p>
         </div>
         <div className="flex flex-col gap-3">
           <PartyLine party={c.caseLead} />
-          <p className="tnum text-sm text-slate">Last updated {formatDateTime(c.updatedAt)}</p>
+          <p className="tnum text-sm text-fg-3">Last updated {formatDateTime(c.updatedAt)}</p>
         </div>
       </header>
 
@@ -120,25 +115,22 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
           <section
             id="proof-cards"
             aria-labelledby="evidence-preview-heading"
-            className="scroll-mt-6 rounded-lg border border-line bg-ivory/60 p-4 sm:p-5"
+            className="scroll-mt-6 rounded-[var(--radius-panel)] border border-line bg-ink-900 p-4 sm:p-5"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2
-                  id="evidence-preview-heading"
-                  className="font-display text-xl font-medium text-ink"
-                >
+                <h2 id="evidence-preview-heading" className="text-xl text-fg">
                   Evidence preview
                 </h2>
-                <p className="tnum mt-1 text-base text-slate">
+                <p className="tnum mt-1 text-base text-fg-3">
                   {room.files.length} document{room.files.length === 1 ? "" : "s"}
-                  {needsYou.length > 0 && ` · ${needsYou.length} waiting for you`}
-                  {failed > 0 && ` · ${failed} couldn't be read`}
+                  {needsYou.length > 0 && `, ${needsYou.length} waiting for you`}
+                  {failed > 0 && `, ${failed} couldn't be read`}
                 </p>
               </div>
               <Button asChild variant="outline" size="sm">
                 <Link href={evidenceHref}>
-                  <FolderOpen aria-hidden="true" />
+                  <FolderOpenIcon aria-hidden="true" />
                   Open evidence room
                 </Link>
               </Button>
@@ -161,20 +153,20 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-base text-slate">Nothing on this document needs your check.</p>
+                  <p className="text-base text-fg-3">Nothing on this document needs your check.</p>
                 )}
                 <Link
                   href={`${evidenceHref}?doc=${previewFile.id}#doc-detail`}
-                  className="inline-flex min-h-11 items-center gap-1.5 font-medium text-ink underline decoration-ink/30 underline-offset-4 hover:decoration-ink"
+                  className="link inline-flex min-h-11 items-center gap-1.5 font-medium"
                 >
                   See everything read from {previewFile.fileName}
-                  <ArrowRight className="size-4" aria-hidden="true" />
+                  <ArrowRightIcon weight="bold" className="size-4 shrink-0" aria-hidden="true" />
                 </Link>
               </div>
             ) : (
-              <div className="mt-4 rounded-md border border-dashed border-control/60 bg-pearl p-5">
-                <p className="font-semibold text-ink">No documents yet</p>
-                <p className="mt-1 text-base text-slate">
+              <div className="mt-4 rounded-[var(--radius-control)] border border-dashed border-control/60 p-5">
+                <p className="font-semibold text-fg">No documents yet</p>
+                <p className="mt-1 text-base text-fg-2">
                   {room.files.length > 0
                     ? "Documents are still being read. Details will appear here with the page they came from."
                     : "When documents arrive, each detail we read shows up here with its page, our confidence, and buttons for you to approve or correct it."}

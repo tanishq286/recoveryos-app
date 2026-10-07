@@ -6,32 +6,32 @@ import type { AssetType, SelfServiceLink } from "@/lib/types";
  */
 export const OFFICIAL_LINKS = {
   iepfSearch: {
-    label: "IEPF Authority — search unclaimed shares and dividends",
+    label: "IEPF Authority: search unclaimed shares and dividends",
     href: "https://www.iepf.gov.in",
     note: "Free. Search by the holder's name and the company.",
   },
   mcaIepf5: {
-    label: "MCA portal — file Form IEPF-5 yourself",
+    label: "MCA portal: file Form IEPF-5 yourself",
     href: "https://www.mca.gov.in",
     note: "No government filing fee for IEPF-5.",
   },
   sebiScores: {
-    label: "SEBI SCORES — complain about a listed company or registrar",
+    label: "SEBI SCORES: complain about a listed company or registrar",
     href: "https://scores.sebi.gov.in",
     note: "Free. Use it if a company or RTA does not respond.",
   },
   mfCentral: {
-    label: "MF Central — find mutual fund folios",
+    label: "MF Central: find mutual fund folios",
     href: "https://www.mfcentral.com",
     note: "Free. Run by the two registrars, CAMS and KFintech.",
   },
   epfo: {
-    label: "EPFO member portal — PF passbook and claims",
+    label: "EPFO member portal: PF passbook and claims",
     href: "https://unifiedportal-mem.epfindia.gov.in",
     note: "Free. Needs your own UAN login.",
   },
   udgam: {
-    label: "RBI UDGAM — search unclaimed bank deposits",
+    label: "RBI UDGAM: search unclaimed bank deposits",
     href: "https://udgam.rbi.org.in",
     note: "Free. Search several banks at once.",
   },

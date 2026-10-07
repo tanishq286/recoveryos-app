@@ -42,7 +42,7 @@ export const IDENTIFIER_LABELS: Record<IdentifierKind, string> = {
 };
 
 const IDENTIFIER_PATTERNS: Record<IdentifierKind, { re: RegExp; hint: string }> = {
-  folio: { re: /^[A-Z0-9/-]{3,20}$/i, hint: "3–20 letters, numbers, / or -" },
+  folio: { re: /^[A-Z0-9/-]{3,20}$/i, hint: "3 to 20 letters, numbers, / or -" },
   dp_client: {
     re: /^(IN\d{14}|\d{16})$/i,
     hint: "16 characters: IN + 14 digits (NSDL) or 16 digits (CDSL)",
@@ -78,7 +78,7 @@ export function decideRoute(input: TriageInput, now: Date): RouteDecision {
   let lastYear = input.lastActivityYear;
   if (lastYear !== null && (lastYear < 1950 || lastYear > year)) {
     inputNotes.push(
-      `The year you gave is outside 1950–${year}, so we have left it out of this check.`,
+      `The year you gave is outside 1950 to ${year}, so we have left it out of this check.`,
     );
     lastYear = null;
   }
@@ -160,12 +160,12 @@ export function decideRoute(input: TriageInput, now: Date): RouteDecision {
       why: `Shares move to IEPF only after dividends stay unclaimed for ${IEPF_UNCLAIMED_YEARS} consecutive years. Without a rough year we cannot tell whether to look at the company's own unclaimed list or at IEPF, so we have not picked one.`,
     });
     reasons.push(
-      'Both routes are still open. A rough year — even "early 2000s" — is enough to narrow it down. Old bank passbooks often show dividend credits.',
+      'Both routes are still open. A rough year (even "early 2000s") is enough to narrow it down. Old bank passbooks often show dividend credits.',
     );
   } else {
     const gap = year - lastYear;
     reasons.push(
-      `You last received a dividend around ${lastYear} — about ${gap} year${gap === 1 ? "" : "s"} ago.`,
+      `You last received a dividend around ${lastYear}, about ${gap} year${gap === 1 ? "" : "s"} ago.`,
     );
     if (gap > IEPF_UNCLAIMED_YEARS) {
       route = "iepf";
@@ -178,7 +178,7 @@ export function decideRoute(input: TriageInput, now: Date): RouteDecision {
     } else if (gap >= IEPF_UNCLAIMED_YEARS - 1) {
       route = "iepf";
       confidence = "possible";
-      headline = "Possibly IEPF — close to the seven-year line";
+      headline = "Possibly IEPF: close to the seven-year line";
       reasons.push(
         "Whether the shares have moved depends on the exact dividend dates, so they may still be with the company. Both the company's list and the IEPF list should be checked.",
       );
@@ -187,7 +187,7 @@ export function decideRoute(input: TriageInput, now: Date): RouteDecision {
       confidence = "likely";
       headline = "Likely company / RTA route";
       reasons.push(
-        "That is inside the seven-year window, so unclaimed dividends are probably still in the company's unpaid dividend account and the shares still with the company. You claim directly from the company or its registrar (RTA) — no IEPF filing needed.",
+        "That is inside the seven-year window, so unclaimed dividends are probably still in the company's unpaid dividend account and the shares still with the company. You claim directly from the company or its registrar (RTA). No IEPF filing needed.",
       );
     }
   }
@@ -206,12 +206,12 @@ export function decideRoute(input: TriageInput, now: Date): RouteDecision {
 
   if (!input.identifier) {
     inputNotes.push(
-      "No folio or demat number given. That's fine to start — it is printed on share certificates, dividend warrants and old annual reports, and helps the registrar find the holding faster.",
+      "No folio or demat number given. That's fine to start. It is printed on share certificates, dividend warrants and old annual reports, and helps the registrar find the holding faster.",
     );
   }
 
   nextSteps.push(
-    "Search the list yourself using the holder's name exactly as it appeared on the certificate — the official search is free.",
+    "Search the list yourself using the holder's name exactly as it appeared on the certificate. The official search is free.",
     "Collect any share certificate, dividend warrant, or letter from the company or its registrar.",
     "Make sure you have an active demat account in the same name. IEPF returns shares only to a demat account.",
   );
@@ -288,7 +288,7 @@ function institutionRoute(
       confidence: "likely",
       headline: "Likely direct EPFO route",
       reasons: [
-        "PF claims go through EPFO — on the member portal with your UAN, or through your last employer — including for accounts that have gone inoperative.",
+        "PF claims go through EPFO (on the member portal with your UAN, or through your last employer), including for accounts that have gone inoperative.",
         notYet,
       ],
       missing,

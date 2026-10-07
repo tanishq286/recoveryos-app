@@ -17,7 +17,7 @@ export const SUCCESS_FEE_CONDITIONS = [
 ];
 
 export const PROTECTION_CONDITION =
-  "Planned benefit: a further 10% of the recovery set aside toward a life or health insurance policy in your name — subject to licensed partner availability, your choice and policy issuance. We do not sell insurance; any policy would come from an IRDAI-licensed insurer through a licensed intermediary. If you opt out, or no policy is issued, this 10% stays with you.";
+  "Planned benefit: a further 10% of the recovery set aside toward a life or health insurance policy in your name, subject to licensed partner availability, your choice and policy issuance. We do not sell insurance; any policy would come from an IRDAI-licensed insurer through a licensed intermediary. If you opt out, or no policy is issued, this 10% stays with you.";
 
 export const PROTECTION_STATUS_NOTE =
   "Planned, not yet active. Nothing is set aside for it until a licensed partner is in place and you say yes.";

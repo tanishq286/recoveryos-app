@@ -68,7 +68,7 @@ export async function reviewFieldAction(raw: FieldReviewInput): Promise<FieldRev
   } catch {
     return {
       ok: false,
-      error: "We couldn't save that just now. Nothing was changed — please try again.",
+      error: "We couldn't save that just now. Nothing was changed. Please try again.",
     };
   }
 }
@@ -104,7 +104,7 @@ export async function assessEligibilityAction(raw: TriageInput): Promise<TriageA
   } catch {
     return {
       ok: false,
-      error: "We couldn't run the check just now. Your answers are still here — please try again.",
+      error: "We couldn't run the check just now. Your answers are still here. Please try again.",
     };
   }
 }

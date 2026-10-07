@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Fingerprint, Info, Upload } from "lucide-react";
+import { FingerprintIcon, InfoIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 
 import { getDataSource } from "@/lib/data";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,7 +14,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await props.params;
   const room = await getDataSource().getEvidenceRoom(id);
-  return { title: room ? `${room.reference} · Evidence room` : "Case not found" };
+  return { title: room ? `Evidence room, case ${room.reference}` : "Case not found" };
 }
 
 export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evidence">) {
@@ -39,64 +39,57 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
-      <nav aria-label="Breadcrumb" className="text-sm text-slate">
+      <nav aria-label="Breadcrumb" className="text-sm text-fg-3">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
-            <Link
-              href="/cases"
-              className="underline decoration-slate/40 underline-offset-4 hover:text-ink"
-            >
+            <Link href="/cases" className="link text-fg-2">
               Sample cases
             </Link>
           </li>
           <li aria-hidden="true">/</li>
           <li>
-            <Link
-              href={`/cases/${room.caseId}`}
-              className="tnum underline decoration-slate/40 underline-offset-4 hover:text-ink"
-            >
+            <Link href={`/cases/${room.caseId}`} className="link tnum font-mono text-fg-2">
               {room.reference}
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li aria-current="page" className="text-ink">
+          <li aria-current="page" className="text-fg">
             Evidence room
           </li>
         </ol>
       </nav>
 
-      <header className="mt-4 max-w-3xl">
-        <p className="eyebrow text-brass-ink">Evidence room</p>
-        <h1 className="mt-2 font-display text-3xl leading-tight font-medium text-ink sm:text-4xl">
+      <header className="mt-6 max-w-3xl">
+        <h1 className="text-3xl leading-tight text-fg sm:text-4xl sm:leading-[1.1]">
           {room.title}
         </h1>
-        <p className="tnum mt-3 text-lg text-ink/85">
+        <p className="tnum mt-4 text-lg text-fg-2">
           {room.files.length} document{room.files.length === 1 ? "" : "s"}
           {needsYou.length > 0 &&
-            ` · ${needsYou.length} detail${needsYou.length === 1 ? "" : "s"} waiting for you`}
-          {reading > 0 && ` · ${reading} being read`}
-          {failed > 0 && ` · ${failed} couldn't be read`}
+            `, ${needsYou.length} detail${needsYou.length === 1 ? "" : "s"} waiting for you`}
+          {reading > 0 && `, ${reading} being read`}
+          {failed > 0 && `, ${failed} couldn't be read`}
         </p>
       </header>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
         <Alert variant="default">
-          <Fingerprint aria-hidden="true" />
+          <FingerprintIcon aria-hidden="true" />
           <AlertTitle>Every file is fingerprinted on arrival</AlertTitle>
           <AlertDescription>
             <p>
               We record a SHA-256 checksum the moment a file lands. If even one pixel changes, the
-              checksum changes — so you, we, or a regulator can prove the file filed is the file you
+              checksum changes, so you, we, or a regulator can prove the file filed is the file you
               gave us.
             </p>
           </AlertDescription>
         </Alert>
-        <div className="rounded-lg border border-dashed border-control/70 bg-pearl p-4">
-          <p className="flex items-center gap-2 font-semibold text-ink">
-            <Upload className="size-5" aria-hidden="true" />
+        <div className="rounded-[var(--radius-panel)] border border-dashed border-control/70 p-4">
+          <p className="flex items-center gap-2 font-semibold text-fg">
+            <UploadSimpleIcon className="size-5 text-fg-2" aria-hidden="true" />
             Add a document
           </p>
-          <p id="upload-off" className="mt-1 text-base text-slate">
+          <p id="upload-off" className="mt-1 text-base text-fg-2">
             Uploads are switched off in this demo. Real documents are accepted only after the audit
             log, row-level security and backups have been verified.
           </p>
@@ -114,7 +107,7 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
 
       {requested && !requestedFile && (
         <Alert variant="info" className="mt-6">
-          <Info aria-hidden="true" />
+          <InfoIcon aria-hidden="true" />
           <AlertTitle>That document isn&apos;t on this case</AlertTitle>
           <AlertDescription>
             <p>We&apos;re showing {selected ? selected.fileName : "the document list"} instead.</p>
@@ -125,31 +118,38 @@ export default async function EvidenceRoomPage(props: PageProps<"/cases/[id]/evi
       {room.files.length === 0 ? (
         <section
           aria-labelledby="empty-heading"
-          className="mt-8 rounded-lg border border-dashed border-control/70 bg-pearl p-6 sm:p-8"
+          className="mt-10 rounded-[var(--radius-panel)] border border-dashed border-control/70 p-6 sm:p-8"
         >
-          <h2 id="empty-heading" className="font-display text-2xl font-medium text-ink">
+          <h2 id="empty-heading" className="text-2xl text-fg">
             No documents yet
           </h2>
-          <p className="mt-2 max-w-2xl text-lg text-ink/85">
+          <p className="mt-3 max-w-2xl text-lg text-fg-2">
             When you add a document, it appears here with its category, upload date and checksum. We
             then read it field by field, and each detail comes back to you as a proof card with the
             page it came from.
           </p>
-          <h3 className="mt-6 font-sans text-base font-semibold text-ink">Useful to start with</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-base text-ink marker:text-brass">
-            <li>Any share certificate, dividend warrant or letter from the company</li>
-            <li>PAN card and masked Aadhaar (first 8 digits hidden)</li>
-            <li>Client master list from your broker, for the demat account</li>
-            <li>For heir claims: the death certificate, and any will or succession document</li>
+          <h3 className="mt-8 text-base font-semibold text-fg">Useful to start with</h3>
+          <ul className="mt-3 space-y-2 text-base text-fg">
+            {[
+              "Any share certificate, dividend warrant or letter from the company",
+              "PAN card and masked Aadhaar (first 8 digits hidden)",
+              "Client master list from your broker, for the demat account",
+              "For heir claims: the death certificate, and any will or succession document",
+            ].map((item) => (
+              <li key={item} className="flex gap-3">
+                <span aria-hidden="true" className="mt-[0.8em] h-px w-3 shrink-0 bg-signal" />
+                <span className="min-w-0">{item}</span>
+              </li>
+            ))}
           </ul>
         </section>
       ) : (
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)]">
+        <div className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <section aria-labelledby="docs-heading">
-            <h2 id="docs-heading" className="font-display text-xl font-medium text-ink">
+            <h2 id="docs-heading" className="text-xl text-fg">
               Documents
             </h2>
-            <div className="mt-3">
+            <div className="mt-4">
               <EvidenceList
                 files={room.files}
                 fields={room.fields}

@@ -4,20 +4,23 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/*
+ * Press feedback: scale(0.97) on :active, 160ms on the strong ease-out.
+ * Hover changes colour only, and only on fine pointers (no false taps).
+ */
 const buttonVariants = cva(
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md text-center text-base font-medium transition-colors duration-200 ease-(--ease-calm) disabled:pointer-events-none disabled:opacity-60 aria-disabled:pointer-events-none aria-disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] text-center text-base font-medium [font-stretch:104%] transition-[transform,background-color,border-color,color] duration-[160ms] ease-(--ease-out) select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
   {
     variants: {
       variant: {
-        default: "bg-primary px-5 py-2.5 text-primary-foreground hover:bg-ink/90",
+        default: "bg-signal px-5 py-2.5 text-on-signal hover:bg-signal-strong",
         outline:
-          "border border-ink/35 bg-pearl px-5 py-2.5 text-ink hover:border-ink hover:bg-mist",
-        secondary: "bg-secondary px-5 py-2.5 text-secondary-foreground hover:bg-line/70",
-        ghost: "px-3 py-2 text-ink hover:bg-mist",
-        confirm: "bg-teal-ink px-5 py-2.5 text-pearl hover:bg-teal-ink/90",
-        destructive: "bg-alert px-5 py-2.5 text-pearl hover:bg-alert/90",
-        link: "min-h-0 px-0 py-0 text-ink underline decoration-ink/40 hover:decoration-ink",
-        onInk: "bg-ivory px-5 py-2.5 text-ink hover:bg-pearl",
+          "border border-control bg-transparent px-5 py-2.5 text-fg hover:border-fg-2 hover:bg-ink-800",
+        secondary: "bg-ink-800 px-5 py-2.5 text-fg hover:bg-line",
+        ghost: "px-3 py-2 text-fg-2 hover:bg-ink-800 hover:text-fg",
+        confirm: "bg-confirmed px-5 py-2.5 text-on-signal hover:bg-[#7fe0c6]",
+        destructive: "bg-blocker px-5 py-2.5 text-on-signal hover:bg-[#ff968f]",
+        link: "min-h-0 px-0 py-0 text-fg underline decoration-fg/35 underline-offset-[0.22em] active:scale-100 hover:decoration-signal",
       },
       size: {
         default: "",

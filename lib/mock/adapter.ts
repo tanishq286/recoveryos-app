@@ -124,7 +124,7 @@ function sourceChecks(input: TriageInput, now: string, routeLabel: string): Sour
       operator: "RecoveryOS (versioned rule set)",
       url: null,
       whatWeChecked:
-        "Your answers — asset type, years since the last dividend or transaction, and how you hold it — against the published rule set.",
+        "Your answers (asset type, years since the last dividend or transaction, and how you hold it) against the published rule set.",
       status: "checked",
       statusDetail: `Applied. Result: ${routeLabel}.`,
       checkedAt: now,
@@ -144,7 +144,7 @@ function sourceChecks(input: TriageInput, now: string, routeLabel: string): Sour
     if (needsIssuer && !input.issuerName?.trim()) {
       checks.push({
         ...base,
-        whatWeChecked: "Nothing — this list is organised by company.",
+        whatWeChecked: "Nothing. This list is organised by company.",
         status: "insufficient_evidence",
         statusDetail: "Not queried: no company name was given, so there is no list to look in.",
       });
@@ -156,8 +156,8 @@ function sourceChecks(input: TriageInput, now: string, routeLabel: string): Sour
       checks.push({
         ...base,
         whatWeChecked: byLogin
-          ? "Nothing — this source needs your own login."
-          : `Nothing yet — the lookup would use the holder's name${needsIssuer ? " and the company" : ""}.`,
+          ? "Nothing. This source needs your own login."
+          : `Nothing yet. The lookup would use the holder's name${needsIssuer ? " and the company" : ""}.`,
         status: "not_connected",
         statusDetail: byLogin
           ? "Not queried. It needs your own login, and we will never ask for your password or OTP. You can check it yourself for free."
@@ -219,7 +219,7 @@ export function createMockDataSource(opts: { latencyMs: number }): RecoveryDataS
       if (f.value === null) {
         return {
           ok: false,
-          error: "There is no value to approve — this detail was not found in the document.",
+          error: "There is no value to approve: this detail was not found in the document.",
         };
       }
 

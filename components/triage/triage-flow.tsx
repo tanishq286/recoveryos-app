@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Lock } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  LockSimpleIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 import type {
   AssetType,
@@ -78,7 +84,7 @@ const ISSUER_COPY: Record<AssetType, { question: string; label: string; hint: st
   iepf_shares_dividends: {
     question: "Which company issued the shares?",
     label: "Company name",
-    hint: "As printed on the certificate or dividend warrant. Old names are fine — companies change names.",
+    hint: "As printed on the certificate or dividend warrant. Old names are fine. Companies change names.",
   },
   mutual_funds: {
     question: "Which fund house was it with?",
@@ -168,8 +174,8 @@ function toInput(a: Answers): TriageInput {
 function ProgressRail({ current }: { current: number }) {
   const total = STEPS.length;
   return (
-    <nav aria-label="Progress" className="mb-8">
-      <p className="tnum text-sm font-medium text-slate">
+    <nav aria-label="Progress" className="mb-10">
+      <p className="tnum text-sm font-medium text-fg-3">
         Step {current + 1} of {total}
         <span className="sr-only">: {STEPS[current].short}</span>
       </p>
@@ -182,27 +188,29 @@ function ProgressRail({ current }: { current: number }) {
               aria-current={state === "current" ? "step" : undefined}
               className="min-w-0"
             >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "block h-1.5 rounded-full transition-colors duration-200",
-                  state === "done" && "bg-teal",
-                  state === "current" && "bg-brass",
-                  state === "upcoming" && "bg-line",
-                )}
-              />
+              {/* Each segment fills along its own length: transform only, no layout. */}
+              <span aria-hidden="true" className="block h-1 overflow-hidden rounded-full bg-line">
+                <span
+                  className={cn(
+                    "block h-full origin-left rounded-full transition-[transform,background-color] duration-[320ms] ease-(--ease-out)",
+                    state === "upcoming" ? "scale-x-0 bg-signal" : "scale-x-100",
+                    state === "done" && "bg-confirmed",
+                    state === "current" && "bg-signal",
+                  )}
+                />
+              </span>
               <span
                 className={cn(
                   "mt-2 hidden items-center gap-1 text-sm sm:flex",
                   state === "current"
-                    ? "font-semibold text-ink"
+                    ? "font-medium text-fg"
                     : state === "done"
-                      ? "text-ink"
-                      : "text-slate",
+                      ? "text-fg-2"
+                      : "text-fg-3",
                 )}
               >
                 {state === "done" && (
-                  <Check className="size-3.5 text-teal-ink" aria-hidden="true" />
+                  <CheckIcon weight="bold" className="size-3.5 text-confirmed" aria-hidden="true" />
                 )}
                 {s.short}
                 <span className="sr-only">
@@ -235,7 +243,7 @@ function Question({
       id={id}
       ref={headingRef}
       tabIndex={-1}
-      className="font-display text-3xl leading-tight font-medium text-ink focus:outline-none sm:text-[2.5rem]"
+      className="text-3xl leading-tight text-fg focus:outline-none sm:text-[2.5rem] sm:leading-[1.1]"
     >
       {children}
     </h1>
@@ -244,8 +252,11 @@ function Question({
 
 function FieldError({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <p id={id} className="mt-2 flex items-start gap-1.5 text-base font-medium text-alert">
-      <CircleAlert className="mt-1 size-4 shrink-0" aria-hidden="true" />
+    <p
+      id={id}
+      className="mt-2 flex animate-arrive items-start gap-1.5 text-base font-medium text-blocker"
+    >
+      <WarningCircleIcon weight="bold" className="mt-1 size-4 shrink-0" aria-hidden="true" />
       <span>
         <span className="sr-only">Error: </span>
         {children}
@@ -288,14 +299,16 @@ function OptionCards<T extends string>({
             key={o.value}
             htmlFor={id}
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border bg-pearl p-4 transition-colors duration-150 hover:border-ink/50",
-              checked ? "border-ink ring-1 ring-ink" : "border-control/70",
+              "flex cursor-pointer items-start gap-3 rounded-[var(--radius-panel)] border p-4 transition-[border-color,background-color,box-shadow,transform] duration-[160ms] ease-(--ease-out) active:scale-[0.99]",
+              checked
+                ? "border-signal bg-signal-wash/60 shadow-[inset_0_0_0_1px_var(--color-signal)]"
+                : "border-line bg-ink-850 shadow-(--highlight) hover:border-control",
             )}
           >
             <RadioGroupItem id={id} value={o.value} className="mt-1" />
             <span className="min-w-0">
-              <span className="block font-semibold text-ink">{o.title}</span>
-              <span className="mt-0.5 block text-base text-slate">{o.body}</span>
+              <span className="block font-semibold text-fg">{o.title}</span>
+              <span className="mt-0.5 block text-base text-fg-2">{o.body}</span>
             </span>
           </label>
         );
@@ -327,7 +340,7 @@ function YearSelect({
       onChange={(e) => onChange(e.target.value)}
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
-      className="tnum block min-h-12 w-full max-w-xs rounded-md border border-input bg-pearl px-3 py-2.5 text-base text-ink aria-invalid:border-alert"
+      className="tnum block min-h-12 w-full max-w-xs rounded-[var(--radius-control)] border border-control bg-ink-900 px-3 py-2.5 text-base text-fg transition-[border-color] duration-[160ms] hover:border-fg-3 aria-invalid:border-blocker"
     >
       <option value="">Choose a year</option>
       <option value="unknown">I don&apos;t remember</option>
@@ -344,6 +357,9 @@ function YearSelect({
 
 export function TriageFlow({ maxYear }: { maxYear: number }) {
   const [step, setStep] = useState(0);
+  // Visual only: which way the last step change went, so the next question
+  // slides in from the matching side. "none" on first paint (no entrance).
+  const [dir, setDir] = useState<"none" | "forward" | "back">("none");
   const [answers, setAnswers] = useState<Answers>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [result, setResult] = useState<EligibilityAssessment | null>(null);
@@ -372,6 +388,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
 
   function go(to: number) {
     moved.current = true;
+    setDir(to < step ? "back" : "forward");
     setErrors({});
     setSubmitError(null);
     setStep(to);
@@ -392,7 +409,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
         else {
           const problem = validateIdentifier(answers.identifierKind, v);
           if (problem)
-            e.identifier = `That doesn't look like a ${IDENTIFIER_LABELS[answers.identifierKind].toLowerCase()} — expected ${problem}.`;
+            e.identifier = `That doesn't look like a ${IDENTIFIER_LABELS[answers.identifierKind].toLowerCase()}. Expected ${problem}.`;
         }
       }
     }
@@ -431,6 +448,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
     setAnswers(EMPTY);
     setResult(null);
     setErrors({});
+    setDir("back");
     setStep(0);
   }
 
@@ -449,8 +467,8 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
 
       {(errorList.length > 0 || submitError) && (
         <div ref={errorRef} tabIndex={-1} className="mb-6 focus:outline-none">
-          <Alert variant="blocker" role="alert">
-            <CircleAlert aria-hidden="true" />
+          <Alert variant="blocker" role="alert" className="animate-arrive">
+            <WarningCircleIcon aria-hidden="true" />
             <AlertTitle>{submitError ? "The check didn't run" : "There is a problem"}</AlertTitle>
             <AlertDescription>
               {submitError ? (
@@ -459,7 +477,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                 <ul className="list-disc pl-5">
                   {errorList.map(([k, v]) => (
                     <li key={k}>
-                      <a href={`#${ids}-${k}`} className="underline underline-offset-4">
+                      <a href={`#${ids}-${k}`} className="link">
                         {v}
                       </a>
                     </li>
@@ -471,7 +489,12 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
         </div>
       )}
 
-      <form onSubmit={onContinue} noValidate key={key} className="animate-step-in">
+      <form
+        onSubmit={onContinue}
+        noValidate
+        key={key}
+        className={cn(dir === "forward" && "animate-forward", dir === "back" && "animate-back")}
+      >
         {key === "asset" && (
           <fieldset>
             <legend className="mb-2">
@@ -479,7 +502,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                 What are you trying to recover?
               </Question>
             </legend>
-            <p className="mb-6 text-lg text-slate">
+            <p className="mb-6 text-lg text-fg-2">
               Choose the closest. You can run the check again for another holding.
             </p>
             <div id={`${ids}-assetType`} tabIndex={-1} className="focus:outline-none">
@@ -509,7 +532,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
             </Question>
             <div className="mt-6 max-w-xl">
               <Label htmlFor={`${ids}-issuerName`}>{ISSUER_COPY[asset].label}</Label>
-              <p id={`${ids}-issuer-hint`} className="mt-1 text-base text-slate">
+              <p id={`${ids}-issuer-hint`} className="mt-1 text-base text-fg-2">
                 {ISSUER_COPY[asset].hint}
               </p>
               <Input
@@ -526,12 +549,12 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
               {errors.issuerName && (
                 <FieldError id={`${ids}-issuerName-err`}>{errors.issuerName}</FieldError>
               )}
-              <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-base text-ink">
+              <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-base text-fg">
                 <input
                   type="checkbox"
                   checked={answers.issuerUnknown}
                   onChange={(e) => set("issuerUnknown", e.target.checked)}
-                  className="size-5 accent-ink"
+                  className="size-5 accent-signal"
                 />
                 I don&apos;t know
               </label>
@@ -547,7 +570,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
             <div className="mt-6 grid gap-6">
               <div>
                 <Label htmlFor={`${ids}-lastYear`}>{DATE_COPY[asset].lastLabel}</Label>
-                <p id={`${ids}-last-hint`} className="mt-1 text-base text-slate">
+                <p id={`${ids}-last-hint`} className="mt-1 text-base text-fg-2">
                   {DATE_COPY[asset].lastHint}
                 </p>
                 <div className="mt-2">
@@ -566,7 +589,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
               </div>
               <div>
                 <Label htmlFor={`${ids}-acquiredYear`}>
-                  Year bought or opened <span className="font-normal text-slate">(optional)</span>
+                  Year bought or opened <span className="font-normal text-fg-3">(optional)</span>
                 </Label>
                 <div className="mt-2">
                   <YearSelect
@@ -588,7 +611,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                 Do you have a reference number?
               </Question>
             </legend>
-            <p className="mb-6 max-w-2xl text-lg text-slate">
+            <p className="mb-6 max-w-2xl text-lg text-fg-2">
               Optional. It helps point to the right record.{" "}
               {asset === "bank_deposits"
                 ? "We only ever need the last 4 digits of an account number."
@@ -602,7 +625,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                 options={[
                   ...IDENTIFIER_OPTIONS[asset].map((k) => ({
                     value: k as IdentifierKind | "none",
-                    title: `Yes — ${IDENTIFIER_LABELS[k]}`,
+                    title: `Yes: ${IDENTIFIER_LABELS[k]}`,
                     body:
                       k === "folio"
                         ? "Printed on certificates, dividend warrants and statements."
@@ -615,7 +638,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                   {
                     value: "none",
                     title: "I don't have it",
-                    body: "That's fine — we can still suggest a route.",
+                    body: "That's fine. We can still suggest a route.",
                   },
                 ]}
                 labelledBy={questionId}
@@ -653,9 +676,9 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                 )}
                 <p
                   id={`${ids}-id-privacy`}
-                  className="mt-2 flex items-start gap-1.5 text-sm text-slate"
+                  className="mt-2 flex items-start gap-1.5 text-sm text-fg-3"
                 >
-                  <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <LockSimpleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   Used only for this check. Not stored in this demo.
                 </p>
               </div>
@@ -670,7 +693,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
                 How is it held?
               </Question>
             </legend>
-            <p className="mb-6 text-lg text-slate">This decides which documents are needed.</p>
+            <p className="mb-6 text-lg text-fg-2">This decides which documents are needed.</p>
             <div id={`${ids}-holderType`} tabIndex={-1} className="focus:outline-none">
               <OptionCards
                 name="holderType"
@@ -692,10 +715,10 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
             <Question id={questionId} headingRef={headingRef}>
               Check your answers
             </Question>
-            <p className="mt-3 text-lg text-slate">
+            <p className="mt-3 text-lg text-fg-2">
               Nothing has been sent anywhere yet. The check runs our route rules on these answers.
             </p>
-            <dl className="mt-6 divide-y divide-line rounded-lg border border-line bg-pearl">
+            <dl className="panel mt-8 divide-y divide-line">
               {[
                 { label: "Holding", value: ASSET_LABELS[asset], to: 0 },
                 {
@@ -734,15 +757,15 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
               ].map((row) => (
                 <div
                   key={row.label}
-                  className="grid gap-1 px-4 py-3 sm:grid-cols-[14rem_1fr_auto] sm:items-center sm:gap-4"
+                  className="grid gap-1 px-5 py-3.5 sm:grid-cols-[14rem_1fr_auto] sm:items-center sm:gap-4"
                 >
-                  <dt className="text-base text-slate">{row.label}</dt>
-                  <dd className="tnum min-w-0 font-medium break-words text-ink">{row.value}</dd>
+                  <dt className="text-base text-fg-3">{row.label}</dt>
+                  <dd className="tnum min-w-0 font-medium break-words text-fg">{row.value}</dd>
                   <dd>
                     <button
                       type="button"
                       onClick={() => go(row.to)}
-                      className="inline-flex min-h-11 items-center text-base font-medium text-ink underline decoration-ink/30 underline-offset-4 hover:decoration-ink"
+                      className="link inline-flex min-h-11 items-center text-base font-medium"
                     >
                       Change<span className="sr-only"> {row.label.toLowerCase()}</span>
                     </button>
@@ -756,7 +779,7 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <Button type="submit" size="lg" disabled={pending} aria-busy={pending || undefined}>
             {key === "review" ? (pending ? "Running the check…" : "Run the check") : "Continue"}
-            {!pending && <ArrowRight aria-hidden="true" />}
+            {!pending && <ArrowRightIcon weight="bold" aria-hidden="true" />}
           </Button>
           {step > 0 && (
             <Button
@@ -766,11 +789,11 @@ export function TriageFlow({ maxYear }: { maxYear: number }) {
               onClick={() => go(step - 1)}
               disabled={pending}
             >
-              <ArrowLeft aria-hidden="true" />
+              <ArrowLeftIcon weight="bold" aria-hidden="true" />
               Back
             </Button>
           )}
-          <span role="status" aria-live="polite" className="text-base text-slate">
+          <span role="status" aria-live="polite" className="text-base text-fg-3">
             {pending ? "Running the check. This takes a moment." : ""}
           </span>
         </div>

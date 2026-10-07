@@ -4,19 +4,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Badges always carry a text label; colour is never the only signal.
- * teal = confirmed, alert = real blocker, brass = in progress.
+ * Badges always carry a word (and usually an icon): colour is never the only signal.
+ * signal = in progress, confirmed = done, blocker = real blocker.
  */
 const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-medium [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        neutral: "border-line bg-mist text-ink",
-        progress: "border-brass/60 bg-brass-wash text-brass-ink",
-        confirmed: "border-teal/50 bg-teal-wash text-teal-ink",
-        blocker: "border-alert/50 bg-alert-wash text-alert",
-        outline: "border-ink/30 bg-transparent text-ink",
+        neutral: "border-line bg-ink-800 text-fg-2",
+        progress: "border-signal/35 bg-signal-wash text-signal",
+        confirmed: "border-confirmed/35 bg-confirmed-wash text-confirmed",
+        blocker: "border-blocker/45 bg-blocker-wash text-blocker",
+        outline: "border-control bg-transparent text-fg-2",
       },
     },
     defaultVariants: {

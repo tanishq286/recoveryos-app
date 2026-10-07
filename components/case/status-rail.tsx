@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Minus } from "lucide-react";
+import { CheckIcon, WarningCircleIcon, MinusIcon } from "@phosphor-icons/react/dist/ssr";
 
 import type { CaseStatus } from "@/lib/types";
 import { railProgress, railStates, stateInfo, type RailStepState } from "@/lib/rules/case-states";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const SR_STATE: Record<RailStepState, string> = {
   done: "Completed",
   current: "Current step",
-  blocked: "Blocked — needs action",
+  blocked: "Blocked, needs action",
   upcoming: "Upcoming",
   skipped: "Skipped",
   not_needed: "Not needed",
@@ -16,31 +16,31 @@ const SR_STATE: Record<RailStepState, string> = {
 
 function Marker({ state, branch }: { state: RailStepState; branch?: boolean }) {
   const base =
-    "relative z-10 grid size-7 shrink-0 place-items-center rounded-full border-2 bg-pearl";
+    "relative z-10 grid size-7 shrink-0 place-items-center rounded-full border bg-ink-850";
   switch (state) {
     case "done":
       return (
-        <span className={cn(base, "border-teal bg-teal text-pearl")}>
-          <Check className="size-4" strokeWidth={2.5} aria-hidden="true" />
+        <span className={cn(base, "border-confirmed/60 bg-confirmed-wash text-confirmed")}>
+          <CheckIcon weight="bold" className="size-3.5" aria-hidden="true" />
         </span>
       );
     case "current":
       return (
-        <span className={cn(base, "animate-milestone border-brass")}>
-          <span className="size-3 rounded-full bg-brass" />
+        <span className={cn(base, "animate-marker border-signal bg-signal-wash")}>
+          <span className="size-2.5 rounded-full bg-signal" />
         </span>
       );
     case "blocked":
       return (
-        <span className={cn(base, "animate-milestone border-alert bg-alert-wash text-alert")}>
-          <CircleAlert className="size-4" strokeWidth={2.5} aria-hidden="true" />
+        <span className={cn(base, "animate-marker border-blocker bg-blocker-wash text-blocker")}>
+          <WarningCircleIcon weight="bold" className="size-4" aria-hidden="true" />
         </span>
       );
     case "not_needed":
     case "skipped":
       return (
-        <span className={cn(base, "border-dashed border-control text-slate")}>
-          <Minus className="size-3.5" aria-hidden="true" />
+        <span className={cn(base, "border-dashed border-control text-fg-3")}>
+          <MinusIcon className="size-3.5" aria-hidden="true" />
         </span>
       );
     default:
@@ -72,27 +72,26 @@ export function StatusRail({
   const isBlocked = status === "query_deficiency";
 
   return (
-    <section
-      aria-labelledby="rail-heading"
-      className="rounded-lg border border-line bg-pearl p-5 sm:p-6"
-    >
+    <section aria-labelledby="rail-heading" className="panel p-5 sm:p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="rail-heading" className="eyebrow text-slate">
+        <h2
+          id="rail-heading"
+          className="text-base font-semibold tracking-[-0.005em] text-fg [font-stretch:100%]"
+        >
           Evidence to credit
         </h2>
-        <p className="text-sm text-slate">
+        <p className="text-sm text-fg-3">
           <span className="tnum">
-            Step {step} of {total}
-          </span>
-          {" · "}
-          <span className={cn("font-semibold", isBlocked ? "text-alert" : "text-ink")}>
+            Step {step} of {total}:
+          </span>{" "}
+          <span className={cn("font-semibold", isBlocked ? "text-blocker" : "text-fg")}>
             {current.label}
           </span>
         </p>
       </div>
 
-      {/* Narrow screens: summary bar + expandable vertical list */}
-      <div className="mt-4 lg:hidden">
+      {/* Narrow screens: summary bar plus an expandable vertical list */}
+      <div className="mt-5 lg:hidden">
         <div className="flex gap-1" aria-hidden="true">
           {steps
             .filter((s) => !s.info.branch)
@@ -100,29 +99,29 @@ export function StatusRail({
               <span
                 key={info.status}
                 className={cn(
-                  "h-1.5 flex-1 rounded-full transition-colors duration-200",
-                  state === "done" && "bg-teal",
-                  state === "current" && (isBlocked ? "bg-alert" : "bg-brass"),
+                  "h-1 flex-1 rounded-full",
+                  state === "done" && "bg-confirmed/70",
+                  state === "current" && (isBlocked ? "bg-blocker" : "bg-signal"),
                   (state === "upcoming" || state === "skipped") && "bg-line",
                 )}
               />
             ))}
         </div>
-        <p className="mt-3 text-base text-ink">{current.description}</p>
+        <p className="mt-4 text-base text-fg-2">{current.description}</p>
         <details className="group mt-3">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-base font-medium text-ink underline decoration-ink/30 underline-offset-4 hover:decoration-ink">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-base font-medium text-fg underline decoration-fg/30 underline-offset-[0.22em] hover:decoration-signal">
             <span className="group-open:hidden">Show all {steps.length} steps</span>
             <span className="hidden group-open:inline">Hide steps</span>
           </summary>
-          <ol className="mt-3 space-y-0">
+          <ol className="mt-4">
             {steps.map(({ info, state }, i) => (
-              <li key={info.status} className="relative flex gap-3 pb-4 last:pb-0">
+              <li key={info.status} className="relative flex gap-3 pb-5 last:pb-0">
                 {i < steps.length - 1 && (
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute top-7 bottom-0 left-[13px] w-0.5",
-                      state === "done" ? "bg-teal" : "bg-line",
+                      "absolute top-7 bottom-0 left-[13px] w-px",
+                      state === "done" ? "bg-confirmed/50" : "bg-line",
                     )}
                   />
                 )}
@@ -131,7 +130,7 @@ export function StatusRail({
                   <p
                     className={cn(
                       "font-medium",
-                      state === "upcoming" || state === "not_needed" ? "text-slate" : "text-ink",
+                      state === "upcoming" || state === "not_needed" ? "text-fg-3" : "text-fg",
                     )}
                   >
                     {info.label}
@@ -143,17 +142,17 @@ export function StatusRail({
                       className={cn(
                         "text-sm",
                         state === "blocked"
-                          ? "font-semibold text-alert"
+                          ? "font-semibold text-blocker"
                           : state === "current"
-                            ? "font-semibold text-brass-ink"
-                            : "text-slate",
+                            ? "font-semibold text-signal"
+                            : "text-fg-3",
                       )}
                     >
                       {stateCaption(state, info.branch)}
                     </p>
                   )}
                   {reachedAt.has(info.status) && state === "done" && (
-                    <p className="tnum text-sm text-slate">
+                    <p className="tnum text-sm text-fg-3">
                       {formatDate(reachedAt.get(info.status)!)}
                     </p>
                   )}
@@ -165,10 +164,14 @@ export function StatusRail({
       </div>
 
       {/* Wide screens: the full horizontal rail */}
-      <ol className="mt-6 hidden grid-cols-12 lg:grid">
+      <ol className="mt-8 hidden grid-cols-12 lg:grid">
         {steps.map(({ info, state }, i) => {
           const caption = stateCaption(state, info.branch);
-          const nextState = steps[i + 1]?.state;
+          const next = steps[i + 1];
+          const joinsDone =
+            state === "done" &&
+            (next?.state === "done" || next?.state === "current" || next?.state === "blocked");
+          const dashed = info.branch || next?.info.branch;
           return (
             <li
               key={info.status}
@@ -179,25 +182,24 @@ export function StatusRail({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "absolute top-[13px] left-1/2 h-0.5 w-full",
-                    state === "done" &&
-                      (nextState === "done" || nextState === "current" || nextState === "blocked")
-                      ? "bg-teal"
-                      : "bg-line",
-                    (info.branch || steps[i + 1]?.info.branch) &&
-                      "bg-transparent border-t-2 border-dashed border-line h-0",
+                    "absolute top-[13px] left-1/2 w-full",
+                    dashed
+                      ? "h-0 border-t border-dashed border-control"
+                      : joinsDone
+                        ? "h-px bg-confirmed/60"
+                        : "h-px bg-line",
                   )}
                 />
               )}
               <Marker state={state} branch={info.branch} />
               <span
                 className={cn(
-                  "mt-2 text-sm leading-tight",
-                  state === "current" && "font-semibold text-ink",
-                  state === "blocked" && "font-semibold text-alert",
-                  state === "done" && "text-ink",
+                  "mt-3 text-sm leading-tight",
+                  state === "current" && "font-semibold text-fg",
+                  state === "blocked" && "font-semibold text-blocker",
+                  state === "done" && "text-fg-2",
                   (state === "upcoming" || state === "not_needed" || state === "skipped") &&
-                    "text-slate",
+                    "text-fg-3",
                 )}
               >
                 {info.short}
@@ -210,12 +212,12 @@ export function StatusRail({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "mt-0.5 text-xs",
+                    "mt-1 text-xs",
                     state === "blocked"
-                      ? "font-semibold text-alert"
+                      ? "font-semibold text-blocker"
                       : state === "current"
-                        ? "font-semibold text-brass-ink"
-                        : "text-slate",
+                        ? "font-semibold text-signal"
+                        : "text-fg-3",
                   )}
                 >
                   {caption}
@@ -225,7 +227,9 @@ export function StatusRail({
           );
         })}
       </ol>
-      <p className="mt-5 hidden text-base text-ink lg:block">{current.description}</p>
+      <p className="mt-7 hidden border-t border-line pt-5 text-base text-fg-2 lg:block">
+        {current.description}
+      </p>
     </section>
   );
 }

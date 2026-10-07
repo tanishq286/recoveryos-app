@@ -1,22 +1,29 @@
 import Link from "next/link";
+import { ArrowUpRightIcon } from "@phosphor-icons/react/dist/ssr";
 
 import { Wordmark } from "@/components/brand/wordmark";
 import { OFFICIAL_LINKS } from "@/lib/sources";
 
+function shortName(label: string) {
+  return label.split(": ")[0];
+}
+
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-line bg-ivory">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr]">
+    <footer className="mt-auto border-t border-line bg-ink-950">
+      <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="space-y-4">
           <Wordmark />
-          <p className="max-w-sm text-base text-slate">
+          <p className="max-w-sm text-sm text-fg-3">
             An independent service. Not affiliated with the IEPF Authority, the Ministry of
             Corporate Affairs, SEBI, RBI or EPFO. We do not give legal, tax or investment advice.
           </p>
         </div>
         <div>
-          <h2 className="eyebrow text-slate">Free official routes</h2>
-          <ul className="mt-3 space-y-2">
+          <h2 className="text-sm font-medium tracking-normal text-fg [font-stretch:100%]">
+            Free official routes
+          </h2>
+          <ul className="mt-4 space-y-2.5">
             {[
               OFFICIAL_LINKS.iepfSearch,
               OFFICIAL_LINKS.mcaIepf5,
@@ -28,9 +35,10 @@ export function SiteFooter() {
                   href={l.href}
                   rel="noopener noreferrer"
                   target="_blank"
-                  className="text-base text-ink underline decoration-ink/30 hover:decoration-ink"
+                  className="inline-flex items-center gap-1 text-sm text-fg-2 transition-colors duration-150 hover:text-fg"
                 >
-                  {l.label.split(" — ")[0]}
+                  {shortName(l.label)}
+                  <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
                   <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               </li>
@@ -38,32 +46,37 @@ export function SiteFooter() {
           </ul>
         </div>
         <div>
-          <h2 className="eyebrow text-slate">If something feels wrong</h2>
-          <p className="mt-3 text-base text-ink">
+          <h2 className="text-sm font-medium tracking-normal text-fg [font-stretch:100%]">
+            If something feels wrong
+          </h2>
+          <p className="mt-4 text-sm text-fg-2">
             Report fraud at{" "}
             <a
               href={OFFICIAL_LINKS.cybercrime.href}
               rel="noopener noreferrer"
               target="_blank"
-              className="underline decoration-ink/30 hover:decoration-ink"
+              className="link"
             >
               cybercrime.gov.in<span className="sr-only"> (opens in a new tab)</span>
             </a>{" "}
-            or call <span className="tnum font-semibold">1930</span>.
+            or call <span className="tnum font-semibold text-fg">1930</span>.
           </p>
-          <p className="mt-4 text-sm text-slate">
-            <Link href="/check" className="underline decoration-slate/40 hover:decoration-ink">
-              Guided check
-            </Link>{" "}
-            ·{" "}
-            <Link href="/cases" className="underline decoration-slate/40 hover:decoration-ink">
-              Sample cases
-            </Link>
-          </p>
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            <li>
+              <Link href="/check" className="link text-fg-2">
+                Guided check
+              </Link>
+            </li>
+            <li>
+              <Link href="/cases" className="link text-fg-2">
+                Sample cases
+              </Link>
+            </li>
+          </ul>
         </div>
       </div>
       <div className="border-t border-line">
-        <p className="mx-auto max-w-6xl px-4 py-4 text-sm text-slate sm:px-6">
+        <p className="mx-auto max-w-[1200px] px-4 py-5 text-sm text-fg-3 sm:px-6">
           Product demo, September 2026. All cases shown are fictional.
         </p>
       </div>

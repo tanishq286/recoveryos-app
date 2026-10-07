@@ -51,7 +51,7 @@ export const EXTRACTION_LABELS: Record<
 
 export const CONFIDENCE_LABELS: Record<Confidence, { label: string; short: string }> = {
   high: { label: "High confidence", short: "High" },
-  medium: { label: "Medium confidence — please check", short: "Medium" },
-  low: { label: "Low confidence — check carefully", short: "Low" },
+  medium: { label: "Medium confidence: please check", short: "Medium" },
+  low: { label: "Low confidence: check carefully", short: "Low" },
   not_found: { label: "Not found in this document", short: "Not found" },
 };
