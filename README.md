@@ -133,10 +133,13 @@ Where the system is written down:
 - Landing: GSAP (`lib/motion/gsap.ts`) drives a SplitText line-mask hero reveal, batched
   ScrollTrigger reveals, a scroll-drawn staged route (DrawSVG) and the pricing ledger print.
 - The hero's route field (`components/marketing/route-field*.ts(x)`) is vanilla three.js with
-  custom shaders, loaded on idle after first paint. It renders on demand, pauses off-screen
-  and in hidden tabs, caps pixel ratio, and falls back to an SVG route when WebGL is
-  unavailable, Save-Data is on, or the device is low-end. Reduced motion renders one still
-  frame.
+  custom shaders, loaded on idle after first paint. The route draws in, then signal pulses
+  travel it and wake nearby records, the field swells slowly, a cursor lens lifts records
+  on fine pointers, and the credit mark ripples when a pulse arrives. The route glow is a
+  second additive point layer, not a post-processing pass. The loop runs only while the
+  canvas is on screen and the tab is visible, caps pixel ratio, and falls back to an SVG
+  route when WebGL is unavailable, Save-Data is on, or the device is low-end. Reduced
+  motion renders one still frame.
 - Product screens use short CSS transitions only (press, state morph, direction-aware step
   change, receipt lines printing in). Everything animates `transform` and `opacity`.
 - An inline `<head>` script sets `data-motion="on"` only without a reduced-motion preference,

@@ -188,7 +188,7 @@ export default function LandingPage() {
               </Link>
             </div>
           </HeroReveal>
-          <RouteField className="mt-10 h-64 [mask-image:linear-gradient(to_bottom,black_70%,transparent)] sm:h-80 lg:absolute lg:inset-y-0 lg:right-[-8%] lg:mt-0 lg:h-auto lg:w-[64%] lg:[mask-image:linear-gradient(to_right,transparent,black_28%)]" />
+          <RouteField className="mt-10 h-64 [mask-image:linear-gradient(to_bottom,black_70%,transparent)] sm:h-80 lg:absolute lg:inset-y-0 lg:right-0 lg:mt-0 lg:h-auto lg:w-[62%] lg:[mask-image:linear-gradient(to_right,transparent,black_32%)]" />
         </div>
       </section>
 

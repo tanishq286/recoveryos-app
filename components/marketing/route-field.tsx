@@ -142,6 +142,12 @@ export function RouteField({ className }: { className?: string }) {
               (e.clientX / window.innerWidth) * 2 - 1,
               (e.clientY / window.innerHeight) * 2 - 1,
             );
+            // Lens: cursor over the canvas, in normalised device coordinates.
+            const r = canvas.current?.getBoundingClientRect();
+            if (!r || r.width === 0) return;
+            const x = ((e.clientX - r.left) / r.width) * 2 - 1;
+            const y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+            scene.current?.setLens(x, y, Math.abs(x) <= 1 && Math.abs(y) <= 1);
           };
           window.addEventListener("pointermove", onMove, { passive: true });
           return () => window.removeEventListener("pointermove", onMove);

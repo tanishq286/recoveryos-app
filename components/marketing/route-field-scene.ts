@@ -5,11 +5,15 @@ import {
   CatmullRomCurve3,
   Color,
   Group,
+  Matrix4,
   NormalBlending,
   PerspectiveCamera,
+  Plane,
   Points,
+  Raycaster,
   Scene,
   ShaderMaterial,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -17,31 +21,57 @@ import {
 /*
  * The record field and the route through it.
  *
- * A still field of points stands for the registry. A route draws from one
- * holding (left, deep) to credit (right, near); points within its reach light
- * as it passes, and the end point turns mint only once the route arrives.
- * Nothing moves on its own: frames render only while the draw, the scroll or
- * the pointer-driven camera is still settling (render on demand).
+ * A field of points stands for the registry. A route draws from one holding
+ * (left, deep) to credit (right, near); points within its reach light as it
+ * passes, and the end point turns mint only once the route arrives.
+ *
+ * Once drawn, the field is quietly alive: signal pulses run along the route
+ * and wake the records beside it, the sheet swells slowly, and on fine
+ * pointers a lens lifts the records under the cursor. A pulse that reaches
+ * credit sends one ripple out from the mark. The loop runs only while the
+ * canvas is on screen and the tab is visible; reduced motion gets one still
+ * frame and never animates.
  */
 
 const INK = new Color("#8699a0");
 const SIGNAL = new Color("#7cb8ff");
+const SIGNAL_HOT = new Color("#d6e9ff");
 const CONFIRMED = new Color("#5cd3b4");
+
+/* Pulse rhythm: travel time along the route, then rest, in seconds. */
+const PULSE_TRAVEL = 2.8;
+const PULSE_REST = 2.2;
 
 const FIELD_VERT = /* glsl */ `
   uniform float uPixelRatio;
   uniform float uDraw;
+  uniform float uTime;
+  uniform float uPulse;
+  uniform vec3 uPointer;
+  uniform float uPointerAmt;
   attribute float aSeed;
   attribute float aNear;
   attribute float aRouteT;
   varying float vLit;
+  varying float vGlow;
   varying float vSeed;
+  varying float vFade;
   void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vec3 p = position;
+    // A slow swell travels across the sheet.
+    p.y += sin(p.x * 0.55 + uTime * 0.35) * cos(p.z * 0.6 - uTime * 0.27) * 0.06;
+    // Lens: records under the cursor lift toward the viewer.
+    float lens = (1.0 - smoothstep(0.0, 1.5, distance(p.xz, uPointer.xz))) * uPointerAmt;
+    p.y += lens * lens * 0.22;
+
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
     float reached = smoothstep(aRouteT, aRouteT + 0.05, uDraw);
+    float wake = exp(-pow((uPulse - aRouteT) * 13.0, 2.0)) * aNear * reached;
     vLit = aNear * reached;
-    vSeed = aSeed;
-    float size = mix(1.3, 2.2, aSeed) + vLit * 1.2;
+    vGlow = max(wake, lens * 0.75);
+    vSeed = aSeed * (0.8 + 0.2 * sin(uTime * (0.5 + aSeed * 1.3) + aSeed * 40.0));
+    vFade = smoothstep(16.0, 7.5, -mv.z);
+    float size = mix(1.5, 2.5, aSeed) + vLit * 1.4 + vGlow * 2.2;
     gl_PointSize = size * uPixelRatio * (9.5 / -mv.z);
     gl_Position = projectionMatrix * mv;
   }
@@ -50,30 +80,39 @@ const FIELD_VERT = /* glsl */ `
 const FIELD_FRAG = /* glsl */ `
   uniform vec3 uBase;
   uniform vec3 uSignal;
+  uniform vec3 uHot;
   varying float vLit;
+  varying float vGlow;
   varying float vSeed;
+  varying float vFade;
   void main() {
-    vec2 c = gl_PointCoord - 0.5;
-    float d = length(c);
-    float edge = 1.0 - smoothstep(0.38, 0.5, d);
-    vec3 col = mix(uBase, uSignal, vLit * 0.85);
-    float alpha = edge * mix(0.24 + vSeed * 0.18, 0.95, vLit);
+    float d = length(gl_PointCoord - 0.5);
+    float edge = 1.0 - smoothstep(0.36, 0.5, d);
+    vec3 col = mix(uBase, uSignal, clamp(vLit * 0.85 + vGlow, 0.0, 1.0));
+    col = mix(col, uHot, vGlow * 0.45);
+    float alpha = edge * mix(0.3 + vSeed * 0.24, 0.95, clamp(max(vLit, vGlow), 0.0, 1.0)) * vFade;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
 `;
 
+/* Drawn twice: a crisp core, then a wide soft halo (additive, no post pass). */
 const ROUTE_VERT = /* glsl */ `
   uniform float uPixelRatio;
   uniform float uDraw;
+  uniform float uPulse;
+  uniform float uSize;
   attribute float aT;
   varying float vVisible;
   varying float vHead;
+  varying float vPulse;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     vVisible = step(aT, uDraw);
     vHead = 1.0 - smoothstep(0.0, 0.035, abs(uDraw - aT));
-    float size = 2.3 + vHead * 3.2;
+    float behind = uPulse - aT;
+    vPulse = exp(-max(behind, 0.0) * 16.0) * smoothstep(-0.008, 0.0, behind);
+    float size = uSize * (1.0 + vHead * 1.4 + vPulse * 1.3);
     gl_PointSize = size * uPixelRatio * (9.5 / -mv.z) * vVisible;
     gl_Position = projectionMatrix * mv;
   }
@@ -81,13 +120,23 @@ const ROUTE_VERT = /* glsl */ `
 
 const ROUTE_FRAG = /* glsl */ `
   uniform vec3 uSignal;
+  uniform vec3 uHot;
+  uniform float uSoft;
+  uniform float uAlpha;
   varying float vVisible;
   varying float vHead;
+  varying float vPulse;
   void main() {
     if (vVisible < 0.5) discard;
     vec2 c = gl_PointCoord - 0.5;
-    float edge = 1.0 - smoothstep(0.36, 0.5, length(c));
-    gl_FragColor = vec4(mix(uSignal, vec3(0.93), vHead * 0.35), edge * 0.95);
+    float core = 1.0 - smoothstep(0.34, 0.5, length(c));
+    float halo = exp(-dot(c, c) * 14.0);
+    float shape = mix(core, halo, uSoft);
+    float energy = clamp(vHead * 0.5 + vPulse, 0.0, 1.0);
+    vec3 col = mix(uSignal, uHot, energy * 0.7);
+    float a = shape * uAlpha * mix(1.0 - uSoft * 0.65, 1.0 + uSoft * 2.2, energy);
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(col, a);
   }
 `;
 
@@ -115,6 +164,21 @@ const MARK_FRAG = /* glsl */ `
   }
 `;
 
+/* One expanding ring from the credit mark when a pulse arrives. */
+const RIPPLE_FRAG = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uProgress;
+  uniform float uOpacity;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    float r = mix(0.06, 0.48, uProgress);
+    float ring = exp(-pow((d - r) * 38.0, 2.0));
+    float a = ring * (1.0 - uProgress) * uOpacity;
+    if (a < 0.01) discard;
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
 export interface RouteFieldOptions {
   /** Fewer points and a lower pixel-ratio cap on small or low-power screens. */
   compact: boolean;
@@ -129,7 +193,9 @@ export class RouteFieldScene {
   private group = new Group();
   private fieldMat: ShaderMaterial;
   private routeMat: ShaderMaterial;
+  private haloMat: ShaderMaterial;
   private endMat: ShaderMaterial;
+  private rippleMat: ShaderMaterial;
   private disposables: { dispose(): void }[] = [];
 
   private intro = 0;
@@ -139,6 +205,24 @@ export class RouteFieldScene {
   private frame = 0;
   private lastTime = 0;
   private active = true;
+
+  // Ambient life (never runs in still mode)
+  private time = 0;
+  private pulseClock = 0;
+  private lensTarget = { x: 0, y: 0, on: 0 };
+  private lens = new Vector3(0, 0, 0);
+  private lensAmt = 0;
+  private raycaster = new Raycaster();
+  private plane = new Plane(new Vector3(0, 1, 0), 0);
+  private hit = new Vector3();
+  private inv = new Matrix4();
+  private ndc = new Vector2();
+  private shared: {
+    uPixelRatio: { value: number };
+    uTime: { value: number };
+    uPulse: { value: number };
+    uDraw: { value: number };
+  };
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -154,7 +238,7 @@ export class RouteFieldScene {
     const dpr = Math.min(window.devicePixelRatio || 1, opts.compact ? 1.5 : 1.75);
     this.renderer.setPixelRatio(dpr);
 
-    this.camera.position.set(0.3, 5.4, 7.4);
+    this.camera.position.set(0.3, 5.4, 7.8);
     this.camera.lookAt(-0.1, 0.5, -0.2);
 
     const curve = new CatmullRomCurve3(
@@ -228,14 +312,22 @@ export class RouteFieldScene {
     fieldGeo.setAttribute("aNear", new BufferAttribute(near, 1));
     fieldGeo.setAttribute("aRouteT", new BufferAttribute(rt, 1));
     const uPixelRatio = { value: this.renderer.getPixelRatio() };
+    this.shared = {
+      uPixelRatio,
+      uTime: { value: 0 },
+      uPulse: { value: -1 },
+      uDraw: { value: 0 },
+    };
     this.fieldMat = new ShaderMaterial({
       vertexShader: FIELD_VERT,
       fragmentShader: FIELD_FRAG,
       uniforms: {
-        uPixelRatio,
-        uDraw: { value: 0 },
+        ...this.shared,
+        uPointer: { value: this.lens },
+        uPointerAmt: { value: 0 },
         uBase: { value: INK },
         uSignal: { value: SIGNAL },
+        uHot: { value: SIGNAL_HOT },
       },
       transparent: true,
       depthWrite: false,
@@ -246,14 +338,26 @@ export class RouteFieldScene {
     const routeGeo = new BufferGeometry();
     routeGeo.setAttribute("position", new BufferAttribute(routePos, 3));
     routeGeo.setAttribute("aT", new BufferAttribute(routeT, 1));
-    this.routeMat = new ShaderMaterial({
-      vertexShader: ROUTE_VERT,
-      fragmentShader: ROUTE_FRAG,
-      uniforms: { uPixelRatio, uDraw: { value: 0 }, uSignal: { value: SIGNAL } },
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-    });
+    const routeLayer = (size: number, soft: number, alpha: number) =>
+      new ShaderMaterial({
+        vertexShader: ROUTE_VERT,
+        fragmentShader: ROUTE_FRAG,
+        uniforms: {
+          ...this.shared,
+          uSize: { value: size },
+          uSoft: { value: soft },
+          uAlpha: { value: alpha },
+          uSignal: { value: SIGNAL },
+          uHot: { value: SIGNAL_HOT },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      });
+    // Halo first, so the crisp core sits on top of its own glow.
+    this.haloMat = routeLayer(opts.compact ? 11 : 15, 1, 0.11);
+    this.routeMat = routeLayer(2.6, 0, 0.95);
+    this.group.add(new Points(routeGeo, this.haloMat));
     this.group.add(new Points(routeGeo, this.routeMat));
 
     // Start (the holding) and end (credit) marks
@@ -281,10 +385,44 @@ export class RouteFieldScene {
       return m;
     };
     mark(routePts[0], SIGNAL, 14, 1);
-    this.endMat = mark(routePts[routeCount - 1], INK, 16, 1);
+    const end = routePts[routeCount - 1];
+    this.endMat = mark(end, INK, 16, 1);
 
+    const rippleGeo = new BufferGeometry();
+    rippleGeo.setAttribute(
+      "position",
+      new BufferAttribute(new Float32Array([end.x, sheetY(end.x, end.z) + 0.04, end.z]), 3),
+    );
+    this.rippleMat = new ShaderMaterial({
+      vertexShader: MARK_VERT,
+      fragmentShader: RIPPLE_FRAG,
+      uniforms: {
+        uPixelRatio,
+        uSize: { value: 120 },
+        uColor: { value: CONFIRMED },
+        uProgress: { value: 1 },
+        uOpacity: { value: 0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    });
+    this.group.add(new Points(rippleGeo, this.rippleMat));
+
+    // Framed (solved numerically) so the whole route, holding to credit,
+    // sits inside the canvas on both desktop and phone aspect ratios.
+    this.group.position.set(-1.4, 0, -1.6);
     this.scene.add(this.group);
-    this.disposables.push(fieldGeo, routeGeo, this.fieldMat, this.routeMat, this.renderer);
+    this.disposables.push(
+      fieldGeo,
+      routeGeo,
+      rippleGeo,
+      this.fieldMat,
+      this.routeMat,
+      this.haloMat,
+      this.rippleMat,
+      this.renderer,
+    );
   }
 
   resize(width: number, height: number) {
@@ -316,6 +454,17 @@ export class RouteFieldScene {
     this.requestRender();
   }
 
+  /**
+   * Cursor position over the canvas in normalised device coordinates
+   * (-1..1, y up), and whether it is over the canvas at all. Drives the lens.
+   */
+  setLens(x: number, y: number, inside: boolean) {
+    this.lensTarget.x = x;
+    this.lensTarget.y = y;
+    this.lensTarget.on = inside ? 1 : 0;
+    this.requestRender();
+  }
+
   setActive(active: boolean) {
     this.active = active;
     if (active) this.requestRender();
@@ -331,27 +480,56 @@ export class RouteFieldScene {
     this.frame = 0;
     const dt = Math.min(0.05, (now - this.lastTime) / 1000);
     this.lastTime = now;
+    const still = this.opts.still;
 
     // Critically damped approach to the pointer target: no overshoot, no drift.
-    const a = this.opts.still ? 1 : 1 - Math.exp(-dt * 6);
+    const a = still ? 1 : 1 - Math.exp(-dt * 6);
     this.current.x += (this.target.x - this.current.x) * a;
     this.current.y += (this.target.y - this.current.y) * a;
-    const settling =
-      Math.abs(this.target.x - this.current.x) > 0.0005 ||
-      Math.abs(this.target.y - this.current.y) > 0.0005;
 
-    const draw = this.opts.still ? 1 : Math.min(1, 0.64 * this.intro + 0.36 * this.scroll);
-    this.fieldMat.uniforms.uDraw.value = draw;
-    this.routeMat.uniforms.uDraw.value = draw;
+    const draw = still ? 1 : this.intro;
+    this.shared.uDraw.value = draw;
     const arrived = Math.max(0, Math.min(1, (draw - 0.97) / 0.03));
     (this.endMat.uniforms.uColor.value as Color).copy(INK).lerp(CONFIRMED, arrived);
 
-    this.group.rotation.y = -0.1 + this.current.x * 0.07 + this.scroll * 0.06;
+    this.group.rotation.y = -0.2 + this.current.x * 0.07 + this.scroll * 0.06;
     this.group.rotation.x = this.current.y * 0.035;
-    this.camera.position.z = 7.4 - this.scroll * 0.9;
+    this.camera.position.z = 7.8 - this.scroll * 0.9;
+
+    if (!still) {
+      this.time += dt;
+      this.shared.uTime.value = this.time;
+
+      // Pulses start once the authored entrance has drawn the route.
+      if (this.intro >= 0.99) {
+        this.pulseClock = (this.pulseClock + dt) % (PULSE_TRAVEL + PULSE_REST);
+        const p = this.pulseClock / PULSE_TRAVEL;
+        // The head runs a little past the drawn end so the tail clears it.
+        this.shared.uPulse.value = p <= 1 ? -0.04 + p * (draw + 0.1) : -1;
+        // The ripple follows the pulse's arrival at credit, only when the route is complete.
+        const r = (this.pulseClock - PULSE_TRAVEL * (draw / (draw + 0.1))) / 1.6;
+        this.rippleMat.uniforms.uProgress.value = Math.max(0, Math.min(1, r));
+        this.rippleMat.uniforms.uOpacity.value = r > 0 && r < 1 ? arrived * 0.9 : 0;
+      }
+
+      // Lens: project the cursor onto the sheet, in the group's local space.
+      const la = 1 - Math.exp(-dt * 8);
+      this.lensAmt += (this.lensTarget.on - this.lensAmt) * la;
+      if (this.lensTarget.on) {
+        this.group.updateMatrixWorld();
+        this.ndc.set(this.lensTarget.x, this.lensTarget.y);
+        this.raycaster.setFromCamera(this.ndc, this.camera);
+        this.raycaster.ray.applyMatrix4(this.inv.copy(this.group.matrixWorld).invert());
+        if (this.raycaster.ray.intersectPlane(this.plane, this.hit)) {
+          this.lens.lerp(this.hit, la);
+        }
+      }
+      this.fieldMat.uniforms.uPointerAmt.value = this.lensAmt;
+    }
 
     this.renderer.render(this.scene, this.camera);
-    if (settling && this.active) this.requestRender();
+    // Still mode renders on demand only; otherwise the field breathes while visible.
+    if (!still && this.active) this.requestRender();
   };
 
   dispose() {
