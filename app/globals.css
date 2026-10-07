@@ -118,8 +118,8 @@
   --ease-vault: cubic-bezier(0.16, 1, 0.3, 1);
 
   --animate-arrive: arrive 220ms var(--ease-out) both;
-  --animate-marker: marker 320ms var(--ease-out) both;
-  --animate-settle: settle 220ms var(--ease-out) both;
+  --animate-marker: marker 320ms var(--ease-out) backwards;
+  --animate-settle: settle 220ms var(--ease-out) backwards;
   --animate-forward: forward 220ms var(--ease-out) both;
   --animate-back: back 220ms var(--ease-out) both;
   --animate-print: print 260ms var(--ease-out) both;
@@ -146,10 +146,12 @@
     to {
       opacity: 1;
       transform: scale(1);
-      filter: blur(0);
+      filter: none;
     }
   }
-  /* State morph: a blur-masked crossfade so two states never double-expose. */
+  /* State morph: a blur-masked crossfade so two states never double-expose.
+     Filled backwards only: once it ends, no filter is left on the element
+     (a lingering blur(0) layer can be rastered soft in Chromium). */
   @keyframes settle {
     from {
       opacity: 0;
@@ -157,7 +159,7 @@
     }
     to {
       opacity: 1;
-      filter: blur(0);
+      filter: none;
     }
   }
   /* Direction-aware step transitions in the guided check. */
@@ -257,7 +259,7 @@
   --highlight: inset 0 1px 0 var(--edge);
   --lift: var(--glass-rim), var(--glass-shadow);
   --overlay: 0 0 0 1px var(--glass-border), 0 40px 80px -20px var(--shadow-deep);
-  --chrome-bg: rgb(5 8 14 / 0.72);
+  --chrome-bg: rgb(5 8 14 / 0.86);
   --scrim: rgb(2 4 8 / 0.62);
   --link-rule: rgb(232 238 247 / 0.35);
   --selection: rgb(79 172 254 / 0.32);
@@ -363,7 +365,7 @@
   --shadow-deep: rgb(10 20 36 / 0.16);
   --highlight: 0 1px 2px rgb(10 20 36 / 0.04);
   --overlay: 0 0 0 1px rgb(10 20 36 / 0.07), 0 40px 80px -24px rgb(10 20 36 / 0.3);
-  --chrome-bg: rgb(243 246 250 / 0.78);
+  --chrome-bg: rgb(243 246 250 / 0.88);
   --scrim: rgb(10 20 36 / 0.3);
   --link-rule: rgb(10 20 36 / 0.3);
   --selection: rgb(3 105 161 / 0.18);
@@ -570,6 +572,12 @@
 
   /* Radiant headline type. A solid colour is set first for engines without clip. */
   .text-gradient-cyan {
+    /* Shrink the box to the text so the full gradient lands on the glyphs,
+       however wide the container; inline fragments each get their own. */
+    width: fit-content;
+    max-width: 100%;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
     color: var(--color-fg);
     background: var(--gradient-text);
     -webkit-background-clip: text;
@@ -592,7 +600,8 @@
     text-decoration-color: var(--color-signal);
   }
 
-  /* Translucent sticky chrome; content scrolls underneath. */
+  /* Translucent sticky chrome; content scrolls underneath. Opaque enough
+     (86%) to stay readable where backdrop blur isn't rendered. */
   .chrome {
     background-color: var(--chrome-bg);
     backdrop-filter: blur(24px) saturate(160%);
@@ -787,6 +796,80 @@ body::after {
       repeat-x;
     mask: radial-gradient(circle at 6px 0, transparent 5px, #000 5.5px) 0 0 / 12px 10px repeat-x;
   }
+
+  /* Seven-year rule: armed (dim) until in view, then the years fill in turn
+     and the steps follow. Without the armed state it is simply finished. */
+  .year-rule [data-phase="armed"] [data-year] {
+    opacity: 0.28;
+  }
+  .year-rule [data-phase="armed"] [data-step] {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  .year-rule [data-phase="run"] [data-year] {
+    transition: opacity 260ms var(--ease-out);
+    transition-delay: calc(var(--i) * 130ms);
+  }
+  .year-rule [data-phase="run"] [data-step] {
+    transition:
+      opacity 420ms var(--ease-vault),
+      translate 420ms var(--ease-vault);
+    transition-delay: calc(1050ms + var(--i) * 160ms);
+  }
+}
+
+/* A horizontal scroller whose edges fade where more content waits. Where
+   scroll-driven animation runs, each edge fades only while there is
+   something past it; elsewhere the end edge always fades, so the scroller
+   needs end padding for its last item to land clear. A utility, so it takes
+   breakpoint variants (max-lg:scroll-fade-x). */
+@utility scroll-fade-x {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  --fade-end: 2rem;
+  @supports (animation-timeline: scroll()) {
+    --fade-end: 0px;
+    animation: scroll-fade-x linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade-x {
+  0% {
+    --fade-start: 0px;
+    --fade-end: 2rem;
+  }
+  8%,
+  92% {
+    --fade-start: 2rem;
+    --fade-end: 2rem;
+  }
+  100% {
+    --fade-start: 0px;
+    --fade-end: 0px;
+  }
 }
 
 @keyframes scan {
@@ -912,7 +995,7 @@ body::after {
   }
   to {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
   }
 }
 @keyframes vt-slide {

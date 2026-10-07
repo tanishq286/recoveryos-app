@@ -3,7 +3,7 @@ import { RouteLoader } from "@/components/brand/route-loader";
 
 export default function EvidenceLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10" aria-busy="true">
+    <div className="mx-auto max-w-[84rem] px-4 py-8 sm:px-6 sm:py-10" aria-busy="true">
       <p role="status" className="flex items-center gap-3 text-base text-fg-3">
         <RouteLoader />
         Loading the evidence room…

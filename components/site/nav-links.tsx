@@ -21,12 +21,14 @@ export function NavLinks({ items, label }: { items: NavItem[]; label: string }) 
   const layoutId = `nav-rule-${label}`;
   return (
     <nav aria-label={label}>
-      <ul className="-mx-2 flex flex-wrap gap-x-1">
+      {/* Below lg: one row that scrolls sideways, fading where more waits,
+          with room inside the scroller for the focus ring. */}
+      <ul className="-mx-2 flex gap-x-1 whitespace-nowrap max-lg:scroll-fade-x max-lg:-mx-3.5 max-lg:-my-1.5 max-lg:overflow-x-auto max-lg:px-1.5 max-lg:py-1.5 max-lg:[scrollbar-width:none] max-lg:after:block max-lg:after:w-8 max-lg:after:shrink-0">
         {items.map((item) => {
           const path = item.href.split("#")[0];
           const active = !item.href.includes("#") && path !== "/" && pathname.startsWith(path);
           return (
-            <li key={item.href}>
+            <li key={item.href} className="shrink-0">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}

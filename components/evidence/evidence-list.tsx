@@ -35,16 +35,13 @@ export function EvidenceList({
       <div className="panel hidden overflow-hidden md:block">
         <table className="w-full border-collapse text-left">
           <caption className="sr-only">
-            Documents on this case, with category, upload date, SHA-256 checksum and extraction
+            Documents on this case, with category and upload date, SHA-256 checksum and extraction
             status
           </caption>
           <thead className="border-b border-(--glass-border) bg-(--glass-elevated)">
             <tr>
               <th scope="col" className="px-4 py-3 text-sm font-medium whitespace-nowrap text-fg-3">
                 Document
-              </th>
-              <th scope="col" className="px-4 py-3 text-sm font-medium whitespace-nowrap text-fg-3">
-                Uploaded
               </th>
               <th scope="col" className="px-4 py-3 text-sm font-medium whitespace-nowrap text-fg-3">
                 Checksum (SHA-256)
@@ -80,14 +77,12 @@ export function EvidenceList({
                           {f.fileName}
                         </Link>
                         <p className="mt-0.5 text-sm text-fg-3">{CATEGORY_LABELS[f.category]}</p>
+                        <p className="tnum text-sm text-fg-3">
+                          Uploaded {formatDate(f.uploadedAt)},{" "}
+                          {f.uploadedBy.role === "client" ? "by you" : `by ${f.uploadedBy.name}`}
+                        </p>
                       </div>
                     </div>
-                  </td>
-                  <td className="tnum px-4 py-4 text-sm whitespace-nowrap text-fg-2">
-                    {formatDate(f.uploadedAt)}
-                    <p className="text-fg-3">
-                      {f.uploadedBy.role === "client" ? "by you" : `by ${f.uploadedBy.name}`}
-                    </p>
                   </td>
                   <td className="px-4 py-4">
                     <span className="flex items-center gap-1.5">

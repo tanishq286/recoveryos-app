@@ -1,15 +1,27 @@
-import type { CaseStatus } from "@/lib/types";
+import type { CaseStatus, HolderType } from "@/lib/types";
 import { stateInfo } from "@/lib/rules/case-states";
-import { LIFECYCLE_SHORT_LABELS, stageOf } from "@/lib/rules/lifecycle";
+import { LIFECYCLE_SHORT_LABELS, STAGE_KEYS, stageOf } from "@/lib/rules/lifecycle";
 import { cn } from "@/lib/utils";
 
 /**
  * The IEPF lifecycle in miniature: six segments, emerald behind, electric cyan
  * at the current stage (red when a query is open), hairline ahead. Used where
  * a whole case has to read in a glance, e.g. the cases list.
+ *
+ * Stage names match the case page. Without the holder type the affirmation
+ * stage stays neutral ("Affirmation"), since heirs and claimants differ there.
  */
-export function RouteProgress({ status, className }: { status: CaseStatus; className?: string }) {
-  const { index, total, short } = stageOf(status);
+export function RouteProgress({
+  status,
+  holderType,
+  className,
+}: {
+  status: CaseStatus;
+  holderType?: HolderType;
+  className?: string;
+}) {
+  const { index, total, label, short } = stageOf(status, holderType);
+  const name = STAGE_KEYS[index] === "affirmation" && !holderType ? short : label;
   const blocked = status === "query_deficiency";
 
   return (
@@ -19,7 +31,7 @@ export function RouteProgress({ status, className }: { status: CaseStatus; class
           <span className="tnum">
             Stage {index + 1} of {total}
           </span>
-          <span className="text-fg-2">: {short}</span>
+          <span className="text-fg-2">: {name}</span>
           <span className="sr-only"> ({stateInfo(status).label})</span>
         </span>
         {blocked && <span className="font-medium text-blocker">Query open</span>}
