@@ -6,7 +6,7 @@ import { ArrowRightIcon, FolderOpenIcon, ScanSearchIcon } from "lucide-react";
 import { getDataSource } from "@/lib/data";
 import { ROUTE_LABELS, stateInfo } from "@/lib/rules/case-states";
 import { lifecycleStages } from "@/lib/rules/lifecycle";
-import { byNewest, daysBetween, formatDate, formatDateTime, formatPaise } from "@/lib/format";
+import { byNewest, daysBetween, formatDate, formatDateTime } from "@/lib/format";
 import { CATEGORY_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -278,7 +278,7 @@ export default async function CaseOverviewPage(props: PageProps<"/cases/[id]">) 
             <p className="text-sm text-fg-3">Indicative value at stake</p>
             {value !== null ? (
               <p className="display text-gradient-cyan tnum mt-1 text-[clamp(2.5rem,4.6vw,3.75rem)]">
-                {formatPaise(value)}
+                <MetricCounter value={value} kind="paise" duration={1.4} />
               </p>
             ) : (
               <p className="mt-1 text-2xl font-[560] tracking-[-0.02em] text-fg [font-stretch:106%]">

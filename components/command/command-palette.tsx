@@ -22,6 +22,7 @@ import {
   HistoryIcon,
   RouteIcon,
   SearchIcon,
+  ShieldAlertIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -273,7 +274,14 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
               </p>
             ) : (
               rows.map((row, i) => {
-                const Icon = row.group === "Recent" ? HistoryIcon : KIND_ICON[row.item.kind];
+                // Fraud reporting reads as a safety action, not just another link.
+                const isFraud = row.item.id === "action:fraud";
+                const Icon =
+                  row.group === "Recent"
+                    ? HistoryIcon
+                    : isFraud
+                      ? ShieldAlertIcon
+                      : KIND_ICON[row.item.kind];
                 const isActive = i === safeActive;
                 const showHeading = i === 0 || rows[i - 1].group !== row.group;
                 return (
@@ -306,7 +314,7 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
                       <Icon
                         className={cn(
                           "relative size-[1.125rem] shrink-0 transition-colors duration-[160ms]",
-                          isActive ? "text-signal" : "text-fg-3",
+                          isFraud ? "text-blocker" : isActive ? "text-signal" : "text-fg-3",
                         )}
                         aria-hidden="true"
                       />

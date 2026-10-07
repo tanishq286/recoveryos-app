@@ -19,6 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MetricCounter } from "@/components/ui/metric-counter";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { VaultCard } from "@/components/ui/vault-card";
 import { QuickScanBar } from "@/components/marketing/quick-scan-bar";
@@ -341,9 +342,15 @@ export default async function LandingPage() {
                 <div className="col-span-2">
                   <dt className="text-sm text-fg-3">Indicative value at stake</dt>
                   <dd className="display text-gradient-cyan tnum mt-1 text-[clamp(2.25rem,4vw,3.25rem)]">
-                    {sample.quote.indicativeValuePaise !== null
-                      ? formatPaise(sample.quote.indicativeValuePaise)
-                      : "Not estimated yet"}
+                    {sample.quote.indicativeValuePaise !== null ? (
+                      <MetricCounter
+                        value={sample.quote.indicativeValuePaise}
+                        kind="paise"
+                        duration={1.4}
+                      />
+                    ) : (
+                      "Not estimated yet"
+                    )}
                   </dd>
                 </div>
                 <div>
@@ -371,9 +378,7 @@ export default async function LandingPage() {
             <VaultCard lift className="overflow-hidden lg:col-span-7">
               {/* Terminal bar: the case reference and when it last moved. */}
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-(--glass-border) bg-(--glass-elevated) px-5 py-3 sm:px-7">
-                <p className="tnum font-mono text-sm text-fg-2">
-                  {sample.reference}
-                </p>
+                <p className="tnum font-mono text-sm text-fg-2">{sample.reference}</p>
                 <p className="tnum text-sm text-fg-3">Updated {formatDate(sample.updatedAt)}</p>
               </div>
               <div className="p-5 sm:p-7">
@@ -599,7 +604,7 @@ export default async function LandingPage() {
           <div className="mt-14 grid gap-12 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-5">
               <p className="text-base font-medium text-fg-2">Success fee</p>
-              <p className="display text-gradient-cyan tnum mt-3 text-[clamp(4.5rem,11vw,8rem)] leading-none">
+              <p className="display text-gradient-cyan mt-3 text-[clamp(4.5rem,11vw,8rem)] leading-none">
                 {formatBps(SUCCESS_FEE_BPS)}
               </p>
               <p className="mt-4 max-w-[34ch] text-lg text-fg">
@@ -616,7 +621,7 @@ export default async function LandingPage() {
                 <p className="text-base font-medium text-fg-2">Protection allocation</p>
                 <Badge variant="outline">Planned, conditional</Badge>
               </div>
-              <p className="display tnum mt-3 text-[clamp(3rem,6vw,4.5rem)] leading-none text-fg-2">
+              <p className="display mt-3 text-[clamp(3rem,6vw,4.5rem)] leading-none text-fg-2">
                 {formatBps(PROTECTION_ALLOCATION_BPS)}
               </p>
               <p className="mt-4 max-w-[46ch] text-lg text-fg">

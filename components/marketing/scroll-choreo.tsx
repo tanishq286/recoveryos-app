@@ -161,7 +161,7 @@ export function Stages({ stages }: { stages: Stage[] }) {
                 data-stage-index
                 className="group flex items-center gap-3 text-2xl font-[560] tracking-[-0.02em] text-fg-3 transition-colors duration-300 ease-(--ease-out) [font-stretch:106%] data-[active]:text-fg"
               >
-                <span className="size-2 rounded-full bg-control transition-[background-color,transform] duration-300 ease-(--ease-out) group-data-[active]:scale-125 group-data-[active]:bg-signal" />
+                <span className="size-2 rounded-full bg-control transition-[background-color,transform,box-shadow] duration-300 ease-(--ease-out) group-data-[active]:scale-125 group-data-[active]:bg-brand-cyan group-data-[active]:shadow-[0_0_12px_var(--color-brand-cyan)]" />
                 {s.title}
               </li>
             ))}
@@ -173,28 +173,38 @@ export function Stages({ stages }: { stages: Stage[] }) {
           <li
             key={s.title}
             data-stage
-            className="relative border-l border-line pb-2 pl-6 lg:flex lg:min-h-[58vh] lg:flex-col lg:justify-center lg:border-l-0 lg:pl-0"
+            className="relative border-l border-(--glass-border) pb-2 pl-6 lg:flex lg:min-h-[58vh] lg:flex-col lg:justify-center lg:border-l-0 lg:pl-0"
           >
             <span
               aria-hidden="true"
-              className="absolute top-2 -left-[5px] size-2.5 rounded-full border border-signal bg-ink-950 lg:hidden"
+              className="absolute top-8 -left-[5px] size-2.5 rounded-full border border-signal bg-ink-950 lg:hidden"
             />
-            <div className="flex items-center gap-3 text-signal [&_svg]:size-6">{s.icon}</div>
-            <h3 className="mt-5 text-[1.75rem] leading-tight font-[560] tracking-[-0.02em] text-fg [font-stretch:106%]">
-              <span className="sr-only">
-                Stage {i + 1} of {stages.length}:{" "}
-              </span>
-              {s.title}
-            </h3>
-            <p className="mt-3 max-w-[46ch] text-lg text-fg-2">{s.body}</p>
-            <ul className="mt-6 max-w-[52ch] space-y-3">
-              {s.detail.map((d) => (
-                <li key={d} className="flex gap-3 text-base text-fg-2">
-                  <span aria-hidden="true" className="mt-[0.7em] h-px w-3 shrink-0 bg-control" />
-                  {d}
-                </li>
-              ))}
-            </ul>
+            <div className="panel vault-card max-w-[40rem] p-6 sm:p-8">
+              <div
+                aria-hidden="true"
+                className="grid size-11 place-items-center rounded-[12px] border border-signal/25 bg-signal-wash text-signal [&_svg]:size-[1.375rem]"
+              >
+                {s.icon}
+              </div>
+              <h3 className="mt-5 text-[1.75rem] leading-tight font-[560] tracking-[-0.02em] text-fg [font-stretch:106%]">
+                <span className="sr-only">
+                  Stage {i + 1} of {stages.length}:{" "}
+                </span>
+                {s.title}
+              </h3>
+              <p className="mt-3 max-w-[46ch] text-lg text-fg-2">{s.body}</p>
+              <ul className="mt-6 max-w-[52ch] space-y-3 border-t border-(--glass-border) pt-5">
+                {s.detail.map((d) => (
+                  <li key={d} className="flex gap-3 text-base text-fg-2">
+                    <span
+                      aria-hidden="true"
+                      className="mt-[0.7em] h-px w-3 shrink-0 bg-signal/60"
+                    />
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </li>
         ))}
       </ol>
