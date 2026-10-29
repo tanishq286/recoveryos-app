@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,10 +11,10 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage
 
 # next.js
-/.next/
+.next/
 /out/
 
 # production
@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -42,3 +43,9 @@ next-env.d.ts
 
 # impeccable review captures (regenerated; large)
 .impeccable/review/
+
+# monorepo build output and local state
+dist/
+.data/
+.uploads/
+packages/db/src/generated/

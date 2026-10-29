@@ -1,0 +1,77 @@
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { CRM_STAGES, SCENARIO_TYPES } from "@recoveryos/shared";
+import { z } from "zod";
+
+import { CurrentUser, Roles } from "../../common/auth/decorators.js";
+import type { SessionClaims } from "../../common/auth/tokens.service.js";
+import { CasesService } from "../cases/cases.service.js";
+import { CASE_COLUMNS, CrmService } from "./crm.service.js";
+
+const id = z.uuid();
+const updateSchema = z.object({
+  crmStage: z.enum(CRM_STAGES).optional(),
+  assignedAnalystId: z.uuid().nullable().optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+const convertSchema = z.object({
+  folioId: z.uuid(),
+  scenarioType: z.enum(SCENARIO_TYPES),
+  agreedSuccessFeePct: z.number().min(0).max(30).default(10),
+});
+const moveCaseSchema = z.object({
+  caseCode: z.string(),
+  column: z.enum(CASE_COLUMNS.map((c) => c.id) as [string, ...string[]]),
+});
+
+@Roles("VALUATION_ANALYST", "LEGAL_OPS_EXEC")
+@Controller("crm")
+export class CrmController {
+  constructor(
+    private readonly crm: CrmService,
+    private readonly cases: CasesService,
+  ) {}
+
+  @Get("board")
+  board(
+    @Query({ schema: z.object({ mine: z.enum(["1", "0"]).optional() }) }) q: { mine?: "1" | "0" },
+    @CurrentUser() user: SessionClaims,
+  ) {
+    return this.crm.board({ mine: q.mine === "1", user });
+  }
+
+  @Get("team")
+  team() {
+    return this.crm.team();
+  }
+
+  @Patch("leads/:id")
+  update(
+    @Param("id", { schema: id }) leadId: string,
+    @Body({ schema: updateSchema }) body: z.infer<typeof updateSchema>,
+    @CurrentUser() user: SessionClaims,
+  ) {
+    return this.crm.update(leadId, user, body);
+  }
+
+  @Post("leads/:id/convert")
+  convert(
+    @Param("id", { schema: id }) leadId: string,
+    @Body({ schema: convertSchema }) body: z.infer<typeof convertSchema>,
+    @CurrentUser() user: SessionClaims,
+  ) {
+    return this.crm.convert(leadId, user, body);
+  }
+
+  /** Dragging a case card to the next column advances it one R.E.C.O.V.E.R. step. */
+  @Post("cases/move")
+  async moveCase(
+    @Body({ schema: moveCaseSchema }) body: z.infer<typeof moveCaseSchema>,
+    @CurrentUser() user: SessionClaims,
+  ) {
+    const target = CASE_COLUMNS.find((c) => c.id === body.column)!;
+    const current = await this.cases.get(body.caseCode, user);
+    const toStep = Math.min(...target.steps.filter((s) => s > current.recoverStep));
+    if (!Number.isFinite(toStep)) return current;
+    return this.cases.advance(body.caseCode, user, toStep);
+  }
+}

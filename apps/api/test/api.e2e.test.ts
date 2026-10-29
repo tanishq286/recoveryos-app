@@ -1,0 +1,742 @@
+import type { INestApplication } from "@nestjs/common";
+import request from "supertest";
+import pg from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { createApp } from "../src/bootstrap.js";
+import { ConsoleOtpSender, OTP_SENDER } from "../src/common/providers/otp.provider.js";
+import { JobQueueService } from "../src/common/queue/job-queue.service.js";
+
+let app: INestApplication;
+let http: Parameters<typeof request>[0];
+let otp: ConsoleOtpSender;
+
+const PHONES = {
+  admin: "+919000000001",
+  analyst: "+919000000002",
+  legal: "+919000000004",
+  sunita: "+919000000011",
+  venkatesh: "+919000000012",
+  anil: "+919000000013",
+  meera: "+919000000021",
+};
+
+async function login(phone: string, name?: string): Promise<string> {
+  await request(http)
+    .post("/api/v1/auth/otp/request")
+    .send({ phone, purpose: "LOGIN" })
+    .expect(200);
+  const code = otp.lastCode(phone)!;
+  const res = await request(http)
+    .post("/api/v1/auth/otp/verify")
+    .send({ phone, code, name })
+    .expect(200);
+  return res.body.token as string;
+}
+
+const tokens: Record<string, string> = {};
+const auth = (who: keyof typeof PHONES) => ({ authorization: `Bearer ${tokens[who]}` });
+
+beforeAll(async () => {
+  app = await createApp({ logger: false });
+  await app.init();
+  http = app.getHttpServer();
+  otp = app.get(OTP_SENDER);
+  for (const who of [
+    "admin",
+    "analyst",
+    "legal",
+    "sunita",
+    "venkatesh",
+    "anil",
+    "meera",
+  ] as const) {
+    tokens[who] = await login(PHONES[who]);
+  }
+});
+
+afterAll(async () => {
+  await app?.close();
+});
+
+describe("health", () => {
+  it("reports the local adapters", async () => {
+    const res = await request(http).get("/api/v1/health").expect(200);
+    expect(res.body.adapters).toMatchObject({
+      otp: "console",
+      esign: "mock",
+      storage: "local",
+      search: "postgres",
+      jobs: "inline",
+    });
+  });
+});
+
+describe("GET /search/unclaimed", () => {
+  it("finds spelling variants of a surname within the state, masked", async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" })
+      .expect(200);
+    expect(res.body.mode).toBe("LAST");
+    const names = res.body.results.map((r: { investorFullName: string }) => r.investorFullName);
+    expect(names).toEqual(
+      expect.arrayContaining(["Ramesh Kumar Agarwal", "Ramesh K Agrawal", "Kamla Devi Aggarwal"]),
+    );
+    const ril = res.body.results.find(
+      (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
+    );
+    expect(ril).toMatchObject({
+      unlocked: false,
+      companyName: "R******e Industries Limited",
+      folioNumber: "RIL***21",
+      fatherOrSpouseName: "Om Prakash Agarwal",
+      city: "New Delhi",
+    });
+    expect(ril.postActionShares).toBe(1600);
+    expect(ril.estimatedTotalValuePaise).toBeGreaterThan(1600 * 1000 * 100);
+    expect(JSON.stringify(res.body)).not.toContain("RIL0012345621");
+    expect(JSON.stringify(res.body)).not.toContain("Reliance");
+  });
+
+  it("supports all four search modes", async () => {
+    const full = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ firstName: "Ramesh", middleName: "Kumar", lastName: "Agarwal", state: "DELHI" })
+      .expect(200);
+    expect(full.body.mode).toBe("FULL");
+    expect(full.body.results[0].investorFullName).toBe("Ramesh Kumar Agarwal");
+    const first = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ firstName: "Venkatesh", state: "TELANGANA" })
+      .expect(200);
+    expect(first.body.mode).toBe("FIRST");
+    expect(
+      first.body.results.map((r: { investorFullName: string }) => r.investorFullName),
+    ).toContain("Venkatesh Rao");
+    const middle = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ middleName: "Devi", state: "DELHI" })
+      .expect(200);
+    expect(middle.body.mode).toBe("MIDDLE");
+    expect(
+      middle.body.results.map((r: { investorFullName: string }) => r.investorFullName),
+    ).toContain("Kamla Devi Aggarwal");
+    const phonetic = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Debasish Chaudhary", state: "WEST_BENGAL" })
+      .expect(200);
+    expect(
+      phonetic.body.results.map((r: { investorFullName: string }) => r.investorFullName),
+    ).toContain("Debashish Chowdhury");
+  });
+
+  it("scopes to the state and filters custody", async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "KERALA" })
+      .expect(200);
+    expect(
+      res.body.results.map((r: { investorFullName: string }) => r.investorFullName),
+    ).not.toContain("Ramesh Kumar Agarwal");
+    const custody = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Aggarwal", state: "DELHI", custodyStatus: "COMPANY_SUSPENSE" })
+      .expect(200);
+    expect(
+      custody.body.results.every(
+        (r: { custodyStatus: string }) => r.custodyStatus === "COMPANY_SUSPENSE",
+      ),
+    ).toBe(true);
+  });
+
+  it("requires a state and a name", async () => {
+    await request(http).get("/api/v1/search/unclaimed").query({ lastName: "Agarwal" }).expect(400);
+    await request(http).get("/api/v1/search/unclaimed").query({ state: "DELHI" }).expect(400);
+  });
+
+  it("shows staff everything unmasked", async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" })
+      .set(auth("analyst"))
+      .expect(200);
+    const ril = res.body.results.find(
+      (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
+    );
+    expect(ril).toMatchObject({
+      unlocked: true,
+      companyName: "Reliance Industries Limited",
+      folioNumber: "RIL0012345621",
+      rtaName: "KFIN",
+    });
+  });
+});
+
+describe("POST /search/unlock", () => {
+  const phone = "9876500001";
+  let folioId: string;
+  let otherId: string;
+
+  beforeAll(async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" });
+    folioId = res.body.results.find(
+      (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
+    ).id;
+    otherId = res.body.results.find(
+      (r: { investorFullName: string }) => r.investorFullName === "Ramesh K Agrawal",
+    ).id;
+  });
+
+  const body = (code: string) => ({
+    name: "Asha Agarwal",
+    phone,
+    otpCode: code,
+    relationshipToHolder: "SON_DAUGHTER",
+    physicalCertStatus: "LOST",
+    folioIds: [folioId],
+    referralCode: "rahul-del",
+    consent: true,
+  });
+
+  it("rejects a wrong code and creates no lead", async () => {
+    await request(http)
+      .post("/api/v1/auth/otp/request")
+      .send({ phone, purpose: "UNLOCK" })
+      .expect(200);
+    const real = otp.lastCode("+919876500001")!;
+    const wrong = real === "000000" ? "111111" : "000000";
+    await request(http).post("/api/v1/search/unlock").send(body(wrong)).expect(400);
+  });
+
+  it("verifies the code, records the lead and unmasks only the chosen rows", async () => {
+    const code = otp.lastCode("+919876500001")!;
+    const res = await request(http).post("/api/v1/search/unlock").send(body(code)).expect(200);
+    expect(res.body.results[0]).toMatchObject({
+      unlocked: true,
+      companyName: "Reliance Industries Limited",
+      folioNumber: "RIL0012345621",
+      rtaLabel: "KFin Technologies Limited",
+    });
+    const token = res.body.unlockToken as string;
+
+    const again = await request(http).post("/api/v1/search/unlock").send(body(code));
+    expect(again.status).toBe(400); // a code works once
+
+    const search = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" })
+      .set("x-unlock-token", token)
+      .expect(200);
+    const unlocked = search.body.results.find((r: { id: string }) => r.id === folioId);
+    const other = search.body.results.find((r: { id: string }) => r.id === otherId);
+    expect(unlocked.unlocked).toBe(true);
+    expect(other.unlocked).toBe(false);
+
+    const forged = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" })
+      .set("x-unlock-token", token.slice(0, -4) + "AAAA")
+      .expect(200);
+    expect(forged.body.results.every((r: { unlocked: boolean }) => !r.unlocked)).toBe(true);
+
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const lead = await db.query(
+      "SELECT l.*, a.referral_code FROM leads_and_inquiries l LEFT JOIN associates a ON a.id = l.associate_id WHERE l.id = $1",
+      [res.body.leadId],
+    );
+    await db.end();
+    expect(lead.rows[0]).toMatchObject({
+      phone: "+919876500001",
+      phone_otp_verified: true,
+      crm_stage: "NEW_SEARCH_LEAD",
+      relationship_to_holder: "SON_DAUGHTER",
+      referral_code: "RAHUL-DEL",
+    });
+    expect(lead.rows[0].assigned_analyst_id).toBeTruthy();
+    expect(lead.rows[0].matched_folio_ids).toContain(folioId);
+  });
+
+  it("rejects an unlock without consent", async () => {
+    await request(http)
+      .post("/api/v1/search/unlock")
+      .send({ ...body("123456"), consent: false })
+      .expect(400);
+  });
+});
+
+describe("auth and roles", () => {
+  it("needs a session for private routes", async () => {
+    await request(http).get("/api/v1/cases").expect(401);
+    await request(http).get("/api/v1/cases").set({ authorization: "Bearer nonsense" }).expect(401);
+  });
+
+  it("keeps investors out of the CRM and the importer", async () => {
+    await request(http).get("/api/v1/crm/board").set(auth("sunita")).expect(403);
+    await request(http).get("/api/v1/admin/ingestion").set(auth("sunita")).expect(403);
+    await request(http).get("/api/v1/crm/board").set(auth("analyst")).expect(200);
+  });
+
+  it("returns the signed-in user", async () => {
+    const res = await request(http).get("/api/v1/auth/me").set(auth("meera")).expect(200);
+    expect(res.body).toMatchObject({
+      role: "ASSOCIATE_PARTNER",
+      associate: { referralCode: "MEERA-PUN" },
+    });
+  });
+});
+
+describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
+  it("shows clients only their own cases", async () => {
+    const mine = await request(http).get("/api/v1/cases").set(auth("sunita")).expect(200);
+    expect(mine.body.map((c: { caseCode: string }) => c.caseCode).sort()).toEqual([
+      "RC-2026-1001",
+      "RC-2026-1004",
+    ]);
+    await request(http).get("/api/v1/cases/RC-2026-1001").set(auth("venkatesh")).expect(404);
+    const c = await request(http).get("/api/v1/cases/RC-2026-1001").set(auth("sunita")).expect(200);
+    expect(c.body).toMatchObject({
+      recoverStep: 3,
+      viewerRole: "client",
+      holding: { folioNumber: "RIL0012345621" },
+    });
+    expect(c.body.steps.map((s: { state: string }) => s.state)).toEqual([
+      "done",
+      "done",
+      "current",
+      "upcoming",
+      "upcoming",
+      "upcoming",
+      "upcoming",
+    ]);
+    expect(c.body.vault.map((v: { docType: string }) => v.docType)).toContain("DEATH_CERTIFICATE");
+  });
+
+  it("does not let clients move their own case", async () => {
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("sunita"))
+      .send({ toStep: 4 })
+      .expect(403);
+  });
+
+  it("walks a case from Check to Realize, gated on eSign and the SRN", async () => {
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("analyst"))
+      .send({ toStep: 5 })
+      .expect(409); // no skipping
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("analyst"))
+      .send({ toStep: 4 })
+      .expect(200);
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/esign/start")
+      .set(auth("sunita"))
+      .expect(409); // not yet step 5
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("analyst"))
+      .send({ toStep: 5 })
+      .expect(200);
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("analyst"))
+      .send({ toStep: 6 })
+      .expect(409); // unsigned
+
+    const start = await request(http)
+      .post("/api/v1/cases/RC-2026-1001/esign/start")
+      .set(auth("sunita"))
+      .expect(200);
+    expect(start.body).toMatchObject({ provider: "mock", mode: "simulated", signUrl: null });
+    const preview = await request(http)
+      .get("/api/v1/cases/RC-2026-1001/mandate")
+      .set(auth("sunita"))
+      .expect(200);
+    expect(preview.headers["content-type"]).toContain("application/pdf");
+    expect(preview.body.subarray(0, 5).toString()).toBe("%PDF-");
+
+    const signed = await request(http)
+      .post("/api/v1/cases/RC-2026-1001/esign/mock-complete")
+      .set(auth("sunita"))
+      .send({ aadhaarLast4: "1234", otp: "456789" })
+      .expect(200);
+    expect(signed.body.esign.status).toBe("SIGNED");
+
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("legal"))
+      .send({ toStep: 6 })
+      .expect(200);
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("legal"))
+      .send({ toStep: 7 })
+      .expect(409); // no SRN
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/tracking")
+      .set(auth("legal"))
+      .send({ mcaIepf5Srn: "12345" })
+      .expect(400);
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/tracking")
+      .set(auth("legal"))
+      .send({ mcaIepf5Srn: "t11223344", nodalVerificationStatus: "IN_PROGRESS" })
+      .expect(200);
+    const done = await request(http)
+      .post("/api/v1/cases/RC-2026-1001/advance")
+      .set(auth("legal"))
+      .send({ toStep: 7 })
+      .expect(200);
+    expect(done.body).toMatchObject({
+      recoverStep: 7,
+      tracking: { mcaIepf5Srn: "T11223344", nodalVerificationStatus: "IN_PROGRESS" },
+    });
+  });
+
+  it("accrues the referring associate's commission once the credit is recorded", async () => {
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/tracking")
+      .set(auth("legal"))
+      .send({ creditedValueRupees: 2_000_000 })
+      .expect(400); // credit not done
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/tracking")
+      .set(auth("legal"))
+      .send({ dematCreditStatus: "DONE", creditedValueRupees: 2_000_000 })
+      .expect(200);
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/tracking")
+      .set(auth("legal"))
+      .send({ dematCreditStatus: "DONE", creditedValueRupees: 2_000_000 })
+      .expect(200);
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const rows = await db.query(
+      "SELECT amount_paise FROM commission_ledger l JOIN recovery_cases c ON c.id = l.case_id WHERE c.case_code = 'RC-2026-1001' AND entry_type = 'ACCRUAL'",
+    );
+    await db.end();
+    expect(rows.rows).toHaveLength(1);
+    // 30% of a 10% fee on ₹20,00,000 = ₹60,000
+    expect(Number(rows.rows[0].amount_paise)).toBe(60_000_00);
+  });
+
+  it("stores uploads encrypted and serves them back intact", async () => {
+    const pdf = Buffer.from("%PDF-1.4\n% test cancelled cheque\n");
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1003/documents/CANCELLED_CHEQUE")
+      .set(auth("anil"))
+      .attach("file", Buffer.from("MZ"), {
+        filename: "x.exe",
+        contentType: "application/x-msdownload",
+      })
+      .expect(400);
+    const up = await request(http)
+      .post("/api/v1/cases/RC-2026-1003/documents/CANCELLED_CHEQUE")
+      .set(auth("anil"))
+      .attach("file", pdf, { filename: "cheque.pdf", contentType: "application/pdf" })
+      .expect(201);
+    const doc = up.body.vault.find((v: { docType: string }) => v.docType === "CANCELLED_CHEQUE");
+    expect(doc).toMatchObject({ status: "UPLOADED", fileName: "cheque.pdf", hasFile: true });
+    const back = await request(http)
+      .get("/api/v1/cases/RC-2026-1003/documents/CANCELLED_CHEQUE/file")
+      .set(auth("anil"))
+      .expect(200);
+    expect(Buffer.compare(back.body, pdf)).toBe(0);
+    await request(http)
+      .get("/api/v1/cases/RC-2026-1003/documents/CANCELLED_CHEQUE/file")
+      .set(auth("sunita"))
+      .expect(404);
+
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1003/documents/CANCELLED_CHEQUE")
+      .set(auth("legal"))
+      .send({ status: "REJECTED" })
+      .expect(400);
+    const reviewed = await request(http)
+      .patch("/api/v1/cases/RC-2026-1003/documents/CANCELLED_CHEQUE")
+      .set(auth("legal"))
+      .send({ status: "VERIFIED" })
+      .expect(200);
+    expect(
+      reviewed.body.vault.find((v: { docType: string }) => v.docType === "CANCELLED_CHEQUE").status,
+    ).toBe("VERIFIED");
+  });
+
+  it("refuses an eSign webhook with a bad signature", async () => {
+    await request(http)
+      .post("/api/v1/webhooks/esign/mock")
+      .set("x-recoveryos-signature", "00".repeat(32))
+      .send({ requestId: "MOCK-x", status: "SIGNED" })
+      .expect(401);
+  });
+});
+
+describe("CRM board", () => {
+  it("lays out lead and case columns and converts a lead into a case", async () => {
+    const board = await request(http).get("/api/v1/crm/board").set(auth("analyst")).expect(200);
+    const ids = board.body.columns.map((c: { id: string }) => c.id);
+    expect(ids).toEqual([
+      "NEW_SEARCH_LEAD",
+      "RING_UP_DONE",
+      "EVALUATION_IN_PROGRESS",
+      "FEASIBILITY_CHECKED",
+      "OFFER_SENT",
+      "CASE_VERIFY",
+      "CASE_EMPLOY",
+      "CASE_REALIZE",
+    ]);
+    const offer = board.body.columns.find((c: { id: string }) => c.id === "OFFER_SENT").items[0];
+    await request(http)
+      .patch(`/api/v1/crm/leads/${offer.id}`)
+      .set(auth("analyst"))
+      .send({ crmStage: "CONVERTED_TO_CASE" })
+      .expect(400);
+    const created = await request(http)
+      .post(`/api/v1/crm/leads/${offer.id}/convert`)
+      .set(auth("analyst"))
+      .send({
+        folioId: offer.holdings[0].folioId,
+        scenarioType: "STANDARD_IEPF5",
+        agreedSuccessFeePct: 10,
+      })
+      .expect(201);
+    expect(created.body.caseCode).toMatch(/^RC-\d{4}-\d{4}$/);
+    expect(created.body.recoverStep).toBe(5);
+    await request(http)
+      .post(`/api/v1/crm/leads/${offer.id}/convert`)
+      .set(auth("analyst"))
+      .send({ folioId: offer.holdings[0].folioId, scenarioType: "STANDARD_IEPF5" })
+      .expect(409);
+
+    const lead = board.body.columns.find((c: { id: string }) => c.id === "RING_UP_DONE").items[0];
+    const moved = await request(http)
+      .patch(`/api/v1/crm/leads/${lead.id}`)
+      .set(auth("analyst"))
+      .send({ crmStage: "EVALUATION_IN_PROGRESS", notes: "Called, holder confirmed." })
+      .expect(200);
+    expect(moved.body.crmStage).toBe("EVALUATION_IN_PROGRESS");
+  });
+});
+
+describe("associates", () => {
+  it("lists only verified partners on the public locator", async () => {
+    const all = await request(http).get("/api/v1/associates/locator").expect(200);
+    expect(all.body.map((a: { referralCode: string }) => a.referralCode)).not.toContain(
+      "DEBAS-KOL",
+    );
+    const kerala = await request(http)
+      .get("/api/v1/associates/locator")
+      .query({ state: "KERALA" })
+      .expect(200);
+    expect(kerala.body).toHaveLength(1);
+    expect(JSON.stringify(all.body)).not.toContain("+9190000000");
+  });
+
+  it("registers a partner, who can then submit leads and see a ledger", async () => {
+    const token = await login("+919811100001", "Neha Kapoor");
+    const reg = await request(http)
+      .post("/api/v1/associates/register")
+      .set({ authorization: `Bearer ${token}` })
+      .send({
+        firmName: "Kapoor & Co, Company Secretaries",
+        profession: "CS",
+        state: "PUNJAB",
+        city: "Ludhiana",
+      })
+      .expect(201);
+    expect(reg.body.associate.isVerified).toBe(false);
+    const partner = { authorization: `Bearer ${reg.body.session.token}` };
+    await request(http)
+      .post("/api/v1/associates/me/leads")
+      .set(partner)
+      .send({
+        claimantName: "Gurpreet Singh",
+        phone: "9876512345",
+        relationshipToHolder: "SELF",
+        physicalCertStatus: "AVAILABLE",
+        holderName: "Gurpreet Singh",
+        state: "PUNJAB",
+        consentConfirmed: true,
+      })
+      .expect(201);
+    const me = await request(http).get("/api/v1/associates/me").set(partner).expect(200);
+    expect(me.body.leads).toHaveLength(1);
+    expect(me.body.profile.revenueSharePct).toBe(30);
+  });
+
+  it("shows a partner's ledger with running balance", async () => {
+    const me = await request(http).get("/api/v1/associates/me").set(auth("meera")).expect(200);
+    expect(me.body.totals.accruedPaise).toBeGreaterThan(0);
+    expect(me.body.totals.balancePaise).toBe(
+      me.body.totals.accruedPaise - me.body.totals.paidPaise,
+    );
+  });
+});
+
+describe("IEPF-2 / IEPF-4 ingestion", () => {
+  it("imports an IEPF-4 statement in the background and makes it searchable", async () => {
+    const csv = [
+      "Statement of shares transferred to IEPF,,,,,,,,,,,,,,,,",
+      "Investor First Name,Investor Middle Name,Investor Last Name,Father/Husband First Name,Father/Husband Middle Name,Father/Husband Last Name,Address,Country,State,District,Pin Code,Folio Number,DP Id-Client Id-Account Number,Investment Type,Amount transferred,Number of underlying Shares,Proposed Date of transfer to IEPF",
+      "Hemlata,,Bhargava,Suresh,,Bhargava,12 Civil Lines,India,Rajasthan,Jaipur,302006,RIL0099887766,,Shares,0,150,23-Oct-2019",
+      "Hemlata,,Bhargava,Suresh,,Bhargava,12 Civil Lines,India,Rajasthan,Jaipur,302006,RIL0099887766,,Shares,0,150,23-Oct-2019",
+      "Prakash,,Nambiar,Raman,,Nambiar,Kochi,India,Kerela,Ernakulam,,RIL0012121212,,Shares,0,40,2019-10-23",
+      ",,,,,,,,,,,,,,,,",
+      "Imran,,Qureshi,Abdul,,Qureshi,Dubai Marina,UAE,,,,RIL0055554444,,Shares,0,20,23/10/2019",
+    ].join("\n");
+    const up = await request(http)
+      .post("/api/v1/admin/ingestion")
+      .set(auth("admin"))
+      .field("formType", "IEPF_4")
+      .field("companySlug", "reliance-industries-limited")
+      .attach("file", Buffer.from(csv), { filename: "iepf4-ril.csv", contentType: "text/csv" })
+      .expect(201);
+    await app.get(JobQueueService).drain();
+    const job = await request(http)
+      .get(`/api/v1/admin/ingestion/${up.body.id}`)
+      .set(auth("admin"))
+      .expect(200);
+    expect(job.body).toMatchObject({
+      status: "COMPLETED",
+      totalRows: 4,
+      insertedRows: 2,
+      skippedRows: 1,
+    });
+    expect(job.body.errors[0].message).toContain("Kerela");
+
+    const found = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Bhargav", state: "RAJASTHAN" })
+      .expect(200);
+    expect(found.body.results[0]).toMatchObject({
+      investorFullName: "Hemlata Bhargava",
+      // 150 shares moved in Oct 2019, doubled by Reliance's Oct 2024 bonus inside the IEPF.
+      postActionShares: 300,
+      custodyStatus: "IEPF_AUTHORITY",
+      transferFinancialYear: "2019-20",
+      eventDate: "2019-10-23",
+    });
+    const abroad = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Qureshi", state: "OUT_OF_INDIA" })
+      .expect(200);
+    expect(abroad.body.total).toBe(1);
+  });
+
+  it("reads a real-layout .xlsx IEPF-2 statement with a title block and share rows", async () => {
+    const XLSX = await import("xlsx");
+    const header = ["Investor First Name", "Investor Middle Name", "Investor Last Name", "Father/Husband First Name", "Father/Husband Middle Name", "Father/Husband Last Name", "Address", "Country", "State", "District", "Pin Code", "Folio Number", "DP Id-Client Id-Account Number", "Investment Type", "Amount Transferred", "Proposed Date of Transfer to IEPF", "PAN", "Financial Year"];
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["Add Investor Details"],
+      ["(i) Fill in the details below. First Name -> Mandatory if 'Last Name' is blank. DP Id-Client Id-Account Number -> 16 characters."],
+      [],
+      header,
+      ["Gurmeet", "", "Kaur", "Harbans", "", "Singh", "12 Model Town", "INDIA", "", "Ludhiana", "141002", "TCS0045671234", "", "Amount for unpaid and unclaimed dividend", 412.5, new Date(Date.UTC(2031, 6, 27)), "", "FY-1"],
+      ["Gurmeet", "", "Kaur", "Harbans", "", "Singh", "12 Model Town", "INDIA", "", "Ludhiana", "141002", "TCS0045671234", "", "Number of underlying Shares", 75, new Date(Date.UTC(2031, 6, 27)), "", "FY-1"],
+      ["Total", "", "", "", "", "", "", "", "", "", "", "", "", "", 487.5, "", "", ""],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, "Investor Details");
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const up = await request(http)
+      .post("/api/v1/admin/ingestion")
+      .set(auth("admin"))
+      .field("companySlug", "tata-consultancy-services-limited")
+      .field("sourceUrl", "https://example.org/investors/iepf-2.xlsx")
+      .attach("file", buffer, { filename: "iepf-2.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+      .expect(201);
+    expect(up.body).toMatchObject({ formType: "IEPF_2", sourceUrl: "https://example.org/investors/iepf-2.xlsx" });
+    await app.get(JobQueueService).drain();
+    const job = await request(http).get(`/api/v1/admin/ingestion/${up.body.id}`).set(auth("admin")).expect(200);
+    expect(job.body).toMatchObject({ status: "COMPLETED", totalRows: 2, insertedRows: 1, skippedRows: 0 });
+    // State came from the PIN code; the shares row became shares, not rupees.
+    const found = await request(http).get("/api/v1/search/unclaimed").query({ fullName: "Gurmeet Kaur", state: "PUNJAB" }).set(auth("analyst")).expect(200);
+    expect(found.body.results[0]).toMatchObject({ investorFullName: "Gurmeet Kaur", postActionShares: 75, custodyStatus: "COMPANY_SUSPENSE", unclaimedDividendPaise: 41250 });
+  });
+
+  it("reads a PDF statement table and keeps holders with no state searchable everywhere", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([842, 595]);
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const cols = [40, 140, 240, 340, 440, 560, 680];
+    const draw = (row: string[], y: number) => row.forEach((t, i) => t && page.drawText(t, { x: cols[i]!, y, size: 8, font }));
+    page.drawText("Statement of unclaimed dividend (IEPF-2)", { x: 40, y: 560, size: 11, font });
+    draw(["Investor First", "Investor Middle", "Investor Last", "Folio No.", "Investment", "Amount", "Proposed date of"], 520);
+    draw(["Name", "Name", "Name", "", "Type", "transferred", "transfer to IEPF"], 510);
+    draw(["Zarina", "", "Wadia", "MRF0000771", "Amount for unclaimed", "1250.00", "12-Sep-2031"], 480);
+    draw(["", "", "", "", "and unpaid dividend", "", ""], 470);
+    draw(["Bhupinder", "", "Sodhi", "MRF0000772", "Amount for unclaimed", "640.00", "12-Sep-2031"], 450);
+    const pdf = Buffer.from(await doc.save());
+    const up = await request(http)
+      .post("/api/v1/admin/ingestion")
+      .set(auth("admin"))
+      .field("companySlug", "mrf-limited")
+      .attach("file", pdf, { filename: "mrf-iepf2.pdf", contentType: "application/pdf" })
+      .expect(201);
+    await app.get(JobQueueService).drain();
+    const job = await request(http).get(`/api/v1/admin/ingestion/${up.body.id}`).set(auth("admin")).expect(200);
+    expect(job.body).toMatchObject({ status: "COMPLETED", totalRows: 2, insertedRows: 2 });
+    for (const state of ["GOA", "ASSAM"]) {
+      const res = await request(http).get("/api/v1/search/unclaimed").query({ lastName: "Wadia", state }).set(auth("analyst")).expect(200);
+      expect(res.body.results[0]).toMatchObject({ investorFullName: "Zarina Wadia", state: "UNKNOWN", investmentType: "Amount for unclaimed and unpaid dividend", unclaimedDividendPaise: 125000 });
+    }
+  });
+
+  it("rejects a file without a folio column at upload", async () => {
+    await request(http)
+      .post("/api/v1/admin/ingestion")
+      .set(auth("admin"))
+      .field("formType", "IEPF_2")
+      .attach("file", Buffer.from("a,b\n1,2"), { filename: "bad.csv", contentType: "text/csv" })
+      .expect(400);
+  });
+});
+
+describe("audit log", () => {
+  it("is append-only, even for the table owner", async () => {
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const count = await db.query("SELECT count(*)::int AS n FROM audit_events");
+    expect(count.rows[0].n).toBeGreaterThan(5);
+    await expect(db.query("UPDATE audit_events SET action = 'x'")).rejects.toThrow(/append-only/);
+    await expect(db.query("DELETE FROM audit_events")).rejects.toThrow(/append-only/);
+    await db.end();
+  });
+});
+
+describe("companies and stats", () => {
+  it("serves a company page payload with actions and records", async () => {
+    const res = await request(http).get("/api/v1/companies/wipro-limited").expect(200);
+    expect(res.body).toMatchObject({
+      name: "Wipro Limited",
+      isin: "INE075A01022",
+      rta: { name: "KFIN", label: "KFin Technologies Limited" },
+      nodalOfficer: {
+        name: "Mr. M Sanaulla Khan (Company Secretary)",
+        emails: ["sanaulla.khan@wipro.com", "iepf.nodalofficer@wipro.com"],
+        phone: "+91 80 28440011",
+      },
+    });
+    expect(
+      res.body.corporateActions.filter((a: { actionType: string }) => a.actionType === "BONUS"),
+    ).toHaveLength(7);
+    expect(res.body.corporateActions.every((a: { source: string | null }) => a.source)).toBe(true);
+    const sbi = await request(http).get("/api/v1/companies/state-bank-of-india").expect(200);
+    expect(sbi.body.cin).toBeNull();
+    expect(sbi.body.statutoryBasis).toContain("State Bank of India Act, 1955");
+    const ril = await request(http).get("/api/v1/companies/reliance-industries-limited").expect(200);
+    expect(ril.body.nodalOfficer.deputies).toHaveLength(2);
+    expect(ril.body.rta).toMatchObject({ email: "rilinvestor@kfintech.com", phone: "1800 309 4001 (toll-free)" });
+    await request(http).get("/api/v1/companies/no-such-co").expect(404);
+    const stats = await request(http).get("/api/v1/stats").expect(200);
+    expect(stats.body.companies).toBe(15);
+    expect(stats.body.folios).toBeGreaterThan(10);
+  });
+});

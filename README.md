@@ -1,45 +1,182 @@
 # RecoveryOS
 
-An AI-first recovery room for unclaimed investments in India. The first wedge is
-**IEPF shares and dividends**: shares a company moved to the Investor Education and
-Protection Fund after seven years of unclaimed dividends, which the holder (or their heirs)
-can claim back on Form IEPF-5.
+A recovery platform for unclaimed investments in India. The first wedge is **IEPF shares and
+dividends**: shares a company moved to the Investor Education and Protection Fund after seven
+years of unclaimed dividends, which the holder (or their heirs) can claim back on Form IEPF-5.
 
-This repository is the **MVP slice**: the marketing site, a guided triage, a case overview
-and an evidence room. They run on a typed mock data layer, and a production Postgres schema
-is ready for a Supabase free-tier project.
+Version 0.2 turns the MVP into a platform: a public name + state search over companies'
+IEPF-2/IEPF-4 filings with a teaser-to-unlock flow, programmatic company guides, a
+corporate-action and fee calculator, a client portal with the seven-step R.E.C.O.V.E.R.
+tracker, Aadhaar eSign and a document vault, an associate partner programme, and an admin
+workspace with a CRM board and a filings importer.
 
-> **Demo only.** Every case, person, company, folio, checksum and price in this build is
-> fictional. Uploads are switched off. Do not put real documents into it. See the
+> **Demo data.** Every person, folio, phone number and case in the seed is fictional. Company
+> identifiers, registrars and corporate actions are reference data compiled for this build and
+> prices are samples: verify them before relying on them. Do not upload real documents. See the
 > [launch-gate checklist](#launch-gate-checklist).
 
 ---
 
+## Monorepo
+
+```
+apps/
+  web/        Next.js 16 (App Router) + Tailwind 4 + shadcn/ui + Recharts: site, portal, partner desk, admin
+  api/        NestJS 12 (ESM) API + BullMQ worker: search/unlock, auth, cases, CRM, associates, ETL
+packages/
+  shared/     Domain enums, name phonetics, masking, corporate-action and fee maths, R.E.C.O.V.E.R.
+              rules, document checklists, reference companies and services (used by api, web and seed)
+  db/         Prisma 7 schema, SQL migrations (pg_trgm + fuzzystrmatch), seed, field encryption,
+              and a local PostgreSQL 18 that needs no install
+```
+
 ## Setup
 
-Requirements: Node.js 20.9 or newer, npm.
+Requirements: Node.js 20.19+ (24 recommended) and npm 11. No Docker, Postgres or Redis needed for
+development.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000 — no environment variables needed
+npm run build:packages        # shared + db (generates the Prisma client)
+npm run db:start              # terminal 1: PostgreSQL 18 on :54329, data in .data/pg
+npm run db:migrate && npm run db:seed
+npm run build -w @recoveryos/api && npm run dev:api     # terminal 2: API on :4000/api/v1
+npm run dev:web               # terminal 3: web on :3000
 ```
 
-| Script                     | What it does                                                                                              |
-| -------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `npm run dev`              | Development server                                                                                        |
-| `npm run build`            | Production build (Turbopack), including the TypeScript check                                              |
-| `npm start`                | Serve the production build                                                                                |
-| `npm run lint`             | ESLint (Next.js core-web-vitals + TypeScript rules)                                                       |
-| `npm run typecheck`        | Generate route types, then `tsc --noEmit`                                                                 |
-| `npm run format`           | Prettier                                                                                                  |
-| `scripts/verify-schema.sh` | Apply the migration to a throwaway local Postgres and run 25 behaviour checks (see [Database](#database)) |
+Sign in at `/login` with a seeded number; in development the code is printed in the API log
+(`Development OTP for +91…`).
 
-Optional environment variables (none are required):
+| Who                                                | Mobile      | Lands on                         |
+| -------------------------------------------------- | ----------- | -------------------------------- |
+| Client with two cases (RC-2026-1001, RC-2026-1004) | 90000 00011 | `/portal`                        |
+| Client at step 5, ready to eSign (RC-2026-1003)    | 90000 00013 | `/portal`                        |
+| Valuation analyst                                  | 90000 00002 | `/admin/crm`                     |
+| Legal operations                                   | 90000 00004 | `/admin/crm`, `/admin/ingestion` |
+| Associate partner (MEERA-PUN)                      | 90000 00021 | `/partners/dashboard`            |
+| Administrator                                      | 90000 00001 | everything                       |
 
-| Variable                 | Default | Meaning                                                                                     |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------- |
-| `RECOVERYOS_DATA_SOURCE` | `mock`  | Which adapter `lib/data.ts` returns. Anything else fails loudly — only `mock` exists today. |
-| `MOCK_LATENCY_MS`        | `0`     | Adds delay to every mock call, to see loading states.                                       |
+Try `/search?lastName=Agarwal&state=DELHI`: Agarwal, Agrawal and Aggarwal come back together,
+masked. Select one, unlock it with any mobile number and the code from the API log, and the
+company, registrar and folio appear while the lead lands on the CRM board.
+
+| Script (root)                                              | What it does                                                                                    |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `npm run db:start` / `db:migrate` / `db:seed` / `db:reset` | Local Postgres; apply migrations; seed; drop and rebuild (local only)                           |
+| `npm run dev:api` / `dev:worker` / `dev:web`               | API (tsc watch + node --watch), BullMQ worker (needs `REDIS_URL`), web                          |
+| `npm test`                                                 | Shared unit tests (20) and API end-to-end tests (26) against a fresh `recoveryos_test` database |
+| `npm run typecheck` / `npm run lint` / `npm run build`     | Across all workspaces                                                                           |
+
+### Environment
+
+Every integration has a local adapter, and setting its variables switches it to the real
+service. `/api/v1/health` reports which adapter each one is running on. Production refuses
+to start with development secrets or adapters.
+
+| Variable                                        | Default                                    | Purpose                                                                                            |
+| ----------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                  | local embedded Postgres                    | Any PostgreSQL 15+ with `pg_trgm` and `fuzzystrmatch` (Supabase works)                             |
+| `JWT_SECRET`, `UNLOCK_JWT_SECRET`, `OTP_SECRET` | dev values                                 | 32+ chars each; separate secrets for sessions, unlock tokens, OTP hashes                           |
+| `FOLIO_ENCRYPTION_KEY`, `FOLIO_HASH_KEY`        | derived dev keys                           | 32 bytes base64: AES-256-GCM for folio numbers, HMAC blind index                                   |
+| `OTP_PROVIDER`                                  | `console`                                  | `msg91` (`MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_*`)                           |
+| `ESIGN_PROVIDER`                                | `mock`                                     | `digio` (`DIGIO_CLIENT_ID/SECRET`) or `leegality` (`LEEGALITY_AUTH_TOKEN`); `ESIGN_WEBHOOK_SECRET` |
+| `STORAGE_PROVIDER`                              | `local` (AES-256-GCM files in `.uploads/`) | `s3` with `S3_BUCKET`, `S3_REGION`, `S3_KMS_KEY_ID` (SSE-KMS)                                      |
+| `REDIS_URL`                                     | unset: jobs run inline                     | BullMQ queue; run `npm run dev:worker`                                                             |
+| `MEILI_HOST`, `MEILI_API_KEY`                   | unset: Postgres search                     | Meilisearch, with automatic fallback to Postgres on any error                                      |
+| `RECOVERYOS_API_URL` (web)                      | `http://localhost:4000/api/v1`             | Where the web server reaches the API                                                               |
+| `NEXT_PUBLIC_SITE_URL` (web)                    | `http://localhost:3000`                    | Canonical URLs, sitemap, referral links                                                            |
+
+See `.env.example` for the full list.
+
+## Platform architecture
+
+**Search (teaser to unlock).** `GET /api/v1/search/unclaimed` takes `firstName`, `middleName`,
+`lastName` or `fullName`, a mandatory `state` and an optional `custodyStatus`, and resolves to
+one of four modes: full name (two or more parts), first only, middle only, or surname only.
+Every name part given must match, by any of:
+
+- trigram similarity (`pg_trgm`, GIN indexes on each part);
+- an Indian-transliteration phonetic key computed in `packages/shared/names.ts`, so that
+  Agarwal, Agrawal and Aggarwal give AGRVL, and Chaudhary and Chowdhury give CDR;
+- Soundex with Levenshtein distance up to 3 (`fuzzystrmatch`, with expression indexes scoped by
+  state).
+
+A single letter matches as an initial. Typical query time on the seed is under 5 ms.
+
+Unverified callers get the holder, father or spouse, city, state, custody status, post-action
+shares and an estimated value, with the company masked (`R******e Industries Ltd`) and the folio
+masked (`RIL***21`). `POST /api/v1/search/unlock` takes the claimant's name, phone, a one-time
+code, relationship to the holder and certificate status. It verifies the code, records or merges
+the lead, assigns the least-loaded valuation analyst, queues a notification and returns an
+unlock JWT covering only the chosen folios. The web app keeps that token (and the session) in
+httpOnly cookies through its `/api/v1/*` backend-for-frontend route, so browser JavaScript never
+sees a token.
+
+Guard rails: OTPs are 6 digits, live 5 minutes, allow 5 tries, are stored as an HMAC and are
+rate-limited (one every 30 s, five an hour per phone). Each phone may make 5 unlocks a day, with
+at most 10 folios per unlock. Search is IP-throttled and every unlock is audited.
+
+**Data model.** There are 13 tables. The 7 core tables are `companies`, `corporate_actions`,
+`unclaimed_folios`, `leads_and_inquiries`, `recovery_cases`, `case_documents` and `associates`.
+The 6 supporting tables are `users`, `otp_challenges`, `case_events`, `commission_ledger`,
+`ingestion_jobs` and `audit_events`. The second migration adds what Prisma cannot express:
+
+- the extensions and the trigram, Soundex and Double Metaphone indexes;
+- CHECK constraints: step 1 to 7, no step 6 without a signed mandate, no step 7 without an SRN,
+  and the folio column must hold ciphertext;
+- an append-only audit log, enforced by trigger even for the table owner.
+
+`folio_number` is AES-256-GCM ciphertext, with a masked copy and an HMAC blind index for
+de-duplication.
+
+**R.E.C.O.V.E.R.** The seven steps are Ring up, Evaluate, Check, Offer, Verify, Employ and
+Realize. They advance one at a time, by staff only, through `canAdvanceRecoverStep`, and the
+database constraints repeat the same rules. At step 5 the client reads the generated Scope of
+Work PDF and signs it with Aadhaar eSign. The mandate only becomes "signed" through a verified
+provider webhook; the development provider routes its simulated signature through the same
+webhook check. When a referred case is credited, the associate's 30% share of the fee accrues
+to the commission ledger exactly once.
+
+**Document vault.** The checklist depends on the scenario: standard IEPF-5, duplicate shares,
+deceased transmission, NRI or physical-to-demat. Uploads must be PDF, JPG or PNG up to 10 MB.
+Each file is stored encrypted with its SHA-256 recorded, then reviewed by staff (verify, or send
+back with a reason). Downloads are authorised and audited.
+
+**ETL.** `POST /api/v1/admin/ingestion` accepts an IEPF-2 or IEPF-4 investor-wise statement as
+`.csv` or `.xlsx`. Headers are matched by alias, and the header row is found below any title
+block. Rows for the same (company, folio, holder) are grouped, then upserted in batches of 250.
+Invalid rows are skipped with a reason. A background job does the parsing (BullMQ, or inline
+without Redis), then syncs Meilisearch when it is configured.
+
+**API surface** (all under `/api/v1`):
+
+- Public: `health`, `stats`, `companies`, `companies/:slug`, `search/unclaimed`, `search/unlock`,
+  `auth/otp/request`, `auth/otp/verify`, `associates/locator`, `associates/referral/:code`,
+  `webhooks/esign/:provider` (verified by signature).
+- Signed in: `auth/me`, `cases`, `cases/:code`, `cases/:code/esign/start`, `cases/:code/mandate`,
+  `cases/:code/documents/:docType` (upload), `…/file`, `associates/register`.
+- `ASSOCIATE_PARTNER`: `associates/me` and `associates/me/leads`.
+- Staff: `cases/:code/advance`, `cases/:code/tracking`, `PATCH cases/:code/documents/:docType`,
+  `crm/board`, `crm/team`, `crm/leads/:id`, `crm/leads/:id/convert` and `crm/cases/move`.
+- `LEGAL_OPS_EXEC` or `SUPER_ADMIN`: `admin/ingestion…`.
+
+**Web routes added in 0.2.**
+
+- Public: `/search`, `/services` (11 verticals), `/services/[slug]`, `/unclaimed-shares` and
+  `/unclaimed-shares/[company-slug]`. The company guides are statically generated with hourly
+  revalidation, carry HowTo and BreadcrumbList JSON-LD, and fall back to the shared catalogue
+  if the API is down at build time.
+- Also public: `/calculator`, `/partners` (pitch plus state and city locator), `/login`,
+  `sitemap.xml` and `robots.txt`.
+- Signed in: `/portal`, `/portal/cases/[code]`, `/partners/join`, `/partners/dashboard`,
+  `/admin/crm` and `/admin/ingestion`.
+
+---
+
+## Web app (apps/web)
+
+Paths in the rest of this section are relative to `apps/web`. The original MVP screens
+(`/check`, `/cases`, the evidence room) still run on the typed mock data layer described below.
 
 ## Screens
 
@@ -352,6 +489,22 @@ Nothing here is done yet. **No real client documents are accepted until every it
       audit.
 - [ ] Incident response plan, including CERT-In's 6-hour reporting requirement.
 - [ ] Independent security review or penetration test.
+
+### Platform (0.2)
+
+- [ ] **Data licensing.** Investor-wise IEPF data is published by companies and the IEPF Authority. Confirm with counsel that
+      indexing it, and showing teaser fields about named private individuals, is permitted. Decide on a DPDP basis, a takedown
+      route and how long records are kept.
+- [ ] **Reference data.** Verify every company's CIN, ISIN, registrar, corporate actions and nodal officer against primary
+      sources. Replace sample prices with an exchange feed.
+- [ ] **OTP.** Register a DLT sender ID and template for MSG91 or Twilio. Load-test the rate limits. Confirm that the anti-fraud
+      copy ("we never ask you to read out a code") matches every script the call team uses.
+- [ ] **eSign.** Sign a Digio or Leegality contract. Confirm their request fields and webhook signature scheme against the
+      adapters in `apps/api/src/common/providers/esign.provider.ts`. Have the Scope of Work reviewed by counsel.
+- [ ] **Storage.** Private S3 bucket with SSE-KMS, a malware scan on upload and a retention schedule. Generate keys for
+      `FOLIO_*` and `STORAGE_ENCRYPTION_KEY` in a KMS, with a rotation procedure.
+- [ ] **Associates.** Write a partner agreement covering the 30% share, verification of professional membership, a payout
+      process and TDS.
 
 ### Product
 
