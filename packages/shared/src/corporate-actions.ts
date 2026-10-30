@@ -105,7 +105,13 @@ export function computeEntitlement(
     } else {
       shares = applyAction(shares, action);
     }
-    steps.push({ action, sharesBefore: before, sharesAfter: shares, dividendPaise: earned, cashPaise: cash });
+    steps.push({
+      action,
+      sharesBefore: before,
+      sharesAfter: shares,
+      dividendPaise: earned,
+      cashPaise: cash,
+    });
   }
   return { shares, steps, dividendPaise, cashPaise };
 }

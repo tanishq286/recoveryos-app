@@ -41,16 +41,28 @@ if (form && form !== "IEPF_2" && form !== "IEPF_4") fail("--form must be IEPF_2 
 const prisma = createPrismaClient();
 try {
   const company = await prisma.company.findFirst({
-    where: values.cin ? { cin: values.cin.toUpperCase() } : values.isin ? { isin: values.isin.toUpperCase() } : { slug: values.slug },
+    where: values.cin
+      ? { cin: values.cin.toUpperCase() }
+      : values.isin
+        ? { isin: values.isin.toUpperCase() }
+        : { slug: values.slug },
   });
-  if (!company) fail("That company is not in the catalogue. Add it to packages/shared/src/reference/companies.ts and re-seed first.");
+  if (!company)
+    fail(
+      "That company is not in the catalogue. Add it to packages/shared/src/reference/companies.ts and re-seed first.",
+    );
 
   const source = values.file!;
   let file: { buffer: Buffer; fileName: string; contentType: string | null };
   if (/^https?:\/\//i.test(source)) {
-    if (!(await robotsAllows(source))) fail(`robots.txt on ${new URL(source).host} disallows fetching ${source}.`);
+    if (!(await robotsAllows(source)))
+      fail(`robots.txt on ${new URL(source).host} disallows fetching ${source}.`);
     const res = await fetchBuffer(source);
-    file = { buffer: res.buffer, fileName: decodeURIComponent(basename(new URL(res.finalUrl).pathname)), contentType: res.contentType };
+    file = {
+      buffer: res.buffer,
+      fileName: decodeURIComponent(basename(new URL(res.finalUrl).pathname)),
+      contentType: res.contentType,
+    };
   } else {
     file = { buffer: await readFile(source), fileName: basename(source), contentType: null };
   }
@@ -59,7 +71,15 @@ try {
   const job = dryRun
     ? null
     : await prisma.ingestionJob.create({
-        data: { formType: (form as "IEPF_2" | "IEPF_4" | undefined) ?? "IEPF_4", fileName: file.fileName, storageKey: `cli:${source}`, sourceUrl: source, companyId: company.id, status: "PROCESSING", startedAt: new Date() },
+        data: {
+          formType: (form as "IEPF_2" | "IEPF_4" | undefined) ?? "IEPF_4",
+          fileName: file.fileName,
+          storageKey: `cli:${source}`,
+          sourceUrl: source,
+          companyId: company.id,
+          status: "PROCESSING",
+          startedAt: new Date(),
+        },
       });
   try {
     const result = await ingestStatement(prisma, keysFromEnv(), file, {
@@ -105,10 +125,20 @@ try {
       ),
     );
     if (!dryRun && result.insertedRows + result.updatedRows > 0) {
-      console.log("Rows are searchable now. If Meilisearch is configured, the next import or API restart re-syncs it.");
+      console.log(
+        "Rows are searchable now. If Meilisearch is configured, the next import or API restart re-syncs it.",
+      );
     }
   } catch (e) {
-    if (job) await prisma.ingestionJob.update({ where: { id: job.id }, data: { status: "FAILED", errors: [{ row: 0, message: (e as Error).message }], finishedAt: new Date() } });
+    if (job)
+      await prisma.ingestionJob.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          errors: [{ row: 0, message: (e as Error).message }],
+          finishedAt: new Date(),
+        },
+      });
     throw e;
   }
 } finally {

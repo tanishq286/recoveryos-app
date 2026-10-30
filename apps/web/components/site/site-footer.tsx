@@ -95,7 +95,8 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
       </div>
       <div className="border-t border-(--glass-border)">
         <p className={cn("mx-auto px-4 py-5 text-sm text-fg-3 sm:px-6", width)}>
-          Investor records come from companies&apos; IEPF-2 and IEPF-4 statements. The sample case under Sample cases is illustrative.
+          Investor records come from companies&apos; IEPF-2 and IEPF-4 statements. The sample case
+          under Sample cases is illustrative.
         </p>
       </div>
     </footer>

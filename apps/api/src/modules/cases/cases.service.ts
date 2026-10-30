@@ -177,7 +177,8 @@ export class CasesService {
     const shares = c.folio?.postActionShares ?? 0;
     const price = c.company.currentMarketPrice === null ? null : num(c.company.currentMarketPrice);
     const estimatePaise = c.folio
-      ? holdingValuePaise(shares, price ?? 0) + Math.round(num(c.folio.unclaimedDividendAmount) * 100)
+      ? holdingValuePaise(shares, price ?? 0) +
+        Math.round(num(c.folio.unclaimedDividendAmount) * 100)
       : 0;
     const feeBps = pctToBps(num(c.agreedSuccessFeePct));
     const basis = c.creditedValuePaise !== null ? Number(c.creditedValuePaise) : estimatePaise;

@@ -82,7 +82,12 @@ export interface CompanyDetail {
   contacts: { source: string | null; verifiedAt: string | null };
   irPageUrl: string | null;
   corporateActions: CompanyAction[];
-  records: { custodyStatus: CustodyStatus; folios: number; shares: number; dividendRupees: number }[];
+  records: {
+    custodyStatus: CustodyStatus;
+    folios: number;
+    shares: number;
+    dividendRupees: number;
+  }[];
 }
 
 export interface Me {

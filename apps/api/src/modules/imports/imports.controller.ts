@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Header, Param, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { TEMPLATE_HEADERS } from "@recoveryos/db";
 import { INGESTION_FORMS } from "@recoveryos/shared";
@@ -11,7 +20,11 @@ import { ImportsService } from "./imports.service.js";
 const blankToUndefined = z.literal("").transform(() => undefined);
 const uploadSchema = z.object({
   formType: z.enum(INGESTION_FORMS).optional().or(blankToUndefined),
-  companySlug: z.string().regex(/^[a-z0-9-]{2,120}$/).optional().or(blankToUndefined),
+  companySlug: z
+    .string()
+    .regex(/^[a-z0-9-]{2,120}$/)
+    .optional()
+    .or(blankToUndefined),
   sourceUrl: z.url().max(2000).optional().or(blankToUndefined),
 });
 

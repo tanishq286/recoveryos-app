@@ -17,7 +17,14 @@ export class MarketController {
   @Get("prices")
   async prices() {
     const rows = await this.prisma.client.company.findMany({
-      select: { slug: true, name: true, tickerNse: true, currentMarketPrice: true, priceUpdatedAt: true, priceSource: true },
+      select: {
+        slug: true,
+        name: true,
+        tickerNse: true,
+        currentMarketPrice: true,
+        priceUpdatedAt: true,
+        priceSource: true,
+      },
       orderBy: { name: "asc" },
     });
     return {

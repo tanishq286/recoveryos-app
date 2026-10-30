@@ -29,7 +29,11 @@ export async function generateStaticParams() {
   return (await listCompanies()).map((c) => ({ slug: c.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const c = await getCompany((await params).slug);
   if (!c) return {};
   return {
@@ -42,7 +46,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 const EXAMPLE_YEAR = 1995;
 const EXAMPLE_SHARES = 100;
 
-function ratioText(a: { actionType: string; ratioFrom: number | null; ratioTo: number | null; dividendPerShare: number | null }) {
+function ratioText(a: {
+  actionType: string;
+  ratioFrom: number | null;
+  ratioTo: number | null;
+  dividendPerShare: number | null;
+}) {
   if (a.actionType === "CASH_ENTITLEMENT") return `₹${a.dividendPerShare} cash per equity share`;
   if (a.ratioFrom === null || a.ratioTo === null) return "";
   if (a.actionType === "SPLIT") return `Face value ₹${a.ratioFrom} to ₹${a.ratioTo}`;
@@ -56,12 +65,23 @@ const ACTION_LABEL: Record<string, string> = {
   CASH_ENTITLEMENT: "Cash entitlement",
 };
 
-function ContactLines({ emails, phone, address }: { emails: string[]; phone: string | null; address: string | null }) {
+function ContactLines({
+  emails,
+  phone,
+  address,
+}: {
+  emails: string[];
+  phone: string | null;
+  address: string | null;
+}) {
   return (
     <ul className="mt-2 grid gap-1.5 text-sm">
       {emails.map((e) => (
         <li key={e}>
-          <a href={`mailto:${e}`} className="link inline-flex items-center gap-1.5 break-all text-fg-2">
+          <a
+            href={`mailto:${e}`}
+            className="link inline-flex items-center gap-1.5 break-all text-fg-2"
+          >
             <MailIcon className="size-3.5 shrink-0" aria-hidden="true" />
             {e}
           </a>
@@ -95,7 +115,10 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
   if (!c) notFound();
 
   const structural = c.corporateActions.filter((a) => a.actionType !== "DIVIDEND");
-  const dividends = c.corporateActions.filter((a) => a.actionType === "DIVIDEND").slice(-7).reverse();
+  const dividends = c.corporateActions
+    .filter((a) => a.actionType === "DIVIDEND")
+    .slice(-7)
+    .reverse();
   const dividendSource = dividends[0]?.source;
   const example = computeEntitlement(
     EXAMPLE_SHARES,
@@ -137,7 +160,12 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
           "@type": "HowTo",
           name: `How to recover unclaimed ${c.name} shares from the IEPF`,
           estimatedCost: { "@type": "MonetaryAmount", currency: "INR", value: "0" },
-          step: steps.map((s, i) => ({ "@type": "HowToStep", position: i + 1, name: s.name, text: s.text })),
+          step: steps.map((s, i) => ({
+            "@type": "HowToStep",
+            position: i + 1,
+            name: s.name,
+            text: s.text,
+          })),
         }}
       />
       <JsonLd
@@ -145,8 +173,18 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
           itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Company guides", item: `${SITE_URL}/unclaimed-shares` },
-            { "@type": "ListItem", position: 2, name: c.name, item: `${SITE_URL}/unclaimed-shares/${c.slug}` },
+            {
+              "@type": "ListItem",
+              position: 1,
+              name: "Company guides",
+              item: `${SITE_URL}/unclaimed-shares`,
+            },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: c.name,
+              item: `${SITE_URL}/unclaimed-shares/${c.slug}`,
+            },
           ],
         }}
       />
@@ -161,8 +199,9 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
         Recover unclaimed {c.name} shares and dividends
       </h1>
       <p className="mt-4 max-w-[62ch] text-lg text-fg-2">
-        If dividends on {c.name} shares went unclaimed for seven years in a row, the company had to move the shares to the
-        Investor Education and Protection Fund. They are still claimable, by the holder or their heirs, on Form IEPF-5.
+        If dividends on {c.name} shares went unclaimed for seven years in a row, the company had to
+        move the shares to the Investor Education and Protection Fund. They are still claimable, by
+        the holder or their heirs, on Form IEPF-5.
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild size="lg">
@@ -182,12 +221,19 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
       <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="grid min-w-0 grid-cols-1 content-start gap-10">
           <section aria-labelledby="nodal-heading" className="panel border-iepf/30 p-5 sm:p-6">
-            <h2 id="nodal-heading" className="flex items-center gap-2 text-xl font-semibold text-fg">
+            <h2
+              id="nodal-heading"
+              className="flex items-center gap-2 text-xl font-semibold text-fg"
+            >
               <UserRoundCheckIcon className="size-5 text-iepf" aria-hidden="true" />
               IEPF nodal officer
             </h2>
             <p className="mt-3 text-lg font-medium text-fg">{c.nodalOfficer.name}</p>
-            <ContactLines emails={c.nodalOfficer.emails} phone={c.nodalOfficer.phone} address={c.nodalOfficer.address} />
+            <ContactLines
+              emails={c.nodalOfficer.emails}
+              phone={c.nodalOfficer.phone}
+              address={c.nodalOfficer.address}
+            />
             {c.nodalOfficer.deputies.length > 0 && (
               <div className="mt-4 border-t border-(--glass-border) pt-4">
                 <h3 className="text-sm font-medium text-fg-3">Deputy nodal officers</h3>
@@ -210,7 +256,10 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
             )}
             {c.contacts.verifiedAt && (
               <p className="mt-4 flex items-start gap-1.5 text-sm text-fg-3">
-                <BadgeCheckIcon className="mt-0.5 size-4 shrink-0 text-confirmed" aria-hidden="true" />
+                <BadgeCheckIcon
+                  className="mt-0.5 size-4 shrink-0 text-confirmed"
+                  aria-hidden="true"
+                />
                 Verified {formatDate(c.contacts.verifiedAt)}
                 {c.contacts.source ? ` · ${c.contacts.source}` : ""}
               </p>
@@ -222,16 +271,20 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
               {EXAMPLE_SHARES} shares bought in {EXAMPLE_YEAR}, today
             </h2>
             <p className="mt-3 text-fg-2">
-              After the bonuses and splits below, {formatCount(EXAMPLE_SHARES)} shares held since {EXAMPLE_YEAR} would now be{" "}
+              After the bonuses and splits below, {formatCount(EXAMPLE_SHARES)} shares held since{" "}
+              {EXAMPLE_YEAR} would now be{" "}
               <strong className="text-fg tnum">{formatCount(example.shares)} shares</strong>
               {exampleValue !== null ? (
                 <>
-                  , worth about <strong className="text-fg tnum">{formatPaise(exampleValue)}</strong> at today&apos;s price
+                  , worth about{" "}
+                  <strong className="text-fg tnum">{formatPaise(exampleValue)}</strong> at
+                  today&apos;s price
                 </>
               ) : null}
               {example.cashPaise > 0 && (
                 <>
-                  , plus <strong className="text-fg tnum">{formatPaise(example.cashPaise)}</strong> in cash entitlements
+                  , plus <strong className="text-fg tnum">{formatPaise(example.cashPaise)}</strong>{" "}
+                  in cash entitlements
                 </>
               )}
               . The registrar&apos;s entitlement letter confirms the real figure.
@@ -249,17 +302,27 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                 <table className="w-full min-w-[36rem] text-left">
                   <thead className="text-sm text-fg-3">
                     <tr className="border-b border-(--glass-border)">
-                      <th scope="col" className="px-4 py-3 font-medium">Ex-date</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Action</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Terms</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Source</th>
+                      <th scope="col" className="px-4 py-3 font-medium">
+                        Ex-date
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-medium">
+                        Action
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-medium">
+                        Terms
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-medium">
+                        Source
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-(--glass-border)">
                     {structural.map((a) => (
                       <tr key={`${a.actionType}-${a.exDate}`} className="align-top">
                         <td className="px-4 py-3 text-fg-2 tnum">{formatDate(a.exDate)}</td>
-                        <td className="px-4 py-3 text-fg">{ACTION_LABEL[a.actionType] ?? a.actionType}</td>
+                        <td className="px-4 py-3 text-fg">
+                          {ACTION_LABEL[a.actionType] ?? a.actionType}
+                        </td>
                         <td className="px-4 py-3 text-fg-2">
                           {ratioText(a)}
                           {a.notes && a.actionType !== "BONUS" && a.notes !== ratioText(a) && (
@@ -281,7 +344,10 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                     {i > 0 ? ", " : ""}₹{d.dividendPerShare} ({formatDate(d.exDate)})
                   </span>
                 ))}
-                .{dividendSource ? <span className="text-fg-3"> Source: {dividendSource}.</span> : null}
+                .
+                {dividendSource ? (
+                  <span className="text-fg-3"> Source: {dividendSource}.</span>
+                ) : null}
               </p>
             )}
           </section>
@@ -305,19 +371,28 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
             </ol>
             <p className="mt-6 text-fg-2">
               You can do all of this yourself, free, on the{" "}
-              <a href={OFFICIAL_LINKS.mcaIepf5.href} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1">
+              <a
+                href={OFFICIAL_LINKS.mcaIepf5.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link inline-flex items-center gap-1"
+              >
                 MCA portal
                 <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
-              . If you would rather we prepare and track it, our fee is a share of what is actually credited, nothing upfront.
+              . If you would rather we prepare and track it, our fee is a share of what is actually
+              credited, nothing upfront.
             </p>
           </section>
         </div>
 
         <aside className="grid min-w-0 grid-cols-1 content-start gap-6">
           <section aria-labelledby="price-heading" className="panel p-5 sm:p-6">
-            <h2 id="price-heading" className="flex items-center gap-2 text-lg font-semibold text-fg">
+            <h2
+              id="price-heading"
+              className="flex items-center gap-2 text-lg font-semibold text-fg"
+            >
               <TrendingUpIcon className="size-5 text-signal" aria-hidden="true" />
               Share price
             </h2>
@@ -332,7 +407,9 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                 </p>
               </>
             ) : (
-              <p className="mt-2 text-sm text-fg-2">Waiting for the first price from the exchange feed.</p>
+              <p className="mt-2 text-sm text-fg-2">
+                Waiting for the first price from the exchange feed.
+              </p>
             )}
           </section>
 
@@ -367,9 +444,18 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
               Registrar (RTA)
             </h2>
             <p className="mt-3 font-medium text-fg">{c.rta.label}</p>
-            <ContactLines emails={c.rta.email ? [c.rta.email] : []} phone={c.rta.phone} address={c.rta.address} />
+            <ContactLines
+              emails={c.rta.email ? [c.rta.email] : []}
+              phone={c.rta.phone}
+              address={c.rta.address}
+            />
             {c.rta.website && (
-              <a href={c.rta.website} target="_blank" rel="noopener noreferrer" className="link mt-3 inline-flex items-center gap-1 text-sm">
+              <a
+                href={c.rta.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link mt-3 inline-flex items-center gap-1 text-sm"
+              >
                 Registrar&apos;s investor services
                 <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
                 <span className="sr-only"> (opens in a new tab)</span>
@@ -400,7 +486,12 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
           )}
 
           {c.irPageUrl && (
-            <a href={c.irPageUrl} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1 text-sm">
+            <a
+              href={c.irPageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link inline-flex items-center gap-1 text-sm"
+            >
               {c.name}&apos;s unclaimed dividend and IEPF page
               <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
               <span className="sr-only"> (opens in a new tab)</span>

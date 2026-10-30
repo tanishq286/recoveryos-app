@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from "@nestjs/common";
 import { MARKET_SYNC_SOURCES } from "@recoveryos/db";
 
 import { ENV, type Env } from "../config/env.js";
@@ -41,7 +47,8 @@ export class MarketService implements OnApplicationBootstrap, OnModuleDestroy {
       this.log.log("Market sync is off (MARKET_SYNC_ENABLED=false).");
       return;
     }
-    const tick = () => void this.syncAll().catch((e: Error) => this.log.error(`Sync failed: ${e.message}`));
+    const tick = () =>
+      void this.syncAll().catch((e: Error) => this.log.error(`Sync failed: ${e.message}`));
     setTimeout(tick, 1_000).unref();
     this.timer = setInterval(tick, this.env.MARKET_SYNC_INTERVAL_MINUTES * 60_000);
     this.timer.unref();
@@ -57,7 +64,9 @@ export class MarketService implements OnApplicationBootstrap, OnModuleDestroy {
     const report = await this.running;
     if (Date.now() - this.lastDividendSync > 24 * 3_600_000) {
       this.lastDividendSync = Date.now();
-      await this.syncDividends().catch((e: Error) => this.log.warn(`Dividend sync failed: ${e.message}`));
+      await this.syncDividends().catch((e: Error) =>
+        this.log.warn(`Dividend sync failed: ${e.message}`),
+      );
     }
     return report;
   }
@@ -79,7 +88,11 @@ export class MarketService implements OnApplicationBootstrap, OnModuleDestroy {
           if (!q) continue;
           await db.company.update({
             where: { id: c.id },
-            data: { currentMarketPrice: q.price, priceUpdatedAt: new Date(), priceSource: q.source },
+            data: {
+              currentMarketPrice: q.price,
+              priceUpdatedAt: new Date(),
+              priceSource: q.source,
+            },
           });
           updated.push({ slug: c.slug, price: q.price, source: q.source });
           done = true;
@@ -93,22 +106,30 @@ export class MarketService implements OnApplicationBootstrap, OnModuleDestroy {
       await new Promise((r) => setTimeout(r, this.env.NODE_ENV === "test" ? 0 : 300));
     }
     this.last = { startedAt, finishedAt: new Date().toISOString(), updated, failed };
-    this.log.log(`Prices: ${updated.length} updated${failed.length ? `, no price for ${failed.join(", ")}` : ""}.`);
+    this.log.log(
+      `Prices: ${updated.length} updated${failed.length ? `, no price for ${failed.join(", ")}` : ""}.`,
+    );
     return this.last;
   }
 
   /** Real cash dividends per share (last 10 years) as DIVIDEND corporate actions. */
   async syncDividends(): Promise<number> {
-    const yahoo = this.providers.find((p): p is YahooChartProvider => p instanceof YahooChartProvider);
+    const yahoo = this.providers.find(
+      (p): p is YahooChartProvider => p instanceof YahooChartProvider,
+    );
     if (!yahoo) return 0;
     const db = this.prisma.client;
-    const companies = await db.company.findMany({ select: { id: true, tickerNse: true, tickerBse: true } });
+    const companies = await db.company.findMany({
+      select: { id: true, tickerNse: true, tickerBse: true },
+    });
     let written = 0;
     for (const c of companies) {
       const divs = await yahoo.dividends(c).catch(() => []);
       if (!divs.length) continue;
       await db.$transaction([
-        db.corporateAction.deleteMany({ where: { companyId: c.id, actionType: "DIVIDEND", source: DIVIDEND_SOURCE } }),
+        db.corporateAction.deleteMany({
+          where: { companyId: c.id, actionType: "DIVIDEND", source: DIVIDEND_SOURCE },
+        }),
         db.corporateAction.createMany({
           data: divs.map((d) => ({
             companyId: c.id,

@@ -15,4 +15,3 @@ export function createPrismaClient(
 ): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 }
-

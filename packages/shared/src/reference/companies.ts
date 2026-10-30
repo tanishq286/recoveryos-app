@@ -55,7 +55,13 @@ const VERIFIED_ON = "2026-10-29";
 const EXCHANGE = "Exchange split history (via Yahoo Finance)";
 const ANNOUNCED = "Company announcement";
 
-const bonus = (exDate: string, ratioFrom: number, ratioTo: number, source = EXCHANGE, notes?: string): CorporateActionLike => ({
+const bonus = (
+  exDate: string,
+  ratioFrom: number,
+  ratioTo: number,
+  source = EXCHANGE,
+  notes?: string,
+): CorporateActionLike => ({
   actionType: "BONUS",
   exDate,
   ratioFrom,
@@ -63,7 +69,13 @@ const bonus = (exDate: string, ratioFrom: number, ratioTo: number, source = EXCH
   notes: notes ?? `Bonus ${ratioTo}:${ratioFrom}`,
   source,
 });
-const split = (exDate: string, ratioFrom: number, ratioTo: number, source = EXCHANGE, notes?: string): CorporateActionLike => ({
+const split = (
+  exDate: string,
+  ratioFrom: number,
+  ratioTo: number,
+  source = EXCHANGE,
+  notes?: string,
+): CorporateActionLike => ({
   actionType: "SPLIT",
   exDate,
   ratioFrom,
@@ -72,11 +84,37 @@ const split = (exDate: string, ratioFrom: number, ratioTo: number, source = EXCH
   source,
 });
 
-const emails = (s: string) => s.split("/").map((e) => e.trim()).filter(Boolean);
+const emails = (s: string) =>
+  s
+    .split("/")
+    .map((e) => e.trim())
+    .filter(Boolean);
 
 function company(
-  c: Omit<ReferenceCompany, "rtaAddress" | "rtaWebsite" | "contactsSource" | "contactsVerifiedOn" | "deputyNodalOfficers" | "irPageUrl" | "statutoryBasis" | "rtaEmail" | "rtaPhone"> &
-    Partial<Pick<ReferenceCompany, "rtaAddress" | "rtaWebsite" | "deputyNodalOfficers" | "irPageUrl" | "statutoryBasis" | "rtaEmail" | "rtaPhone">>,
+  c: Omit<
+    ReferenceCompany,
+    | "rtaAddress"
+    | "rtaWebsite"
+    | "contactsSource"
+    | "contactsVerifiedOn"
+    | "deputyNodalOfficers"
+    | "irPageUrl"
+    | "statutoryBasis"
+    | "rtaEmail"
+    | "rtaPhone"
+  > &
+    Partial<
+      Pick<
+        ReferenceCompany,
+        | "rtaAddress"
+        | "rtaWebsite"
+        | "deputyNodalOfficers"
+        | "irPageUrl"
+        | "statutoryBasis"
+        | "rtaEmail"
+        | "rtaPhone"
+      >
+    >,
 ): ReferenceCompany {
   const dir = RTA_DIRECTORY[c.rta];
   return {
@@ -88,7 +126,9 @@ function company(
     contactsSource: CONTACTS_SOURCE,
     contactsVerifiedOn: VERIFIED_ON,
     ...c,
-    rtaAddress: c.rtaAddress ?? (c.rta === "IN_HOUSE" || c.rta === "OTHER" ? null : `${dir.legalName}, ${dir.address}`),
+    rtaAddress:
+      c.rtaAddress ??
+      (c.rta === "IN_HOUSE" || c.rta === "OTHER" ? null : `${dir.legalName}, ${dir.address}`),
     rtaWebsite: c.rtaWebsite ?? dir.website,
   };
 }
@@ -104,7 +144,8 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
     tickerBse: "500325",
     rta: "KFIN",
     rtaDisplayName: "KFin Technologies Limited",
-    rtaAddress: "KFin Technologies Limited, Selenium Tower B, Plot 31-32, Gachibowli, Financial District, Nanakramguda, Hyderabad - 500032",
+    rtaAddress:
+      "KFin Technologies Limited, Selenium Tower B, Plot 31-32, Gachibowli, Financial District, Nanakramguda, Hyderabad - 500032",
     rtaEmail: "rilinvestor@kfintech.com",
     rtaPhone: "1800 309 4001 (toll-free)",
     nodalOfficer: {
@@ -118,7 +159,12 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       { name: "Shri Vivin Mally", email: "vivin.mally@ril.com" },
     ],
     irPageUrl: "https://www.ril.com/investors/shares/dividend-shares",
-    actions: [bonus("1997-10-27", 1, 1), bonus("2009-11-26", 1, 1), bonus("2017-09-07", 1, 1), bonus("2024-10-28", 1, 1)],
+    actions: [
+      bonus("1997-10-27", 1, 1),
+      bonus("2009-11-26", 1, 1),
+      bonus("2017-09-07", 1, 1),
+      bonus("2024-10-28", 1, 1),
+    ],
   }),
   company({
     slug: "tata-consultancy-services-limited",
@@ -155,7 +201,8 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       name: "Shri Dewesh Kumar Verma (Deputy General Manager - Shares & Bonds)",
       emails: ["dgm.snb@sbi.co.in"],
       phone: "022-22741480 / Senior citizen helpline: 022-22740844",
-      address: "Shares & Bonds Dept, 14th Floor, State Bank Bhawan, Madame Cama Road, Nariman Point, Mumbai - 400021",
+      address:
+        "Shares & Bonds Dept, 14th Floor, State Bank Bhawan, Madame Cama Road, Nariman Point, Mumbai - 400021",
     },
     actions: [split("2014-11-20", 10, 1)],
   }),
@@ -194,6 +241,7 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       phone: "+91 80 28440011",
       address: "Doddakannelli, Sarjapur Road, Bengaluru - 560035",
     },
+    irPageUrl: "https://www.wipro.com/investors/details-of-shares-transferred-to-iepf-account/",
     actions: [
       bonus("1997-10-20", 1, 2),
       split("1999-09-27", 10, 2),
@@ -227,9 +275,21 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       { name: "Elangovan S", email: "elangovan.s@bajajfinserv.in" },
     ],
     actions: [
-      split("2016-09-08", 10, 2, ANNOUNCED, "Face value ₹10 to ₹2, with a 1:1 bonus (exchange history shows the split only)"),
+      split(
+        "2016-09-08",
+        10,
+        2,
+        ANNOUNCED,
+        "Face value ₹10 to ₹2, with a 1:1 bonus (exchange history shows the split only)",
+      ),
       bonus("2016-09-08", 1, 1, ANNOUNCED),
-      split("2025-06-16", 2, 1, ANNOUNCED, "Face value ₹2 to ₹1, with a 4:1 bonus (exchange history shows the split only)"),
+      split(
+        "2025-06-16",
+        2,
+        1,
+        ANNOUNCED,
+        "Face value ₹2 to ₹1, with a 4:1 bonus (exchange history shows the split only)",
+      ),
       bonus("2025-06-16", 1, 4, ANNOUNCED),
     ],
   }),
@@ -250,7 +310,13 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       address: null,
     },
     actions: [
-      split("2022-09-13", 5, 1, ANNOUNCED, "Face value ₹5 to ₹1, with a 1:1 bonus (exchange history shows the split only)"),
+      split(
+        "2022-09-13",
+        5,
+        1,
+        ANNOUNCED,
+        "Face value ₹5 to ₹1, with a 1:1 bonus (exchange history shows the split only)",
+      ),
       bonus("2022-09-13", 1, 1, ANNOUNCED),
     ],
   }),
@@ -264,7 +330,8 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
     tickerBse: "500875",
     rta: "IN_HOUSE",
     rtaDisplayName: "ITC In-House Investor Service Centre",
-    rtaAddress: "Investor Service Centre, ITC Limited, Virginia House, 37 Jawaharlal Nehru Road, Kolkata - 700071",
+    rtaAddress:
+      "Investor Service Centre, ITC Limited, Virginia House, 37 Jawaharlal Nehru Road, Kolkata - 700071",
     rtaEmail: "isc@itc.in",
     nodalOfficer: {
       name: "Company Secretary & Head of Investor Service Centre",
@@ -299,7 +366,13 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       address: "3, SIPCOT Industrial Complex, Hosur, Tamil Nadu - 635126",
     },
     actions: [
-      split("2011-06-23", 10, 1, ANNOUNCED, "Face value ₹10 to ₹1, with a 1:1 bonus (exchange history shows the split only)"),
+      split(
+        "2011-06-23",
+        10,
+        1,
+        ANNOUNCED,
+        "Face value ₹10 to ₹1, with a 1:1 bonus (exchange history shows the split only)",
+      ),
       bonus("2011-06-23", 1, 1, ANNOUNCED),
     ],
   }),
@@ -319,7 +392,12 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       phone: null,
       address: "L&T House, Ballard Estate, N. M. Marg, Mumbai - 400001",
     },
-    actions: [bonus("2006-09-28", 1, 1), bonus("2008-10-01", 1, 1), bonus("2013-07-11", 2, 1), bonus("2017-07-13", 2, 1)],
+    actions: [
+      bonus("2006-09-28", 1, 1),
+      bonus("2008-10-01", 1, 1),
+      bonus("2013-07-11", 2, 1),
+      bonus("2017-07-13", 2, 1),
+    ],
   }),
   company({
     slug: "dabur-india-limited",
@@ -337,6 +415,7 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       phone: null,
       address: "8/3, Asaf Ali Road, New Delhi - 110002",
     },
+    irPageUrl: "https://www.dabur.com/investor/investor-information/unclaimed-dividend",
     actions: [bonus("2006-01-19", 1, 1), bonus("2007-01-25", 2, 1), bonus("2010-09-08", 1, 1)],
   }),
   company({
@@ -424,7 +503,8 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
       name: "Ms. Sonali Chandak (Company Secretary)",
       emails: ["shareholders.relations@hdfcfund.com"],
       phone: null,
-      address: "HDFC House, 2nd Floor, H. T. Parekh Marg, 165-166, Backbay Reclamation, Churchgate, Mumbai - 400020",
+      address:
+        "HDFC House, 2nd Floor, H. T. Parekh Marg, 165-166, Backbay Reclamation, Churchgate, Mumbai - 400020",
     },
     actions: [bonus("2025-11-26", 1, 1)],
   }),

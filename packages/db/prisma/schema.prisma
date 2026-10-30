@@ -318,8 +318,11 @@ model UnclaimedFolio {
   certificateNumbers      String?        @map("certificate_numbers")
   originalShares          Int            @default(0) @map("original_shares")
   postActionShares        Int            @default(0) @map("post_action_shares")
-  /// Rupees.
+  /// Rupees: the sum of amounts_by_event.
   unclaimedDividendAmount Decimal        @default(0) @map("unclaimed_dividend_amount") @db.Decimal(14, 2)
+  /// Unclaimed amount per statement event (date or financial year) in rupees, so
+  /// statements for different years add up and re-imports do not double count.
+  amountsByEvent          Json           @default("{}") @map("amounts_by_event")
   custodyStatus           CustodyStatus  @default(IEPF_AUTHORITY) @map("custody_status")
   transferFinancialYear   String?        @map("transfer_financial_year")
   /// "Date of Event" / "Proposed Date of Transfer to IEPF" on the statement.

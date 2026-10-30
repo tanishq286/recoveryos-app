@@ -10,10 +10,11 @@ corporate-action and fee calculator, a client portal with the seven-step R.E.C.O
 tracker, Aadhaar eSign and a document vault, an associate partner programme, and an admin
 workspace with a CRM board and a filings importer.
 
-> **Demo data.** Every person, folio, phone number and case in the seed is fictional. Company
-> identifiers, registrars and corporate actions are reference data compiled for this build and
-> prices are samples: verify them before relying on them. Do not upload real documents. See the
-> [launch-gate checklist](#launch-gate-checklist).
+> **Real data only.** The database holds no fabricated investors. The seed loads the 15 verified
+> companies (CINs, ISINs, nodal officers, registrars) and their sourced corporate actions;
+> investor records come only from companies' published IEPF-2 / IEPF-4 statements; prices come
+> from the live exchange sync. The illustrative `/cases` walkthrough from the MVP is labelled as
+> such and is not stored in the database. See the [launch-gate checklist](#launch-gate-checklist).
 
 ---
 
@@ -39,33 +40,53 @@ development.
 npm install
 npm run build:packages        # shared + db (generates the Prisma client)
 npm run db:start              # terminal 1: PostgreSQL 18 on :54329, data in .data/pg
-npm run db:migrate && npm run db:seed
+npm run db:migrate
+SEED_ADMIN_PHONE=98xxxxxxxx SEED_ADMIN_NAME="Your Name" npm run db:seed   # catalogue + first admin
 npm run build -w @recoveryos/api && npm run dev:api     # terminal 2: API on :4000/api/v1
 npm run dev:web               # terminal 3: web on :3000
 ```
 
-Sign in at `/login` with a seeded number; in development the code is printed in the API log
-(`Development OTP for +91…`).
+Sign in at `/login` with the `SEED_ADMIN_PHONE` number; in development the code is printed in
+the API log (`Development OTP for +91…`). Staff, partners and clients are created from the app
+(clients when a lead is converted, partners at `/partners/join`); role changes are an admin task.
 
-| Who                                                | Mobile      | Lands on                         |
-| -------------------------------------------------- | ----------- | -------------------------------- |
-| Client with two cases (RC-2026-1001, RC-2026-1004) | 90000 00011 | `/portal`                        |
-| Client at step 5, ready to eSign (RC-2026-1003)    | 90000 00013 | `/portal`                        |
-| Valuation analyst                                  | 90000 00002 | `/admin/crm`                     |
-| Legal operations                                   | 90000 00004 | `/admin/crm`, `/admin/ingestion` |
-| Associate partner (MEERA-PUN)                      | 90000 00021 | `/partners/dashboard`            |
-| Administrator                                      | 90000 00001 | everything                       |
+### Loading real investor data
 
-Try `/search?lastName=Agarwal&state=DELHI`: Agarwal, Agrawal and Aggarwal come back together,
-masked. Select one, unlock it with any mobile number and the code from the API log, and the
-company, registrar and folio appear while the lead lands on the CRM board.
+Investor records come from the statutory statements companies publish under the IEPF Rules.
 
-| Script (root)                                              | What it does                                                                                    |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `npm run db:start` / `db:migrate` / `db:seed` / `db:reset` | Local Postgres; apply migrations; seed; drop and rebuild (local only)                           |
-| `npm run dev:api` / `dev:worker` / `dev:web`               | API (tsc watch + node --watch), BullMQ worker (needs `REDIS_URL`), web                          |
-| `npm test`                                                 | Shared unit tests (20) and API end-to-end tests (26) against a fresh `recoveryos_test` database |
-| `npm run typecheck` / `npm run lint` / `npm run build`     | Across all workspaces                                                                           |
+```bash
+# One statement, from a file or straight from the company's site (.xlsx, .xls, .csv or .pdf)
+npm run ingest:iepf -w @recoveryos/db -- --cin L24230DL1975PLC007908 \
+  --file https://www.dabur.com/sites/default/files/2021-06/61617-l24230dl1975plc007908_6.pdf
+npm run ingest:iepf -w @recoveryos/db -- --slug state-bank-of-india --file ./sbi-iepf4.xlsx --dry-run
+
+# Find and download statement files linked from companies' investor pages (polite, robots-aware)
+npm run fetch:iepf -w @recoveryos/db -- --all [--ingest]
+npm run fetch:iepf -w @recoveryos/db -- --company dabur-india-limited --url <investor page>
+```
+
+Admins can also upload statements at `/admin/ingestion`. The parser reads the MCA statutory
+columns as filed (investor and father/husband name parts, address, country, state, district, PIN,
+folio or DP ID-client ID, investment type, amount transferred or number of shares, date of event
+or proposed transfer date), including MCA's own e-form template, title blocks, multi-line
+headers, "Number of underlying Shares" rows and PDF tables (including sideways pages). A missing
+state is taken from the PIN code; with neither, the holder is kept as "state not on the
+statement" and appears in every state's search. Amounts are kept per statement date, so a later
+year's statement adds to a holder's total and re-importing a file never double counts. Bonuses
+and splits dated after a row's transfer date are applied to its share count.
+
+Checked against real published statements: three Dabur IEPF-2 PDFs (8,481–9,870 holders each,
+16,539 distinct holders loaded locally), MCA's IEPF-2 e-form `.xls` from Info Edge (22,975 rows,
+none skipped), and IEPF-2 PDFs from Tata Capital and StockHolding. Pages that load their lists
+through forms or scripts (Reliance's year picker, Wipro's KFin search form) cannot be fetched
+automatically: download those statements and upload them.
+
+| Script (root)                                              | What it does                                                                         |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `npm run db:start` / `db:migrate` / `db:seed` / `db:reset` | Local Postgres; apply migrations; seed; drop and rebuild (local only)                |
+| `npm run dev:api` / `dev:worker` / `dev:web`               | API (tsc watch + node --watch), BullMQ worker (needs `REDIS_URL`), web               |
+| `npm test`                                                 | Shared unit tests (22) and API tests (32) against a fresh `recoveryos_test` database |
+| `npm run typecheck` / `npm run lint` / `npm run build`     | Across all workspaces                                                                |
 
 ### Environment
 
@@ -73,18 +94,20 @@ Every integration has a local adapter, and setting its variables switches it to 
 service. `/api/v1/health` reports which adapter each one is running on. Production refuses
 to start with development secrets or adapters.
 
-| Variable                                        | Default                                    | Purpose                                                                                            |
-| ----------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                  | local embedded Postgres                    | Any PostgreSQL 15+ with `pg_trgm` and `fuzzystrmatch` (Supabase works)                             |
-| `JWT_SECRET`, `UNLOCK_JWT_SECRET`, `OTP_SECRET` | dev values                                 | 32+ chars each; separate secrets for sessions, unlock tokens, OTP hashes                           |
-| `FOLIO_ENCRYPTION_KEY`, `FOLIO_HASH_KEY`        | derived dev keys                           | 32 bytes base64: AES-256-GCM for folio numbers, HMAC blind index                                   |
-| `OTP_PROVIDER`                                  | `console`                                  | `msg91` (`MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_*`)                           |
-| `ESIGN_PROVIDER`                                | `mock`                                     | `digio` (`DIGIO_CLIENT_ID/SECRET`) or `leegality` (`LEEGALITY_AUTH_TOKEN`); `ESIGN_WEBHOOK_SECRET` |
-| `STORAGE_PROVIDER`                              | `local` (AES-256-GCM files in `.uploads/`) | `s3` with `S3_BUCKET`, `S3_REGION`, `S3_KMS_KEY_ID` (SSE-KMS)                                      |
-| `REDIS_URL`                                     | unset: jobs run inline                     | BullMQ queue; run `npm run dev:worker`                                                             |
-| `MEILI_HOST`, `MEILI_API_KEY`                   | unset: Postgres search                     | Meilisearch, with automatic fallback to Postgres on any error                                      |
-| `RECOVERYOS_API_URL` (web)                      | `http://localhost:4000/api/v1`             | Where the web server reaches the API                                                               |
-| `NEXT_PUBLIC_SITE_URL` (web)                    | `http://localhost:3000`                    | Canonical URLs, sitemap, referral links                                                            |
+| Variable                                              | Default                                    | Purpose                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                        | local embedded Postgres                    | Any PostgreSQL 15+ with `pg_trgm` and `fuzzystrmatch` (Supabase works)                             |
+| `JWT_SECRET`, `UNLOCK_JWT_SECRET`, `OTP_SECRET`       | dev values                                 | 32+ chars each; separate secrets for sessions, unlock tokens, OTP hashes                           |
+| `FOLIO_ENCRYPTION_KEY`, `FOLIO_HASH_KEY`              | derived dev keys                           | 32 bytes base64: AES-256-GCM for folio numbers, HMAC blind index                                   |
+| `OTP_PROVIDER`                                        | `console`                                  | `msg91` (`MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_*`)                           |
+| `ESIGN_PROVIDER`                                      | `mock`                                     | `digio` (`DIGIO_CLIENT_ID/SECRET`) or `leegality` (`LEEGALITY_AUTH_TOKEN`); `ESIGN_WEBHOOK_SECRET` |
+| `STORAGE_PROVIDER`                                    | `local` (AES-256-GCM files in `.uploads/`) | `s3` with `S3_BUCKET`, `S3_REGION`, `S3_KMS_KEY_ID` (SSE-KMS)                                      |
+| `REDIS_URL`                                           | unset: jobs run inline                     | BullMQ queue; run `npm run dev:worker`                                                             |
+| `MEILI_HOST`, `MEILI_API_KEY`                         | unset: Postgres search                     | Meilisearch, with automatic fallback to Postgres on any error                                      |
+| `MARKET_SYNC_ENABLED`, `MARKET_SYNC_INTERVAL_MINUTES` | on (off under test), 15                    | Live prices from NSE, falling back to Yahoo Finance (.NS, then .BO); daily dividend history        |
+| `SEED_ADMIN_PHONE`, `SEED_ADMIN_NAME`                 | unset                                      | First administrator created by `npm run db:seed`                                                   |
+| `RECOVERYOS_API_URL` (web)                            | `http://localhost:4000/api/v1`             | Where the web server reaches the API                                                               |
+| `NEXT_PUBLIC_SITE_URL` (web)                          | `http://localhost:3000`                    | Canonical URLs, sitemap, referral links                                                            |
 
 See `.env.example` for the full list.
 
@@ -101,10 +124,11 @@ Every name part given must match, by any of:
 - Soundex with Levenshtein distance up to 3 (`fuzzystrmatch`, with expression indexes scoped by
   state).
 
-A single letter matches as an initial. Typical query time on the seed is under 5 ms.
+A single letter matches as an initial. On 16,539 real Dabur holders a surname + state query
+takes 7–15 ms. Holders whose statement gives no state are included for every state.
 
 Unverified callers get the holder, father or spouse, city, state, custody status, post-action
-shares and an estimated value, with the company masked (`R******e Industries Ltd`) and the folio
+shares and an estimated value, with the company masked (`R******e Industries Limited`) and the folio
 masked (`RIL***21`). `POST /api/v1/search/unlock` takes the claimant's name, phone, a one-time
 code, relationship to the holder and certificate status. It verifies the code, records or merges
 the lead, assigns the least-loaded valuation analyst, queues a notification and returns an
@@ -116,7 +140,7 @@ Guard rails: OTPs are 6 digits, live 5 minutes, allow 5 tries, are stored as an 
 rate-limited (one every 30 s, five an hour per phone). Each phone may make 5 unlocks a day, with
 at most 10 folios per unlock. Search is IP-throttled and every unlock is audited.
 
-**Data model.** There are 13 tables. The 7 core tables are `companies`, `corporate_actions`,
+**Data model.** There are 13 tables (migrations: init, search and integrity, enum values, real-data fields, per-event amounts). The 7 core tables are `companies`, `corporate_actions`,
 `unclaimed_folios`, `leads_and_inquiries`, `recovery_cases`, `case_documents` and `associates`.
 The 6 supporting tables are `users`, `otp_challenges`, `case_events`, `commission_ledger`,
 `ingestion_jobs` and `audit_events`. The second migration adds what Prisma cannot express:
@@ -128,6 +152,22 @@ The 6 supporting tables are `users`, `otp_challenges`, `case_events`, `commissio
 
 `folio_number` is AES-256-GCM ciphertext, with a masked copy and an HMAC blind index for
 de-duplication.
+
+**Market data.** `apps/api/src/market` writes `current_market_price`, `price_updated_at` and
+`price_source` on start-up and every 15 minutes: NSE's quote API first, then Yahoo Finance's
+chart API. Requests identify RecoveryOS honestly and never imitate a browser, so when NSE
+refuses automated clients (it answers 403 from most servers) Yahoo supplies the NSE price. A
+failed fetch keeps the last real price; no price is ever invented, and pages show "price
+pending" until the first sync. Dividends per share for the last ten years come from Yahoo
+Finance daily, scaled back from Yahoo's split adjustment. `GET /api/v1/market/prices` shows each
+company's price, source and time; `POST /api/v1/market/sync` (admin) runs a sync now.
+
+**Company catalogue.** `packages/shared/src/reference/companies.ts` is the single source for
+the 15 companies' identifiers, nodal officers (with deputies, emails, phones and addresses),
+registrars and corporate actions, each action tagged with its source. Bonus and split dates
+were checked against the exchange split history; where that history shows a combined split and
+bonus as one ratio, the announced components are kept and noted. State Bank of India has no
+CIN (it is constituted under the SBI Act, 1955), so its CIN is empty and the statute is recorded.
 
 **R.E.C.O.V.E.R.** The seven steps are Ring up, Evaluate, Check, Offer, Verify, Employ and
 Realize. They advance one at a time, by staff only, through `canAdvanceRecoverStep`, and the
@@ -509,7 +549,7 @@ Nothing here is done yet. **No real client documents are accepted until every it
 ### Product
 
 - [ ] Real registry connectors only through permitted channels. Otherwise keep "Not queried".
-- [ ] Remove fictional sample prices; wire a real valuation source.
+- [x] Live exchange prices (NSE, then Yahoo Finance) replace sample prices. Before launch, consider a licensed market-data feed and check its terms of use.
 - [ ] Screen-reader pass with NVDA, VoiceOver and TalkBack; content in at least one Indian
       language besides English.
 - [ ] Remove the demo banner only when everything above is checked.

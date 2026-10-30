@@ -7,55 +7,335 @@
  * pushing fixture IEPF-4 and IEPF-2 statements through the real ingestion
  * pipeline (ingestStatement), so the tests cover the parser too.
  */
-import { holdingValuePaise, DEFAULT_SUCCESS_FEE_BPS, associateCommission, netRealization } from "@recoveryos/shared";
+import {
+  holdingValuePaise,
+  DEFAULT_SUCCESS_FEE_BPS,
+  associateCommission,
+  netRealization,
+} from "@recoveryos/shared";
 
 import { createPrismaClient, ingestStatement, keysFromEnv } from "../index.js";
 
 const url = process.env.DATABASE_URL ?? "";
 if (!/_test(\?|$)/.test(url)) {
-  console.error("Refusing to load test fixtures: DATABASE_URL must point at a database whose name ends in _test.");
+  console.error(
+    "Refusing to load test fixtures: DATABASE_URL must point at a database whose name ends in _test.",
+  );
   process.exit(1);
 }
 
 const prisma = createPrismaClient(url);
 const keys = keysFromEnv();
-const CLAIMANT_FIRST = ["Asha", "Vikram", "Sunil", "Meena", "Rohit", "Neeta", "Kiran", "Arvind", "Pooja", "Manish"];
+const CLAIMANT_FIRST = [
+  "Asha",
+  "Vikram",
+  "Sunil",
+  "Meena",
+  "Rohit",
+  "Neeta",
+  "Kiran",
+  "Arvind",
+  "Pooja",
+  "Manish",
+];
 
 const IEPF4_HEADER =
   "Investor First Name,Investor Middle Name,Investor Last Name,Father/Husband First Name,Father/Husband Middle Name,Father/Husband Last Name,Address,Country,State,District,Pin Code,Folio Number,DP Id-Client Id-Account Number,Investment Type,Amount Transferred,Number of Shares,Proposed Date of Transfer to IEPF";
-type Row = [string, string, string, string, string, string, string, string, string, string, string, number, string];
+type Row = [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  number,
+  string,
+];
 
 // first, middle, last, father, state, district, pin, folio, investment type, amount, shares, date
 const iepf4: Row[] = [
-  ["Ramesh", "Kumar", "Agarwal", "Om Prakash Agarwal", "Delhi", "New Delhi", "110001", "RIL0012345621", "Shares", "0", "", 800, "23-Oct-2019"],
-  ["Ramesh", "K", "Agrawal", "Om Prakash Agrawal", "Delhi", "New Delhi", "110001", "TIT0004418873", "Shares", "0", "", 2000, "15-Sep-2018"],
-  ["Venkatesh", "", "Rao", "Srinivas Rao", "Telangana", "Hyderabad", "500001", "TCS0000771234", "Shares", "0", "", 400, "02-Nov-2017"],
-  ["Debashish", "", "Chowdhury", "Subhash Chaudhary", "West Bengal", "Kolkata", "700001", "SBI0034455661", "Shares", "0", "", 3000, "18-Sep-2019"],
-  ["Kusum", "", "Agarwal", "Bhaskar Agarwal", "Delhi", "Dwarka", "110075", "RIL0055538649", "Shares", "0", "", 800, "23-Oct-2019"],
-  ["Krishna", "", "Agarwal", "Girish Goel", "Delhi", "New Delhi", "110001", "WIP0031188279", "Shares", "0", "", 1200, "12-Nov-2020"],
-  ["Mukesh", "Chand", "Aggarwal", "Prabhakar Mathur", "Delhi", "New Delhi", "110001", "BAF0007710043", "Shares", "0", "", 50, "06-Dec-2021"],
-  ["Prakash", "", "Nair", "Raman Nair", "Kerala", "Ernakulam", "682001", "HUL0002299111", "Shares", "0", "", 500, "10-Oct-2018"],
-  ["Lakshmi", "", "Iyer", "Raman Iyer", "Tamil Nadu", "Chennai", "600004", "MRF0000014452", "Shares", "0", "", 5, "29-Aug-2020"],
-  ["Suresh", "", "Patel", "Kanti Patel", "Gujarat", "Ahmedabad", "380009", "DAB0011223344", "Shares", "0", "", 600, "14-Oct-2019"],
-  ["Anita", "", "Shah", "Mahesh Shah", "Maharashtra", "Mumbai", "400001", "LTL0099887711", "Shares", "0", "", 300, "21-Nov-2018"],
-  ["Gopal", "", "Reddy", "Narayan Reddy", "Telangana", "Hyderabad", "500016", "TVS0002345671", "Shares", "0", "", 1000, "30-Sep-2019"],
-  ["Farhan", "", "Siddiqui", "Abdul Siddiqui", "", "", "", "BFS0000441231", "Shares", "0", "", 100, "03-Jan-2023"],
+  [
+    "Ramesh",
+    "Kumar",
+    "Agarwal",
+    "Om Prakash Agarwal",
+    "Delhi",
+    "New Delhi",
+    "110001",
+    "RIL0012345621",
+    "Shares",
+    "0",
+    "",
+    800,
+    "23-Oct-2019",
+  ],
+  [
+    "Ramesh",
+    "K",
+    "Agrawal",
+    "Om Prakash Agrawal",
+    "Delhi",
+    "New Delhi",
+    "110001",
+    "TIT0004418873",
+    "Shares",
+    "0",
+    "",
+    2000,
+    "15-Sep-2018",
+  ],
+  [
+    "Venkatesh",
+    "",
+    "Rao",
+    "Srinivas Rao",
+    "Telangana",
+    "Hyderabad",
+    "500001",
+    "TCS0000771234",
+    "Shares",
+    "0",
+    "",
+    400,
+    "02-Nov-2017",
+  ],
+  [
+    "Debashish",
+    "",
+    "Chowdhury",
+    "Subhash Chaudhary",
+    "West Bengal",
+    "Kolkata",
+    "700001",
+    "SBI0034455661",
+    "Shares",
+    "0",
+    "",
+    3000,
+    "18-Sep-2019",
+  ],
+  [
+    "Kusum",
+    "",
+    "Agarwal",
+    "Bhaskar Agarwal",
+    "Delhi",
+    "Dwarka",
+    "110075",
+    "RIL0055538649",
+    "Shares",
+    "0",
+    "",
+    800,
+    "23-Oct-2019",
+  ],
+  [
+    "Krishna",
+    "",
+    "Agarwal",
+    "Girish Goel",
+    "Delhi",
+    "New Delhi",
+    "110001",
+    "WIP0031188279",
+    "Shares",
+    "0",
+    "",
+    1200,
+    "12-Nov-2020",
+  ],
+  [
+    "Mukesh",
+    "Chand",
+    "Aggarwal",
+    "Prabhakar Mathur",
+    "Delhi",
+    "New Delhi",
+    "110001",
+    "BAF0007710043",
+    "Shares",
+    "0",
+    "",
+    50,
+    "06-Dec-2021",
+  ],
+  [
+    "Prakash",
+    "",
+    "Nair",
+    "Raman Nair",
+    "Kerala",
+    "Ernakulam",
+    "682001",
+    "HUL0002299111",
+    "Shares",
+    "0",
+    "",
+    500,
+    "10-Oct-2018",
+  ],
+  [
+    "Lakshmi",
+    "",
+    "Iyer",
+    "Raman Iyer",
+    "Tamil Nadu",
+    "Chennai",
+    "600004",
+    "MRF0000014452",
+    "Shares",
+    "0",
+    "",
+    5,
+    "29-Aug-2020",
+  ],
+  [
+    "Suresh",
+    "",
+    "Patel",
+    "Kanti Patel",
+    "Gujarat",
+    "Ahmedabad",
+    "380009",
+    "DAB0011223344",
+    "Shares",
+    "0",
+    "",
+    600,
+    "14-Oct-2019",
+  ],
+  [
+    "Anita",
+    "",
+    "Shah",
+    "Mahesh Shah",
+    "Maharashtra",
+    "Mumbai",
+    "400001",
+    "LTL0099887711",
+    "Shares",
+    "0",
+    "",
+    300,
+    "21-Nov-2018",
+  ],
+  [
+    "Gopal",
+    "",
+    "Reddy",
+    "Narayan Reddy",
+    "Telangana",
+    "Hyderabad",
+    "500016",
+    "TVS0002345671",
+    "Shares",
+    "0",
+    "",
+    1000,
+    "30-Sep-2019",
+  ],
+  [
+    "Farhan",
+    "",
+    "Siddiqui",
+    "Abdul Siddiqui",
+    "",
+    "",
+    "",
+    "BFS0000441231",
+    "Shares",
+    "0",
+    "",
+    100,
+    "03-Jan-2023",
+  ],
 ];
 const iepf2: Row[] = [
-  ["Kamla", "Devi", "Aggarwal", "Ramesh Kumar Agarwal", "Delhi", "Rohini", "110085", "ITC0098812200", "Amount for unclaimed and unpaid dividend", "3150.00", "", 9000, "08-Aug-2026"],
-  ["Kamla", "Devi", "Aggarwal", "Ramesh Kumar Agarwal", "Delhi", "Rohini", "110085", "ITC0098812200", "Amount for unclaimed and unpaid dividend", "2475.00", "", 9000, "08-Aug-2026"],
-  ["Sushila", "", "Srivastava", "Mohan Shrivastav", "Uttar Pradesh", "Lucknow", "226001", "WIP0007654321", "Amount for unclaimed and unpaid dividend", "1840.50", "", 0, "19-Jul-2026"],
+  [
+    "Kamla",
+    "Devi",
+    "Aggarwal",
+    "Ramesh Kumar Agarwal",
+    "Delhi",
+    "Rohini",
+    "110085",
+    "ITC0098812200",
+    "Amount for unclaimed and unpaid dividend",
+    "3150.00",
+    "",
+    9000,
+    "08-Aug-2026",
+  ],
+  [
+    "Kamla",
+    "Devi",
+    "Aggarwal",
+    "Ramesh Kumar Agarwal",
+    "Delhi",
+    "Rohini",
+    "110085",
+    "ITC0098812200",
+    "Amount for unclaimed and unpaid dividend",
+    "2475.00",
+    "",
+    9000,
+    "08-Aug-2026",
+  ],
+  [
+    "Sushila",
+    "",
+    "Srivastava",
+    "Mohan Shrivastav",
+    "Uttar Pradesh",
+    "Lucknow",
+    "226001",
+    "WIP0007654321",
+    "Amount for unclaimed and unpaid dividend",
+    "1840.50",
+    "",
+    0,
+    "19-Jul-2026",
+  ],
 ];
 
 function csv(rows: Row[], header = IEPF4_HEADER) {
-  const lines = rows.map(([f, m, l, father, state, district, pin, folio, type, amount, _dp, shares, date]) => {
-    const [ff, ...fl] = father.split(" ");
-    const country = state ? "India" : "United Arab Emirates";
-    return [f, m, l, ff, "", fl.join(" "), `${district || "Dubai"} address`, country, state, district, pin, folio, "", type, amount, shares || "", date]
-      .map((v) => `"${v}"`)
-      .join(",");
-  });
-  return Buffer.from(["Statement of shares transferred to the IEPF Authority (test fixture)", header, ...lines].join("\n"));
+  const lines = rows.map(
+    ([f, m, l, father, state, district, pin, folio, type, amount, _dp, shares, date]) => {
+      const [ff, ...fl] = father.split(" ");
+      const country = state ? "India" : "United Arab Emirates";
+      return [
+        f,
+        m,
+        l,
+        ff,
+        "",
+        fl.join(" "),
+        `${district || "Dubai"} address`,
+        country,
+        state,
+        district,
+        pin,
+        folio,
+        "",
+        type,
+        amount,
+        shares || "",
+        date,
+      ]
+        .map((v) => `"${v}"`)
+        .join(",");
+    },
+  );
+  return Buffer.from(
+    ["Statement of shares transferred to the IEPF Authority (test fixture)", header, ...lines].join(
+      "\n",
+    ),
+  );
 }
 
 /** Live prices are never faked in the seed; tests pin known prices with a labelled source. */
@@ -70,12 +350,37 @@ const TEST_PRICES: Record<string, number> = {
 
 async function seedFolios() {
   for (const [slug, price] of Object.entries(TEST_PRICES)) {
-    await prisma.company.update({ where: { slug }, data: { currentMarketPrice: price, priceUpdatedAt: new Date(), priceSource: "Test fixture" } });
+    await prisma.company.update({
+      where: { slug },
+      data: { currentMarketPrice: price, priceUpdatedAt: new Date(), priceSource: "Test fixture" },
+    });
   }
-  const bySlug = new Map((await prisma.company.findMany({ select: { id: true, slug: true } })).map((c) => [c.slug, c.id]));
-  const companyFor: Record<string, string> = { RIL: "reliance-industries-limited", TIT: "titan-company-limited", TCS: "tata-consultancy-services-limited", SBI: "state-bank-of-india", WIP: "wipro-limited", BAF: "bajaj-finance-limited", HUL: "hindustan-unilever-limited", MRF: "mrf-limited", DAB: "dabur-india-limited", LTL: "larsen-and-toubro-limited", TVS: "tvs-motor-company-limited", BFS: "bajaj-finserv-limited", ITC: "itc-limited" };
+  const bySlug = new Map(
+    (await prisma.company.findMany({ select: { id: true, slug: true } })).map((c) => [
+      c.slug,
+      c.id,
+    ]),
+  );
+  const companyFor: Record<string, string> = {
+    RIL: "reliance-industries-limited",
+    TIT: "titan-company-limited",
+    TCS: "tata-consultancy-services-limited",
+    SBI: "state-bank-of-india",
+    WIP: "wipro-limited",
+    BAF: "bajaj-finance-limited",
+    HUL: "hindustan-unilever-limited",
+    MRF: "mrf-limited",
+    DAB: "dabur-india-limited",
+    LTL: "larsen-and-toubro-limited",
+    TVS: "tvs-motor-company-limited",
+    BFS: "bajaj-finserv-limited",
+    ITC: "itc-limited",
+  };
   const groups = new Map<string, { four: Row[]; two: Row[] }>();
-  for (const [list, kind] of [[iepf4, "four"], [iepf2, "two"]] as const) {
+  for (const [list, kind] of [
+    [iepf4, "four"],
+    [iepf2, "two"],
+  ] as const) {
     for (const r of list) {
       const slug = companyFor[r[7].slice(0, 3)]!;
       const g = groups.get(slug) ?? { four: [], two: [] };
@@ -84,8 +389,20 @@ async function seedFolios() {
     }
   }
   for (const [slug, g] of groups) {
-    if (g.four.length) await ingestStatement(prisma, keys, { buffer: csv(g.four), fileName: `${slug}-iepf4.csv` }, { companyId: bySlug.get(slug)!, form: "IEPF_4" });
-    if (g.two.length) await ingestStatement(prisma, keys, { buffer: csv(g.two), fileName: `${slug}-iepf2.csv` }, { companyId: bySlug.get(slug)!, form: "IEPF_2" });
+    if (g.four.length)
+      await ingestStatement(
+        prisma,
+        keys,
+        { buffer: csv(g.four), fileName: `${slug}-iepf4.csv` },
+        { companyId: bySlug.get(slug)!, form: "IEPF_4" },
+      );
+    if (g.two.length)
+      await ingestStatement(
+        prisma,
+        keys,
+        { buffer: csv(g.two), fileName: `${slug}-iepf2.csv` },
+        { companyId: bySlug.get(slug)!, form: "IEPF_2" },
+      );
   }
 }
 
@@ -377,7 +694,10 @@ async function seedCasesAndLeads(people: Awaited<ReturnType<typeof seedPeople>>)
   // Leads across the CRM board.
   const leadFolios = await prisma.unclaimedFolio.findMany({
     take: 14,
-    where: { custodyStatus: "IEPF_AUTHORITY", investorFullName: { notIn: [ril, tcs, titan, itc].map((f) => f.investorFullName) } },
+    where: {
+      custodyStatus: "IEPF_AUTHORITY",
+      investorFullName: { notIn: [ril, tcs, titan, itc].map((f) => f.investorFullName) },
+    },
     orderBy: { fullNameNorm: "asc" },
     include: { company: true },
   });

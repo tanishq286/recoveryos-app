@@ -73,7 +73,12 @@ export class CompaniesController {
       },
       nodalOfficer: {
         name: c.nodalOfficerName,
-        emails: c.nodalOfficerEmail ? c.nodalOfficerEmail.split("/").map((e) => e.trim()).filter(Boolean) : [],
+        emails: c.nodalOfficerEmail
+          ? c.nodalOfficerEmail
+              .split("/")
+              .map((e) => e.trim())
+              .filter(Boolean)
+          : [],
         phone: c.nodalOfficerPhone,
         address: c.nodalOfficeAddress,
         deputies: (c.deputyNodalOfficers as { name: string; email: string | null }[] | null) ?? [],

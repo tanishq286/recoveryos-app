@@ -631,14 +631,73 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
 
   it("reads a real-layout .xlsx IEPF-2 statement with a title block and share rows", async () => {
     const XLSX = await import("xlsx");
-    const header = ["Investor First Name", "Investor Middle Name", "Investor Last Name", "Father/Husband First Name", "Father/Husband Middle Name", "Father/Husband Last Name", "Address", "Country", "State", "District", "Pin Code", "Folio Number", "DP Id-Client Id-Account Number", "Investment Type", "Amount Transferred", "Proposed Date of Transfer to IEPF", "PAN", "Financial Year"];
+    const header = [
+      "Investor First Name",
+      "Investor Middle Name",
+      "Investor Last Name",
+      "Father/Husband First Name",
+      "Father/Husband Middle Name",
+      "Father/Husband Last Name",
+      "Address",
+      "Country",
+      "State",
+      "District",
+      "Pin Code",
+      "Folio Number",
+      "DP Id-Client Id-Account Number",
+      "Investment Type",
+      "Amount Transferred",
+      "Proposed Date of Transfer to IEPF",
+      "PAN",
+      "Financial Year",
+    ];
     const sheet = XLSX.utils.aoa_to_sheet([
       ["Add Investor Details"],
-      ["(i) Fill in the details below. First Name -> Mandatory if 'Last Name' is blank. DP Id-Client Id-Account Number -> 16 characters."],
+      [
+        "(i) Fill in the details below. First Name -> Mandatory if 'Last Name' is blank. DP Id-Client Id-Account Number -> 16 characters.",
+      ],
       [],
       header,
-      ["Gurmeet", "", "Kaur", "Harbans", "", "Singh", "12 Model Town", "INDIA", "", "Ludhiana", "141002", "TCS0045671234", "", "Amount for unpaid and unclaimed dividend", 412.5, new Date(Date.UTC(2031, 6, 27)), "", "FY-1"],
-      ["Gurmeet", "", "Kaur", "Harbans", "", "Singh", "12 Model Town", "INDIA", "", "Ludhiana", "141002", "TCS0045671234", "", "Number of underlying Shares", 75, new Date(Date.UTC(2031, 6, 27)), "", "FY-1"],
+      [
+        "Gurmeet",
+        "",
+        "Kaur",
+        "Harbans",
+        "",
+        "Singh",
+        "12 Model Town",
+        "INDIA",
+        "",
+        "Ludhiana",
+        "141002",
+        "TCS0045671234",
+        "",
+        "Amount for unpaid and unclaimed dividend",
+        412.5,
+        new Date(Date.UTC(2031, 6, 27)),
+        "",
+        "FY-1",
+      ],
+      [
+        "Gurmeet",
+        "",
+        "Kaur",
+        "Harbans",
+        "",
+        "Singh",
+        "12 Model Town",
+        "INDIA",
+        "",
+        "Ludhiana",
+        "141002",
+        "TCS0045671234",
+        "",
+        "Number of underlying Shares",
+        75,
+        new Date(Date.UTC(2031, 6, 27)),
+        "",
+        "FY-1",
+      ],
       ["Total", "", "", "", "", "", "", "", "", "", "", "", "", "", 487.5, "", "", ""],
     ]);
     const wb = XLSX.utils.book_new();
@@ -649,15 +708,61 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
       .set(auth("admin"))
       .field("companySlug", "tata-consultancy-services-limited")
       .field("sourceUrl", "https://example.org/investors/iepf-2.xlsx")
-      .attach("file", buffer, { filename: "iepf-2.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+      .attach("file", buffer, {
+        filename: "iepf-2.xlsx",
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
       .expect(201);
-    expect(up.body).toMatchObject({ formType: "IEPF_2", sourceUrl: "https://example.org/investors/iepf-2.xlsx" });
+    expect(up.body).toMatchObject({
+      formType: "IEPF_2",
+      sourceUrl: "https://example.org/investors/iepf-2.xlsx",
+    });
     await app.get(JobQueueService).drain();
-    const job = await request(http).get(`/api/v1/admin/ingestion/${up.body.id}`).set(auth("admin")).expect(200);
-    expect(job.body).toMatchObject({ status: "COMPLETED", totalRows: 2, insertedRows: 1, skippedRows: 0 });
+    const job = await request(http)
+      .get(`/api/v1/admin/ingestion/${up.body.id}`)
+      .set(auth("admin"))
+      .expect(200);
+    expect(job.body).toMatchObject({
+      status: "COMPLETED",
+      totalRows: 2,
+      insertedRows: 1,
+      skippedRows: 0,
+    });
     // State came from the PIN code; the shares row became shares, not rupees.
-    const found = await request(http).get("/api/v1/search/unclaimed").query({ fullName: "Gurmeet Kaur", state: "PUNJAB" }).set(auth("analyst")).expect(200);
-    expect(found.body.results[0]).toMatchObject({ investorFullName: "Gurmeet Kaur", postActionShares: 75, custodyStatus: "COMPANY_SUSPENSE", unclaimedDividendPaise: 41250 });
+    const found = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Gurmeet Kaur", state: "PUNJAB" })
+      .set(auth("analyst"))
+      .expect(200);
+    expect(found.body.results[0]).toMatchObject({
+      investorFullName: "Gurmeet Kaur",
+      postActionShares: 75,
+      custodyStatus: "COMPANY_SUSPENSE",
+      unclaimedDividendPaise: 41250,
+    });
+
+    // The same statement again: updated in place, never double counted.
+    const again = await request(http)
+      .post("/api/v1/admin/ingestion")
+      .set(auth("admin"))
+      .field("companySlug", "tata-consultancy-services-limited")
+      .attach("file", buffer, {
+        filename: "iepf-2.xlsx",
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+      .expect(201);
+    await app.get(JobQueueService).drain();
+    const job2 = await request(http)
+      .get(`/api/v1/admin/ingestion/${again.body.id}`)
+      .set(auth("admin"))
+      .expect(200);
+    expect(job2.body).toMatchObject({ status: "COMPLETED", insertedRows: 0, updatedRows: 1 });
+    const same = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Gurmeet Kaur", state: "PUNJAB" })
+      .set(auth("analyst"))
+      .expect(200);
+    expect(same.body.results[0].unclaimedDividendPaise).toBe(41250);
   });
 
   it("reads a PDF statement table and keeps holders with no state searchable everywhere", async () => {
@@ -666,13 +771,31 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
     const page = doc.addPage([842, 595]);
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const cols = [40, 140, 240, 340, 440, 560, 680];
-    const draw = (row: string[], y: number) => row.forEach((t, i) => t && page.drawText(t, { x: cols[i]!, y, size: 8, font }));
+    const draw = (row: string[], y: number) =>
+      row.forEach((t, i) => t && page.drawText(t, { x: cols[i]!, y, size: 8, font }));
     page.drawText("Statement of unclaimed dividend (IEPF-2)", { x: 40, y: 560, size: 11, font });
-    draw(["Investor First", "Investor Middle", "Investor Last", "Folio No.", "Investment", "Amount", "Proposed date of"], 520);
+    draw(
+      [
+        "Investor First",
+        "Investor Middle",
+        "Investor Last",
+        "Folio No.",
+        "Investment",
+        "Amount",
+        "Proposed date of",
+      ],
+      520,
+    );
     draw(["Name", "Name", "Name", "", "Type", "transferred", "transfer to IEPF"], 510);
-    draw(["Zarina", "", "Wadia", "MRF0000771", "Amount for unclaimed", "1250.00", "12-Sep-2031"], 480);
+    draw(
+      ["Zarina", "", "Wadia", "MRF0000771", "Amount for unclaimed", "1250.00", "12-Sep-2031"],
+      480,
+    );
     draw(["", "", "", "", "and unpaid dividend", "", ""], 470);
-    draw(["Bhupinder", "", "Sodhi", "MRF0000772", "Amount for unclaimed", "640.00", "12-Sep-2031"], 450);
+    draw(
+      ["Bhupinder", "", "Sodhi", "MRF0000772", "Amount for unclaimed", "640.00", "12-Sep-2031"],
+      450,
+    );
     const pdf = Buffer.from(await doc.save());
     const up = await request(http)
       .post("/api/v1/admin/ingestion")
@@ -681,11 +804,23 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
       .attach("file", pdf, { filename: "mrf-iepf2.pdf", contentType: "application/pdf" })
       .expect(201);
     await app.get(JobQueueService).drain();
-    const job = await request(http).get(`/api/v1/admin/ingestion/${up.body.id}`).set(auth("admin")).expect(200);
+    const job = await request(http)
+      .get(`/api/v1/admin/ingestion/${up.body.id}`)
+      .set(auth("admin"))
+      .expect(200);
     expect(job.body).toMatchObject({ status: "COMPLETED", totalRows: 2, insertedRows: 2 });
     for (const state of ["GOA", "ASSAM"]) {
-      const res = await request(http).get("/api/v1/search/unclaimed").query({ lastName: "Wadia", state }).set(auth("analyst")).expect(200);
-      expect(res.body.results[0]).toMatchObject({ investorFullName: "Zarina Wadia", state: "UNKNOWN", investmentType: "Amount for unclaimed and unpaid dividend", unclaimedDividendPaise: 125000 });
+      const res = await request(http)
+        .get("/api/v1/search/unclaimed")
+        .query({ lastName: "Wadia", state })
+        .set(auth("analyst"))
+        .expect(200);
+      expect(res.body.results[0]).toMatchObject({
+        investorFullName: "Zarina Wadia",
+        state: "UNKNOWN",
+        investmentType: "Amount for unclaimed and unpaid dividend",
+        unclaimedDividendPaise: 125000,
+      });
     }
   });
 
@@ -731,9 +866,14 @@ describe("companies and stats", () => {
     const sbi = await request(http).get("/api/v1/companies/state-bank-of-india").expect(200);
     expect(sbi.body.cin).toBeNull();
     expect(sbi.body.statutoryBasis).toContain("State Bank of India Act, 1955");
-    const ril = await request(http).get("/api/v1/companies/reliance-industries-limited").expect(200);
+    const ril = await request(http)
+      .get("/api/v1/companies/reliance-industries-limited")
+      .expect(200);
     expect(ril.body.nodalOfficer.deputies).toHaveLength(2);
-    expect(ril.body.rta).toMatchObject({ email: "rilinvestor@kfintech.com", phone: "1800 309 4001 (toll-free)" });
+    expect(ril.body.rta).toMatchObject({
+      email: "rilinvestor@kfintech.com",
+      phone: "1800 309 4001 (toll-free)",
+    });
     await request(http).get("/api/v1/companies/no-such-co").expect(404);
     const stats = await request(http).get("/api/v1/stats").expect(200);
     expect(stats.body.companies).toBe(15);

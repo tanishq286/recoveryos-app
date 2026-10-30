@@ -21,8 +21,8 @@ export default async function LoginPage({
       </div>
       {process.env.NODE_ENV !== "production" && (
         <p className="mt-6 text-sm text-fg-3">
-          Development: codes are printed in the API log. The first administrator comes from SEED_ADMIN_PHONE when you
-          seed the database.
+          Development: codes are printed in the API log. The first administrator comes from
+          SEED_ADMIN_PHONE when you seed the database.
         </p>
       )}
     </div>

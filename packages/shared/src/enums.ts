@@ -138,6 +138,8 @@ export function parseIndianState(raw: string | null | undefined): IndianState | 
     "ANDAMAN NICOBAR": "ANDAMAN_AND_NICOBAR_ISLANDS",
     "ANDAMAN AND NICOBAR": "ANDAMAN_AND_NICOBAR_ISLANDS",
     "DADRA AND NAGAR HAVELI": "DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU",
+    "DADAR NAGAR HAVELI": "DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU",
+    "DADRA NAGAR HAVELI": "DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU",
     "DAMAN AND DIU": "DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU",
     FOREIGN: "OUT_OF_INDIA",
     "FOREIGN COUNTRY": "OUT_OF_INDIA",
@@ -187,7 +189,13 @@ export const CUSTODY_LABELS: Record<CustodyStatus, string> = {
  * CASH_ENTITLEMENT: cash per equity share that is not a dividend, e.g. bonus
  * preference shares later redeemed in cash. It never changes the share count.
  */
-export const CORPORATE_ACTION_TYPES = ["BONUS", "SPLIT", "MERGER", "DIVIDEND", "CASH_ENTITLEMENT"] as const;
+export const CORPORATE_ACTION_TYPES = [
+  "BONUS",
+  "SPLIT",
+  "MERGER",
+  "DIVIDEND",
+  "CASH_ENTITLEMENT",
+] as const;
 export type CorporateActionType = (typeof CORPORATE_ACTION_TYPES)[number];
 
 export const RELATIONSHIPS = ["SELF", "SON_DAUGHTER", "SPOUSE", "LEGAL_HEIR", "ADVISOR"] as const;

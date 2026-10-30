@@ -3,7 +3,8 @@
  * browser impersonation or cookie replay. NSE's public API often refuses
  * automated clients (HTTP 401/403), in which case the next provider answers.
  */
-export const MARKET_USER_AGENT = process.env.MARKET_USER_AGENT ?? "RecoveryOS-PriceSync/0.2 (+https://recoveryos.in/bot)";
+export const MARKET_USER_AGENT =
+  process.env.MARKET_USER_AGENT ?? "RecoveryOS-PriceSync/0.2 (+https://recoveryos.in/bot)";
 
 export interface Quote {
   /** Rupees. */
@@ -43,13 +44,18 @@ export class NseQuoteProvider implements QuoteProvider {
 
   async quote({ tickerNse }: Listing): Promise<Quote | null> {
     if (!tickerNse) return null;
-    const body = (await getJson(this.fetchImpl, `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(tickerNse)}`)) as {
+    const body = (await getJson(
+      this.fetchImpl,
+      `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(tickerNse)}`,
+    )) as {
       priceInfo?: { lastPrice?: number; close?: number };
       metadata?: { lastUpdateTime?: string };
     } | null;
     const price = body?.priceInfo?.lastPrice ?? body?.priceInfo?.close;
     if (!price || !Number.isFinite(price) || price <= 0) return null;
-    const t = body?.metadata?.lastUpdateTime ? new Date(`${body.metadata.lastUpdateTime} GMT+0530`) : null;
+    const t = body?.metadata?.lastUpdateTime
+      ? new Date(`${body.metadata.lastUpdateTime} GMT+0530`)
+      : null;
     return { price, tradedAt: t && !Number.isNaN(t.getTime()) ? t : null, source: "NSE" };
   }
 }
@@ -79,7 +85,10 @@ export class YahooChartProvider implements QuoteProvider {
   }
 
   private async chart(symbol: string, query: string): Promise<YahooChart | null> {
-    return (await getJson(this.fetchImpl, `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`)) as YahooChart | null;
+    return (await getJson(
+      this.fetchImpl,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`,
+    )) as YahooChart | null;
   }
 
   async quote(listing: Listing): Promise<Quote | null> {
@@ -87,7 +96,11 @@ export class YahooChartProvider implements QuoteProvider {
       const meta = (await this.chart(symbol, "interval=1d&range=5d"))?.chart?.result?.[0]?.meta;
       const price = meta?.regularMarketPrice;
       if (price && Number.isFinite(price) && price > 0) {
-        return { price, tradedAt: meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000) : null, source: `Yahoo Finance (${exchange})` };
+        return {
+          price,
+          tradedAt: meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000) : null,
+          source: `Yahoo Finance (${exchange})`,
+        };
       }
     }
     return null;
@@ -102,8 +115,12 @@ export class YahooChartProvider implements QuoteProvider {
   async dividends(listing: Listing, years = 10): Promise<{ exDate: string; amount: number }[]> {
     const [first] = YahooChartProvider.symbols(listing);
     if (!first) return [];
-    const result = (await this.chart(first.symbol, `interval=1mo&range=${years}y&events=div,split`))?.chart?.result?.[0];
-    const splits = Object.values(result?.events?.splits ?? {}).map((s) => ({ date: s.date, factor: s.numerator / s.denominator }));
+    const result = (await this.chart(first.symbol, `interval=1mo&range=${years}y&events=div,split`))
+      ?.chart?.result?.[0];
+    const splits = Object.values(result?.events?.splits ?? {}).map((s) => ({
+      date: s.date,
+      factor: s.numerator / s.denominator,
+    }));
     return Object.values(result?.events?.dividends ?? {})
       .filter((d) => d.amount > 0)
       .map((d) => {

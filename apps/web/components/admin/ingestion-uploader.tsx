@@ -110,8 +110,16 @@ export function IngestionUploader({
           <label htmlFor="i-source" className="mb-1.5 block text-sm text-fg-2">
             Where it was published (optional)
           </label>
-          <Input id="i-source" name="sourceUrl" type="url" placeholder="https://www.company.com/investors/iepf/statement.xlsx" maxLength={2000} />
-          <p className="mt-1 text-sm text-fg-3">Kept with every row imported from this file, so each record traces back to its source.</p>
+          <Input
+            id="i-source"
+            name="sourceUrl"
+            type="url"
+            placeholder="https://www.company.com/investors/iepf/statement.xlsx"
+            maxLength={2000}
+          />
+          <p className="mt-1 text-sm text-fg-3">
+            Kept with every row imported from this file, so each record traces back to its source.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={busy}>
@@ -130,10 +138,13 @@ export function IngestionUploader({
           </Button>
         </div>
         <p className="text-sm text-fg-3">
-          Headers are matched by name, so the MCA layout works as filed: investor name parts, father
-          or husband name, address, state, PIN, folio or DP-client ID, amount, shares and transfer
-          date. Rows are de-duplicated on company, folio and holder, so re-importing a file updates
-          rather than duplicates.
+          The MCA statutory columns are read as filed: investor and father or husband names,
+          address, country, state, district, PIN, folio or DP ID-client ID, investment type, amount
+          transferred or number of shares, and the date of event or proposed transfer date. Title
+          blocks, multi-line headers, share-count rows and PDF tables (including sideways pages) are
+          handled; a missing state is taken from the PIN code. Each holder&apos;s amount is kept per
+          statement date, so another year&apos;s statement adds to it and re-importing the same file
+          never double counts.
         </p>
       </form>
 
@@ -181,7 +192,12 @@ export function IngestionUploader({
                         {j.sourceUrl && (
                           <>
                             {" · "}
-                            <a href={j.sourceUrl} target="_blank" rel="noopener noreferrer" className="link">
+                            <a
+                              href={j.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="link"
+                            >
                               source
                             </a>
                           </>

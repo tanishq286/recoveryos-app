@@ -8,13 +8,21 @@ export const USER_AGENT =
 
 const MAX_BYTES = 40 * 1024 * 1024;
 
-export async function fetchBuffer(url: string, timeoutMs = 60_000): Promise<{ buffer: Buffer; contentType: string | null; finalUrl: string }> {
-  const res = await fetch(url, { headers: { "user-agent": USER_AGENT, accept: "*/*" }, redirect: "follow", signal: AbortSignal.timeout(timeoutMs) });
+export async function fetchBuffer(
+  url: string,
+  timeoutMs = 60_000,
+): Promise<{ buffer: Buffer; contentType: string | null; finalUrl: string }> {
+  const res = await fetch(url, {
+    headers: { "user-agent": USER_AGENT, accept: "*/*" },
+    redirect: "follow",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   if (!res.ok) throw new Error(`${url} answered ${res.status}.`);
   const length = Number(res.headers.get("content-length") ?? 0);
   if (length > MAX_BYTES) throw new Error(`${url} is larger than ${MAX_BYTES / 1024 / 1024} MB.`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.length > MAX_BYTES) throw new Error(`${url} is larger than ${MAX_BYTES / 1024 / 1024} MB.`);
+  if (buffer.length > MAX_BYTES)
+    throw new Error(`${url} is larger than ${MAX_BYTES / 1024 / 1024} MB.`);
   return { buffer, contentType: res.headers.get("content-type"), finalUrl: res.url };
 }
 
@@ -26,7 +34,10 @@ export async function robotsAllows(url: string): Promise<boolean> {
   if (!robotsCache.has(u.origin)) {
     let rules: { disallow: string[]; allow: string[] } | null = null;
     try {
-      const res = await fetch(`${u.origin}/robots.txt`, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
+      const res = await fetch(`${u.origin}/robots.txt`, {
+        headers: { "user-agent": USER_AGENT },
+        signal: AbortSignal.timeout(15_000),
+      });
       const type = res.headers.get("content-type") ?? "";
       if (res.ok && type.includes("text/plain")) {
         rules = { disallow: [], allow: [] };
@@ -35,7 +46,8 @@ export async function robotsAllows(url: string): Promise<boolean> {
           const [k, ...rest] = line.split(":");
           const key = k?.trim().toLowerCase();
           const value = rest.join(":").trim();
-          if (key === "user-agent") applies = value === "*" || USER_AGENT.toLowerCase().includes(value.toLowerCase());
+          if (key === "user-agent")
+            applies = value === "*" || USER_AGENT.toLowerCase().includes(value.toLowerCase());
           else if (applies && key === "disallow" && value) rules.disallow.push(value);
           else if (applies && key === "allow" && value) rules.allow.push(value);
         }
@@ -48,7 +60,8 @@ export async function robotsAllows(url: string): Promise<boolean> {
   const rules = robotsCache.get(u.origin);
   if (!rules) return true;
   const path = u.pathname + u.search;
-  const longest = (list: string[]) => Math.max(-1, ...list.filter((p) => path.startsWith(p)).map((p) => p.length));
+  const longest = (list: string[]) =>
+    Math.max(-1, ...list.filter((p) => path.startsWith(p)).map((p) => p.length));
   return longest(rules.allow) >= longest(rules.disallow);
 }
 

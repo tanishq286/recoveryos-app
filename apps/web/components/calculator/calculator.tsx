@@ -112,9 +112,7 @@ export function Calculator({
   const price = company?.currentMarketPrice ?? null;
   const cash = (r: { dividendPaise: number; cashPaise: number }) => r.dividendPaise + r.cashPaise;
   const lowGross = range ? holdingValuePaise(range.low.shares, price ?? 0) + cash(range.low) : 0;
-  const highGross = range
-    ? holdingValuePaise(range.high.shares, price ?? 0) + cash(range.high)
-    : 0;
+  const highGross = range ? holdingValuePaise(range.high.shares, price ?? 0) + cash(range.high) : 0;
   const lowNet = netRealization(lowGross, pctToBps(feePct));
   const highNet = netRealization(highGross, pctToBps(feePct));
   const checklist = documentChecklist({ scenario: sit.scenario, certStatus: sit.certStatus });
@@ -266,7 +264,11 @@ export function Calculator({
                   }
                 />
                 <Figure
-                  label={range.high.cashPaise > 0 ? "Dividends (7 years) and cash" : "Dividends, last 7 years"}
+                  label={
+                    range.high.cashPaise > 0
+                      ? "Dividends (7 years) and cash"
+                      : "Dividends, last 7 years"
+                  }
                   value={formatPaiseCompact(cash(range.high))}
                   note={
                     range.high.cashPaise > 0
@@ -421,9 +423,9 @@ export function Calculator({
             <Alert variant="info">
               <InfoIcon aria-hidden="true" />
               <AlertDescription className="text-sm">
-                An estimate from {company.name}&apos;s recorded bonuses, splits and dividends and the
-                latest exchange price, never a quote. The registrar confirms the real count, and value
-                is fixed on the day shares are credited.
+                An estimate from {company.name}&apos;s recorded bonuses, splits and dividends and
+                the latest exchange price, never a quote. The registrar confirms the real count, and
+                value is fixed on the day shares are credited.
               </AlertDescription>
             </Alert>
             <div>

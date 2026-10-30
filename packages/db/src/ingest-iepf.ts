@@ -14,7 +14,12 @@ import { folioColumns, folioSearchColumns } from "./columns.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { readStatement, type RawTable } from "./statement-reader.js";
 
-export { readStatement, formatOf, type RawTable, type StatementFormat } from "./statement-reader.js";
+export {
+  readStatement,
+  formatOf,
+  type RawTable,
+  type StatementFormat,
+} from "./statement-reader.js";
 
 /**
  * IEPF-2 / IEPF-4 statement ingestion, shared by the CLI
@@ -50,25 +55,83 @@ export type Field =
   | "financialYear";
 
 export const HEADER_ALIASES: Record<Field, string[]> = {
-  first: ["Investor First Name", "First Name", "Shareholder First Name", "Name of Investor First Name"],
+  first: [
+    "Investor First Name",
+    "First Name",
+    "Shareholder First Name",
+    "Name of Investor First Name",
+  ],
   middle: ["Investor Middle Name", "Middle Name", "Shareholder Middle Name"],
   last: ["Investor Last Name", "Last Name", "Shareholder Last Name", "Surname"],
-  fullName: ["Investor Name", "Name of Investor", "Name of the Investor", "Shareholder Name", "Name of the Shareholder", "Name of Shareholder", "Name"],
+  fullName: [
+    "Investor Name",
+    "Name of Investor",
+    "Name of the Investor",
+    "Shareholder Name",
+    "Name of the Shareholder",
+    "Name of Shareholder",
+    "Name",
+  ],
   fatherFirst: ["Father/Husband First Name", "Father First Name"],
   fatherMiddle: ["Father/Husband Middle Name", "Father Middle Name"],
   fatherLast: ["Father/Husband Last Name", "Father Last Name"],
-  fatherFull: ["Father/Husband Name", "Father or Spouse Name", "Father's Name", "Father/Husband's Name"],
+  fatherFull: [
+    "Father/Husband Name",
+    "Father or Spouse Name",
+    "Father's Name",
+    "Father/Husband's Name",
+  ],
   address: ["Address", "Investor Address", "Address of Investor"],
   country: ["Country"],
   state: ["State", "State Name"],
   city: ["District", "City", "Town", "Location"],
   pincode: ["Pin Code", "PIN", "Pincode", "Postal Code"],
   folio: ["Folio Number", "Folio No", "Folio", "Folio Numbers", "Ledger Folio", "Folio No."],
-  dematId: ["DP Id-Client Id-Account Number", "DP Id-Client Id", "DPID-Client ID", "Client ID", "DP Client ID", "DPID/Client ID"],
-  certificates: ["Certificate Numbers", "Certificate No", "Share Certificate Nos", "Certificate Nos"],
-  amount: ["Amount Transferred", "Amount Transfered", "Amount Due", "Amount Due (in Rs.)", "Amount (in Rs.)", "Amount in Rs", "Amount", "Dividend Amount", "Unclaimed Amount", "Amount to be transferred"],
-  shares: ["Number of Shares", "Number of underlying Shares", "No of underlying Shares", "No. of Shares", "Shares", "Shares Transferred", "No of Shares Transferred", "Number of Shares to be transferred"],
-  eventDate: ["Date of Event", "Proposed Date of Transfer to IEPF", "Proposed Date of transfer to IEPF (DD-MON-YYYY)", "Actual Date of Transfer to IEPF", "Date of Transfer to IEPF", "Date of Transfer", "Transfer Date"],
+  dematId: [
+    "DP Id-Client Id-Account Number",
+    "DP Id-Client Id",
+    "DPID-Client ID",
+    "Client ID",
+    "DP Client ID",
+    "DPID/Client ID",
+  ],
+  certificates: [
+    "Certificate Numbers",
+    "Certificate No",
+    "Share Certificate Nos",
+    "Certificate Nos",
+  ],
+  amount: [
+    "Amount Transferred",
+    "Amount Transfered",
+    "Amount Due",
+    "Amount Due (in Rs.)",
+    "Amount (in Rs.)",
+    "Amount in Rs",
+    "Amount",
+    "Dividend Amount",
+    "Unclaimed Amount",
+    "Amount to be transferred",
+  ],
+  shares: [
+    "Number of Shares",
+    "Number of underlying Shares",
+    "No of underlying Shares",
+    "No. of Shares",
+    "Shares",
+    "Shares Transferred",
+    "No of Shares Transferred",
+    "Number of Shares to be transferred",
+  ],
+  eventDate: [
+    "Date of Event",
+    "Proposed Date of Transfer to IEPF",
+    "Proposed Date of transfer to IEPF (DD-MON-YYYY)",
+    "Actual Date of Transfer to IEPF",
+    "Date of Transfer to IEPF",
+    "Date of Transfer",
+    "Transfer Date",
+  ],
   companyName: ["Company Name", "Name of Company", "Name of the Company"],
   cin: ["CIN", "Company CIN", "Corporate Identification Number"],
   srn: ["SRN", "Service Request Number"],
@@ -92,17 +155,34 @@ function fieldOf(header: string): Field | undefined {
   if (LOOKUP.has(n)) return LOOKUP.get(n);
   if (n.startsWith("folio")) return "folio";
   if (n.includes("dpidclientid")) return "dematId";
-  if (n.startsWith("proposeddateoftransfer") || n.startsWith("dateofevent") || n.startsWith("actualdateoftransfer")) return "eventDate";
+  if (
+    n.startsWith("proposeddateoftransfer") ||
+    n.startsWith("dateofevent") ||
+    n.startsWith("actualdateoftransfer")
+  )
+    return "eventDate";
   if (n.startsWith("amount")) return "amount";
-  if (n.startsWith("numberofshares") || n.startsWith("noofshares") || n.startsWith("numberofunderlyingshares")) return "shares";
+  if (
+    n.startsWith("numberofshares") ||
+    n.startsWith("noofshares") ||
+    n.startsWith("numberofunderlyingshares")
+  )
+    return "shares";
   if (n.startsWith("investorfirstname")) return "first";
   if (n.startsWith("investormiddlename")) return "middle";
   if (n.startsWith("investorlastname")) return "last";
-  if (/(shareholder|investor|holder|member)s?name/.test(n) && !/father|husband|joint|nominee/.test(n)) return "fullName";
+  if (
+    /(shareholder|investor|holder|member)s?name/.test(n) &&
+    !/father|husband|joint|nominee/.test(n)
+  )
+    return "fullName";
   return undefined;
 }
 
-export function mapHeaders(headers: string[]): { map: Partial<Record<Field, number>>; unmapped: string[] } {
+export function mapHeaders(headers: string[]): {
+  map: Partial<Record<Field, number>>;
+  unmapped: string[];
+} {
   const map: Partial<Record<Field, number>> = {};
   const unmapped: string[] = [];
   headers.forEach((h, i) => {
@@ -115,7 +195,11 @@ export function mapHeaders(headers: string[]): { map: Partial<Record<Field, numb
 
 /** IEPF-4 statements list shares; IEPF-2 statements list amounts. */
 export function detectForm(map: Partial<Record<Field, number>>): IngestionForm {
-  return map.shares !== undefined && map.amount === undefined ? "IEPF_4" : map.shares !== undefined ? "IEPF_4" : "IEPF_2";
+  return map.shares !== undefined && map.amount === undefined
+    ? "IEPF_4"
+    : map.shares !== undefined
+      ? "IEPF_4"
+      : "IEPF_2";
 }
 
 export interface ParsedRow {
@@ -148,18 +232,40 @@ function text(v: unknown): string {
 
 function number(v: unknown): number {
   if (typeof v === "number") return v;
-  const s = text(v).replace(/[,₹\s]|rs\.?|inr/gi, "");
-  if (!s || s === "-") return 0;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : Number.NaN;
+  const raw = text(v).replace(/rs\.?|inr|₹/gi, "");
+  if (!raw.replace(/[\s,-]/g, "")) return 0;
+  const plain = Number(raw.replace(/[,\s]/g, ""));
+  if (Number.isFinite(plain)) return plain;
+  // PDF cells can carry stray words from neighbours ("un 750.00 02"): take the one decimal amount.
+  const decimals = raw.match(/\d[\d,]*\.\d{1,2}\b/g);
+  if (decimals?.length === 1) return Number(decimals[0]!.replace(/,/g, ""));
+  return Number.NaN;
 }
 
-const MONTHS: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const MONTHS: Record<string, number> = {
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
+};
 
 export function parseDate(v: unknown): Date | null {
-  if (v instanceof Date && !Number.isNaN(v.getTime())) return new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()));
-  if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Date.UTC(1899, 11, 30) + v * 86_400_000); // Excel serial
-  const s = text(v);
+  if (v instanceof Date && !Number.isNaN(v.getTime()))
+    return new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()));
+  if (typeof v === "number" && v > 20000 && v < 80000)
+    return new Date(Date.UTC(1899, 11, 30) + v * 86_400_000); // Excel serial
+  const s = text(v)
+    .replace(/[‐‑‒–—−]/g, "-")
+    .replace(/\s*-\s*/g, "-")
+    .replace(/\s*\/\s*/g, "/");
   if (!s) return null;
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
   if (m) return new Date(Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!));
@@ -179,9 +285,15 @@ export function financialYear(d: Date): string {
   return `${y}-${String((y + 1) % 100).padStart(2, "0")}`;
 }
 
-export type RowResult = { ok: true; value: ParsedRow } | { ok: false; row: number; message: string };
+export type RowResult =
+  { ok: true; value: ParsedRow } | { ok: false; row: number; message: string };
 
-export function parseRow(cells: unknown[], map: Partial<Record<Field, number>>, rowNumber: number, form: IngestionForm): RowResult | null {
+export function parseRow(
+  cells: unknown[],
+  map: Partial<Record<Field, number>>,
+  rowNumber: number,
+  form: IngestionForm,
+): RowResult | null {
   const raw = (f: Field) => (map[f] === undefined ? undefined : cells[map[f]!]);
   const get = (f: Field) => text(raw(f));
   if (cells.every((c) => !text(c))) return null;
@@ -207,33 +319,57 @@ export function parseRow(cells: unknown[], map: Partial<Record<Field, number>>, 
   if (!first) return { ok: false, row: rowNumber, message: "No investor name." };
 
   const folio = (get("folio") || get("dematId")).replace(/\s+/g, "");
-  if (!folio || folio === "-" || /^n\/?a$/i.test(folio)) return { ok: false, row: rowNumber, message: "No folio number or demat account." };
+  if (!folio || folio === "-" || /^n\/?a$/i.test(folio))
+    return { ok: false, row: rowNumber, message: "No folio number or demat account." };
 
   const country = get("country");
   const pinDigits = get("pincode").replace(/\D/g, "");
   const stateText = get("state");
-  // A foreign country, the state as written, else the PIN code's state, else "not stated".
+  // An Indian state as written wins (PDF country cells carry address spill-over,
+  // e.g. "DHARMPUR INDIA"); then a clearly foreign country; then the PIN's state;
+  // else "not stated".
+  const writtenState = parseIndianState(stateText);
+  const foreign =
+    !!country &&
+    !/india$|\bindia\b|^(ind|bharat|na|n\/a|-)$/i.test(country.replace(/[^A-Za-z/ -]/g, "").trim());
+  const blankState = !stateText || /^(na|n\/a|-|‐)$/i.test(stateText);
   const state: FolioState | null =
-    country && !/^(india|ind|bharat|na|n\/a|-)$/i.test(country)
-      ? "OUT_OF_INDIA"
-      : (parseIndianState(stateText) ?? stateFromPincode(pinDigits) ?? (stateText && !/^(na|n\/a|-)$/i.test(stateText) ? null : STATE_NOT_STATED));
+    writtenState && writtenState !== "OUT_OF_INDIA"
+      ? writtenState
+      : foreign || writtenState === "OUT_OF_INDIA"
+        ? "OUT_OF_INDIA"
+        : (stateFromPincode(pinDigits) ?? (blankState ? STATE_NOT_STATED : null));
   if (!state) return { ok: false, row: rowNumber, message: `Unknown state "${stateText}".` };
 
   let shares = map.shares === undefined ? 0 : number(raw("shares"));
   let amount = map.amount === undefined ? 0 : number(raw("amount"));
   // IEPF-2 statements list the shares behind unclaimed dividends as their own
   // rows, with the share count in the amount column.
-  if (map.shares === undefined && /number of (underlying )?shares|^shares$|equity shares/i.test(get("investmentType"))) {
+  if (
+    map.shares === undefined &&
+    /number of (underlying )?shares|^shares$|equity shares/i.test(get("investmentType"))
+  ) {
     shares = amount;
     amount = 0;
   }
-  if (Number.isNaN(shares) || shares < 0) return { ok: false, row: rowNumber, message: "Share count is not a number." };
-  if (Number.isNaN(amount) || amount < 0) return { ok: false, row: rowNumber, message: "Amount is not a number." };
-  if (form === "IEPF_4" && shares <= 0) return { ok: false, row: rowNumber, message: "IEPF-4 rows need a share count." };
-  if (form === "IEPF_2" && amount <= 0 && shares <= 0) return { ok: false, row: rowNumber, message: "IEPF-2 rows need an amount." };
+  if (Number.isNaN(shares) || shares < 0)
+    return { ok: false, row: rowNumber, message: "Share count is not a number." };
+  if (Number.isNaN(amount) || amount < 0)
+    return { ok: false, row: rowNumber, message: "Amount is not a number." };
+  if (form === "IEPF_4" && shares <= 0)
+    return { ok: false, row: rowNumber, message: "IEPF-4 rows need a share count." };
+  if (form === "IEPF_2" && amount <= 0 && shares <= 0)
+    return { ok: false, row: rowNumber, message: "IEPF-2 rows need an amount." };
 
-  const father = get("fatherFull") || [get("fatherFirst"), get("fatherMiddle"), get("fatherLast")].filter(Boolean).join(" ");
-  const eventDate = parseDate(raw("eventDate"));
+  const father =
+    get("fatherFull") ||
+    [get("fatherFirst"), get("fatherMiddle"), get("fatherLast")].filter(Boolean).join(" ");
+  let eventDate = parseDate(raw("eventDate"));
+  // A PDF date that lost its day to the amount cell ("750.00 02" | "-DEC-2017").
+  if (!eventDate && map.amount !== undefined) {
+    const day = /\b(\d{1,2})\s*$/.exec(text(raw("amount")).replace(/\d[\d,]*\.\d{1,2}/g, ""))?.[1];
+    if (day) eventDate = parseDate(`${day}${text(raw("eventDate"))}`);
+  }
   const pin = pinDigits;
   const fy = get("financialYear");
   return {
@@ -253,7 +389,11 @@ export function parseRow(cells: unknown[], map: Partial<Record<Field, number>>, 
       amountRupees: Math.round(amount * 100) / 100,
       shares: Math.floor(shares),
       eventDate,
-      transferFinancialYear: eventDate ? financialYear(eventDate) : /^\d{4}-\d{2,4}$/.test(fy) ? fy : null,
+      transferFinancialYear: eventDate
+        ? financialYear(eventDate)
+        : /^\d{4}-\d{2,4}$/.test(fy)
+          ? fy
+          : null,
       companyName: get("companyName") || null,
       cin: get("cin").toUpperCase() || null,
       srn: get("srn") || null,
@@ -328,11 +468,15 @@ export async function ingestStatement(
   const table: RawTable = await readStatement(file.buffer, file.fileName, file.contentType);
   const { map, unmapped } = mapHeaders(table.headers);
   if (map.first === undefined && map.fullName === undefined && map.last === undefined) {
-    throw new Error(`No investor name column. Headers found: ${table.headers.filter(Boolean).join(", ")}`);
+    throw new Error(
+      `No investor name column. Headers found: ${table.headers.filter(Boolean).join(", ")}`,
+    );
   }
   const form = opts.form ?? detectForm(map);
 
-  const companies = await db.company.findMany({ select: { id: true, cin: true, slug: true, name: true } });
+  const companies = await db.company.findMany({
+    select: { id: true, cin: true, slug: true, name: true },
+  });
   const bySlugOrName = new Map<string, string>();
   for (const c of companies) {
     bySlugOrName.set(norm(c.name), c.id);
@@ -361,7 +505,12 @@ export async function ingestStatement(
   const keep = (e: { row: number; message: string }) => {
     if (errors.length < MAX_ERRORS_KEPT) errors.push(e);
   };
-  const groups = new Map<string, { companyId: string; row: ParsedRow; amount: number; shares: number }>();
+  const groups = new Map<
+    string,
+    { companyId: string; row: ParsedRow; amounts: Record<string, number>; shares: number }
+  >();
+  const eventKey = (r: ParsedRow) =>
+    r.eventDate ? r.eventDate.toISOString().slice(0, 10) : (r.transferFinancialYear ?? "undated");
   let total = 0;
   let skipped = 0;
   table.rows.forEach((cells, i) => {
@@ -374,7 +523,11 @@ export async function ingestStatement(
       return;
     }
     const r = res.value;
-    const companyId = opts.companyId ?? (r.cin && byCin.get(r.cin)) ?? (r.companyName && bySlugOrName.get(norm(r.companyName))) ?? null;
+    const companyId =
+      opts.companyId ??
+      (r.cin && byCin.get(r.cin)) ??
+      (r.companyName && bySlugOrName.get(norm(r.companyName))) ??
+      null;
     if (!companyId) {
       skipped++;
       keep({ row: r.row, message: `Unknown company ${r.cin ?? r.companyName ?? ""}`.trim() });
@@ -383,13 +536,21 @@ export async function ingestStatement(
     const key = `${companyId}|${blindIndex(r.folio, keys)}|${[r.first, r.middle, r.last].join(" ").toUpperCase()}`;
     const g = groups.get(key);
     if (g) {
-      g.amount += r.amountRupees;
+      if (r.amountRupees)
+        g.amounts[eventKey(r)] =
+          Math.round(((g.amounts[eventKey(r)] ?? 0) + r.amountRupees) * 100) / 100;
       g.shares = Math.max(g.shares, r.shares);
       if (r.eventDate && (!g.row.eventDate || r.eventDate > g.row.eventDate)) {
         g.row.eventDate = r.eventDate;
         g.row.transferFinancialYear = r.transferFinancialYear;
       }
-    } else groups.set(key, { companyId, row: r, amount: r.amountRupees, shares: r.shares });
+    } else
+      groups.set(key, {
+        companyId,
+        row: r,
+        amounts: r.amountRupees ? { [eventKey(r)]: r.amountRupees } : {},
+        shares: r.shares,
+      });
   });
 
   const result: IngestResult = {
@@ -419,7 +580,10 @@ export async function ingestStatement(
       batch.map(async (g) => {
         // Shares keep growing inside the IEPF: apply actions after the transfer.
         const after = g.row.eventDate ? g.row.eventDate.toISOString().slice(0, 10) : null;
-        const post = g.shares > 0 && after ? computeEntitlement(g.shares, await actions(g.companyId), { acquiredOn: after }).shares : g.shares;
+        const post =
+          g.shares > 0 && after
+            ? computeEntitlement(g.shares, await actions(g.companyId), { acquiredOn: after }).shares
+            : g.shares;
         // Actions dated on the transfer day itself are already reflected in the statement's count.
         return { g, post: after ? Math.max(g.shares, post) : post };
       }),
@@ -429,16 +593,32 @@ export async function ingestStatement(
         const r = g.row;
         const fullName = [r.first, r.middle, r.last].filter(Boolean).join(" ");
         const folio = folioColumns(r.folio, keys);
-        const where = { companyId_folioNumberHash_investorFullName: { companyId: g.companyId, folioNumberHash: folio.folioNumberHash, investorFullName: fullName } };
+        const where = {
+          companyId_folioNumberHash_investorFullName: {
+            companyId: g.companyId,
+            folioNumberHash: folio.folioNumberHash,
+            investorFullName: fullName,
+          },
+        };
         const existing = await tx.unclaimedFolio.findUnique({ where });
-        const custody = form === "IEPF_4" ? "IEPF_AUTHORITY" : (existing?.custodyStatus ?? (g.shares > 0 ? "COMPANY_SUSPENSE" : "PHYSICAL_DORMANT"));
+        const custody =
+          form === "IEPF_4"
+            ? "IEPF_AUTHORITY"
+            : (existing?.custodyStatus ?? (g.shares > 0 ? "COMPANY_SUSPENSE" : "PHYSICAL_DORMANT"));
+        const sum = (m: Record<string, number>) =>
+          Math.round(Object.values(m).reduce((a, b) => a + b, 0) * 100) / 100;
         if (existing) {
+          const amounts = {
+            ...((existing.amountsByEvent as Record<string, number> | null) ?? {}),
+            ...g.amounts,
+          };
           await tx.unclaimedFolio.update({
             where: { id: existing.id },
             data: {
               custodyStatus: custody,
               ...(g.shares > 0 ? { originalShares: g.shares, postActionShares: post } : {}),
-              ...(g.amount > Number(existing.unclaimedDividendAmount) ? { unclaimedDividendAmount: g.amount } : {}),
+              amountsByEvent: amounts,
+              unclaimedDividendAmount: sum(amounts),
               eventDate: r.eventDate ?? existing.eventDate,
               transferFinancialYear: r.transferFinancialYear ?? existing.transferFinancialYear,
               investmentType: r.investmentType ?? existing.investmentType,
@@ -465,7 +645,8 @@ export async function ingestStatement(
               certificateNumbers: r.certificates,
               originalShares: g.shares,
               postActionShares: post,
-              unclaimedDividendAmount: g.amount,
+              amountsByEvent: g.amounts,
+              unclaimedDividendAmount: sum(g.amounts),
               custodyStatus: custody,
               eventDate: r.eventDate,
               transferFinancialYear: r.transferFinancialYear,
@@ -484,4 +665,3 @@ export async function ingestStatement(
   }
   return result;
 }
-

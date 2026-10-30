@@ -62,7 +62,10 @@ export class SearchService {
       eventDate: f.eventDate ? f.eventDate.toISOString().slice(0, 10) : null,
       investmentType: f.investmentType,
       estimatedTotalValuePaise: estimateValuePaise(f),
-      sharePricePaise: f.company.currentMarketPrice === null ? null : Math.round(num(f.company.currentMarketPrice) * 100),
+      sharePricePaise:
+        f.company.currentMarketPrice === null
+          ? null
+          : Math.round(num(f.company.currentMarketPrice) * 100),
       priceUpdatedAt: f.company.priceUpdatedAt ? f.company.priceUpdatedAt.toISOString() : null,
       companyName: maskCompanyName(f.company.name),
       folioNumber: f.folioNumberMasked,

@@ -31,7 +31,9 @@ export async function listCompanies(): Promise<CompanyListItem[]> {
 }
 
 export async function getCompany(slug: string): Promise<CompanyDetail | null> {
-  const live = await apiOrNull<CompanyDetail>(`companies/${encodeURIComponent(slug)}`, { revalidate: REVALIDATE });
+  const live = await apiOrNull<CompanyDetail>(`companies/${encodeURIComponent(slug)}`, {
+    revalidate: REVALIDATE,
+  });
   if (live) return live;
   const c = referenceCompanyBySlug(slug);
   if (!c) return null;
@@ -47,7 +49,14 @@ export async function getCompany(slug: string): Promise<CompanyDetail | null> {
     currentMarketPrice: null,
     priceUpdatedAt: null,
     priceSource: null,
-    rta: { name: c.rta, label: c.rtaDisplayName, address: c.rtaAddress, email: c.rtaEmail, phone: c.rtaPhone, website: c.rtaWebsite },
+    rta: {
+      name: c.rta,
+      label: c.rtaDisplayName,
+      address: c.rtaAddress,
+      email: c.rtaEmail,
+      phone: c.rtaPhone,
+      website: c.rtaWebsite,
+    },
     nodalOfficer: {
       name: c.nodalOfficer.name,
       emails: c.nodalOfficer.emails,

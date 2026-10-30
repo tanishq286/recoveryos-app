@@ -38,8 +38,10 @@ export class ImportsService {
     sourceUrl?: string,
   ) {
     if (!file) throw new BadRequestException("Attach the statement: .xlsx, .xls, .csv or .pdf.");
-    if (!formatOf(file.originalname, file.mimetype)) throw new BadRequestException("Upload a .xlsx, .xls, .csv or .pdf statement.");
-    if (file.size > MAX_FILE_MB * 1024 * 1024) throw new BadRequestException(`Files can be up to ${MAX_FILE_MB} MB.`);
+    if (!formatOf(file.originalname, file.mimetype))
+      throw new BadRequestException("Upload a .xlsx, .xls, .csv or .pdf statement.");
+    if (file.size > MAX_FILE_MB * 1024 * 1024)
+      throw new BadRequestException(`Files can be up to ${MAX_FILE_MB} MB.`);
     let companyId: string | null = null;
     if (companySlug) {
       const c = await this.prisma.client.company.findUnique({ where: { slug: companySlug } });
@@ -50,7 +52,8 @@ export class ImportsService {
     try {
       const table = await readStatement(file.buffer, file.originalname, file.mimetype);
       const { map } = mapHeaders(table.headers);
-      if (map.first === undefined && map.fullName === undefined && map.last === undefined) throw new Error("No investor name column was found.");
+      if (map.first === undefined && map.fullName === undefined && map.last === undefined)
+        throw new Error("No investor name column was found.");
       if (!companyId && map.cin === undefined && map.companyName === undefined)
         throw new Error("Choose the company, or include a CIN or company name column.");
       form ??= map.shares !== undefined ? "IEPF_4" : "IEPF_2";
@@ -58,27 +61,56 @@ export class ImportsService {
       throw new BadRequestException((e as Error).message);
     }
     const safeName = file.originalname.replace(/[^\w.-]+/g, "_");
-    const storageKey = await this.storage.put(`imports/${randomUUID()}-${safeName}`, file.buffer, file.mimetype ?? "application/octet-stream");
+    const storageKey = await this.storage.put(
+      `imports/${randomUUID()}-${safeName}`,
+      file.buffer,
+      file.mimetype ?? "application/octet-stream",
+    );
     const job = await this.prisma.client.ingestionJob.create({
-      data: { formType: form, fileName: file.originalname, storageKey, sourceUrl: sourceUrl || null, companyId, uploadedById: user.sub },
+      data: {
+        formType: form,
+        fileName: file.originalname,
+        storageKey,
+        sourceUrl: sourceUrl || null,
+        companyId,
+        uploadedById: user.sub,
+      },
     });
-    await this.audit.record({ actorId: user.sub, actorRole: user.role, action: "imports.upload", entityType: "ingestion_job", entityId: job.id, data: { form, fileName: file.originalname, sourceUrl } });
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "imports.upload",
+      entityType: "ingestion_job",
+      entityId: job.id,
+      data: { form, fileName: file.originalname, sourceUrl },
+    });
     await this.jobs.enqueue("ingestion.process", { jobId: job.id });
     return this.view(job.id);
   }
 
   async list() {
-    const jobs = await this.prisma.client.ingestionJob.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { uploadedBy: { select: { name: true } } } });
+    const jobs = await this.prisma.client.ingestionJob.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: { uploadedBy: { select: { name: true } } },
+    });
     return jobs.map((j) => this.shape(j));
   }
 
   async view(id: string) {
-    const job = await this.prisma.client.ingestionJob.findUnique({ where: { id }, include: { uploadedBy: { select: { name: true } } } });
+    const job = await this.prisma.client.ingestionJob.findUnique({
+      where: { id },
+      include: { uploadedBy: { select: { name: true } } },
+    });
     if (!job) throw new NotFoundException("No such import.");
     return this.shape(job);
   }
 
-  private shape(j: Awaited<ReturnType<typeof this.prisma.client.ingestionJob.findUniqueOrThrow>> & { uploadedBy?: { name: string } | null }) {
+  private shape(
+    j: Awaited<ReturnType<typeof this.prisma.client.ingestionJob.findUniqueOrThrow>> & {
+      uploadedBy?: { name: string } | null;
+    },
+  ) {
     return {
       id: j.id,
       formType: j.formType,
@@ -90,7 +122,11 @@ export class ImportsService {
       updatedRows: j.updatedRows,
       skippedRows: j.skippedRows,
       errors: (j.errors as { row: number; message: string }[] | null) ?? [],
-      uploadedBy: j.uploadedBy?.name ?? (j.storageKey.startsWith("cli:") || j.storageKey.startsWith("file:") ? "Command line" : null),
+      uploadedBy:
+        j.uploadedBy?.name ??
+        (j.storageKey.startsWith("cli:") || j.storageKey.startsWith("file:")
+          ? "Command line"
+          : null),
       createdAt: isoTime(j.createdAt),
       startedAt: isoTime(j.startedAt),
       finishedAt: isoTime(j.finishedAt),
@@ -100,18 +136,43 @@ export class ImportsService {
   /** The job body. Runs in the worker (BullMQ) or inline. Safe to re-run: rows upsert. */
   async process(jobId: string): Promise<void> {
     const db = this.prisma.client;
-    const job = await db.ingestionJob.update({ where: { id: jobId }, data: { status: "PROCESSING", startedAt: new Date() } });
+    const job = await db.ingestionJob.update({
+      where: { id: jobId },
+      data: { status: "PROCESSING", startedAt: new Date() },
+    });
     try {
       const buffer = await this.storage.get(job.storageKey);
-      const r = await ingestStatement(db, this.prisma.fieldKeys, { buffer, fileName: job.fileName }, { companyId: job.companyId, form: job.formType, jobId: job.id });
+      const r = await ingestStatement(
+        db,
+        this.prisma.fieldKeys,
+        { buffer, fileName: job.fileName },
+        { companyId: job.companyId, form: job.formType, jobId: job.id },
+      );
       await db.ingestionJob.update({
         where: { id: job.id },
-        data: { status: "COMPLETED", totalRows: r.totalRows, insertedRows: r.insertedRows, updatedRows: r.updatedRows, skippedRows: r.skippedRows, errors: r.errors, finishedAt: new Date() },
+        data: {
+          status: "COMPLETED",
+          totalRows: r.totalRows,
+          insertedRows: r.insertedRows,
+          updatedRows: r.updatedRows,
+          skippedRows: r.skippedRows,
+          errors: r.errors,
+          finishedAt: new Date(),
+        },
       });
       if (r.folioIds.length) await this.jobs.enqueue("search.sync", { folioIds: r.folioIds });
-      this.log.log(`${job.fileName}: ${r.insertedRows} new, ${r.updatedRows} updated, ${r.skippedRows} skipped of ${r.totalRows}.`);
+      this.log.log(
+        `${job.fileName}: ${r.insertedRows} new, ${r.updatedRows} updated, ${r.skippedRows} skipped of ${r.totalRows}.`,
+      );
     } catch (e) {
-      await db.ingestionJob.update({ where: { id: job.id }, data: { status: "FAILED", errors: [{ row: 0, message: (e as Error).message }], finishedAt: new Date() } });
+      await db.ingestionJob.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          errors: [{ row: 0, message: (e as Error).message }],
+          finishedAt: new Date(),
+        },
+      });
       throw e;
     }
   }
