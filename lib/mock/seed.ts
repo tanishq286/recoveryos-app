@@ -994,7 +994,8 @@ const case2: CaseDetail = {
   ],
   isSample: true,
   createdAt: "2026-05-04T09:10:00+05:30",
-  updatedAt: "2026-09-18T15:30:00+05:30",
+  // Last activity: the query letter was filed at 15:40 and read by 16:00.
+  updatedAt: "2026-09-18T16:00:00+05:30",
   actorId: SYSTEM_ACTOR,
   version: 31,
 };
