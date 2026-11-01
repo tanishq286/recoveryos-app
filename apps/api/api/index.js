@@ -1,39 +1,5 @@
-/**
- * Vercel serverless entry. The Nest app is built once per instance and reused
- * across requests (Fluid compute keeps instances warm); every path is
- * rewritten here by vercel.json, and Nest routes on the original URL.
- */
-import { createApp } from "../dist/bootstrap.js";
-
-/** @type {Promise<import("express").Express> | null} */
-let ready = null;
-
-function instance() {
-  ready ??= createApp()
-    .then(async (app) => {
-      await app.init();
-      return app.getHttpAdapter().getInstance();
-    })
-    .catch((e) => {
-      // Let the next request try again instead of caching the failure.
-      ready = null;
-      throw e;
-    });
-  return ready;
-}
-
-export default async function handler(req, res) {
-  let app;
-  try {
-    app = await instance();
-  } catch (e) {
-    console.error("API failed to start:", e);
-    res.statusCode = 503;
-    res.setHeader("content-type", "application/json");
-    res.end(
-      JSON.stringify({ message: "Finsol Enterprises is starting up. Please try again shortly." }),
-    );
-    return;
-  }
-  app(req, res);
-}
+// Vercel function entry. The real handler is src/vercel.ts, bundled into one
+// ESM file by scripts/bundle-vercel.mjs during the build: Vercel's loader
+// cannot require() an ES module, which @nestjs/throttler (CommonJS) does with
+// @nestjs/common (ESM-only since Nest 12).
+export { default } from "../bundle/vercel.mjs";
