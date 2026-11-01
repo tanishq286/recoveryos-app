@@ -12,6 +12,7 @@ const updateSchema = z.object({
   crmStage: z.enum(CRM_STAGES).optional(),
   assignedAnalystId: z.uuid().nullable().optional(),
   notes: z.string().trim().max(2000).optional(),
+  clearReviewAlert: z.literal(true).optional(),
 });
 const convertSchema = z.object({
   folioId: z.uuid(),

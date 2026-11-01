@@ -29,6 +29,7 @@ async function seedCompanies() {
       cin: c.cin,
       statutoryBasis: c.statutoryBasis,
       isin: c.isin,
+      legacyIsins: c.legacyIsins ?? [],
       sector: c.sector,
       tickerNse: c.tickerNse,
       tickerBse: c.tickerBse,

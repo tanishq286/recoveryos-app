@@ -99,6 +99,9 @@ export function SearchResults({
   }, [referralCode]);
 
   const isPublic = access === "public";
+  // Namesakes: rows with the same name but a different holder ID are different people.
+  const clusterOf = new Map(results.map((r) => [r.id, r.investorClusterId]));
+  const selectedPeople = new Set(selected.map((id) => clusterOf.get(id)));
   const toggle = (id: string) =>
     setSelected((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX_SELECT ? s : [...s, id],
@@ -149,6 +152,16 @@ export function SearchResults({
                         <>Father or spouse: {r.fatherOrSpouseName} · </>
                       ) : null}
                       {[r.city, folioStateLabel(r.state)].filter(Boolean).join(", ")}
+                      {r.pincodeMasked ? ` · PIN ${r.pincodeMasked}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-xs text-fg-3">
+                      Holder ID{" "}
+                      <span className="font-mono tnum">
+                        {r.investorClusterId.slice(0, 8).toUpperCase()}
+                      </span>
+                      <span className="sr-only">
+                        . Same name with a different holder ID is a different person.
+                      </span>
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -241,11 +254,19 @@ export function SearchResults({
       {access === "member" && (
         <div className="sticky bottom-4 z-10 mt-6">
           <div className="vault-glass flex flex-col gap-3 rounded-[16px] p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-            <p className="text-base text-fg-2" aria-live="polite">
-              {selected.length
-                ? `${selected.length} of ${MAX_SELECT} selected.`
-                : "Select the holdings that are your family's. Finsol recovers them end to end."}
-            </p>
+            <div aria-live="polite">
+              <p className="text-base text-fg-2">
+                {selected.length
+                  ? `${selected.length} of ${MAX_SELECT} selected.`
+                  : "Select the holdings that are your family's. Finsol recovers them end to end."}
+              </p>
+              {selectedPeople.size > 1 && (
+                <p className="mt-1 text-sm text-pending">
+                  These belong to {selectedPeople.size} different people (different holder IDs:
+                  father or spouse, city or PIN differ). Select only your own family member.
+                </p>
+              )}
+            </div>
             <Button size="lg" disabled={!selected.length} onClick={() => setClaimOpen(true)}>
               <SendIcon aria-hidden="true" />
               Start free trace{selected.length ? ` (${selected.length})` : ""}

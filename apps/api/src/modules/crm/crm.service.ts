@@ -129,6 +129,7 @@ export class CrmService {
           assignedAnalyst: l.assignedAnalyst,
           associate: l.associate,
           notes: l.notes,
+          reviewAlert: l.reviewAlert,
           stage: l.crmStage,
           unlockedAt: isoTime(l.unlockedAt),
           updatedAt: isoTime(l.updatedAt),
@@ -171,7 +172,13 @@ export class CrmService {
   async update(
     id: string,
     user: SessionClaims,
-    patch: { crmStage?: CrmStage; assignedAnalystId?: string | null; notes?: string },
+    patch: {
+      crmStage?: CrmStage;
+      assignedAnalystId?: string | null;
+      notes?: string;
+      /** The analyst has reviewed a duplicate claimant and allows this lead to go on. */
+      clearReviewAlert?: true;
+    },
   ) {
     const lead = await this.lead(id);
     if (lead.crmStage === "CONVERTED_TO_CASE")
@@ -194,6 +201,7 @@ export class CrmService {
         assignedAnalystId:
           patch.assignedAnalystId === undefined ? undefined : patch.assignedAnalystId,
         notes: patch.notes,
+        ...(patch.clearReviewAlert ? { reviewAlert: null } : {}),
       },
     });
     await this.audit.record({
@@ -209,6 +217,7 @@ export class CrmService {
       crmStage: updated.crmStage,
       assignedAnalystId: updated.assignedAnalystId,
       notes: updated.notes,
+      reviewAlert: updated.reviewAlert,
     };
   }
 
@@ -258,6 +267,18 @@ export class CrmService {
       throw new BadRequestException("Pick one of the holdings on this lead.");
     const db = this.prisma.client;
     const folio = await db.unclaimedFolio.findUniqueOrThrow({ where: { id: body.folioId } });
+    // One holding never ends up in two different people's cases by accident.
+    const existing = await db.recoveryCase.findMany({
+      where: { folioId: folio.id },
+      select: { caseCode: true, client: { select: { phone: true } } },
+    });
+    const mine = existing.find((c) => c.client.phone === lead.phone);
+    if (mine)
+      throw new ConflictException(`This client already has case ${mine.caseCode} on this holding.`);
+    if (existing.length && lead.reviewAlert === "DUPLICATE_CLAIMANT_REVIEW")
+      throw new ConflictException(
+        `Duplicate claimant: case ${existing[0]!.caseCode} already covers this holding for another client. Review both claims before opening a case.`,
+      );
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

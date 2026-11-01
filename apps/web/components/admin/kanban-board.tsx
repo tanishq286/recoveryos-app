@@ -267,6 +267,9 @@ function LeadCardView({
 }) {
   return (
     <>
+      {card.reviewAlert === "DUPLICATE_CLAIMANT_REVIEW" && (
+        <DuplicateClaimantAlert leadId={card.id} />
+      )}
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-semibold text-fg">{card.claimantName}</h3>
         {busy && <LoaderCircleIcon className="size-4 animate-spin text-fg-3" aria-label="Saving" />}
@@ -341,6 +344,42 @@ function LeadCardView({
         <p className="mt-2 text-xs text-fg-3">Claim requested {formatDate(card.unlockedAt)}</p>
       )}
     </>
+  );
+}
+
+/** Another client already claims one of these holdings: verify both before going on. */
+function DuplicateClaimantAlert({ leadId }: { leadId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <div
+      role="alert"
+      className="mb-2 rounded-md border border-blocker/40 bg-blocker-wash px-2 py-1.5 text-xs text-fg"
+    >
+      <p className="font-semibold">Duplicate claimant: review</p>
+      <p className="text-fg-2">
+        Another client claims one of these holdings. Verify both families first.
+      </p>
+      <button
+        type="button"
+        className="link mt-1 text-fg-2 disabled:opacity-60"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await callApi(`crm/leads/${leadId}`, {
+              method: "PATCH",
+              body: { clearReviewAlert: true },
+            });
+            router.refresh();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Saving…" : "Mark reviewed"}
+      </button>
+    </div>
   );
 }
 

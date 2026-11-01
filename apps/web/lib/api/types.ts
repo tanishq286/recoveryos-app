@@ -267,6 +267,8 @@ export interface LeadCard {
   assignedAnalyst: { id: string; name: string } | null;
   associate: { firmName: string; referralCode: string } | null;
   notes: string | null;
+  /** "DUPLICATE_CLAIMANT_REVIEW" when another client already claims one of these holdings. */
+  reviewAlert: string | null;
   stage: CrmStage;
   unlockedAt: string | null;
   updatedAt: string;

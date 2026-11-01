@@ -87,6 +87,12 @@ export function maskFolio(folio: string): string {
   return `${f.slice(0, prefix)}***${f.slice(-suffix)}`;
 }
 
+/** "400001" → "400***": the region, never the exact address. */
+export function maskPincode(pincode: string | null | undefined): string | null {
+  const p = (pincode ?? "").replace(/\D/g, "");
+  return p.length === 6 ? `${p.slice(0, 3)}***` : null;
+}
+
 /** "+91 98765 43210" → "+91 ••••• •3210" for receipts and CRM cards. */
 export function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");

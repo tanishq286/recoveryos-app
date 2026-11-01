@@ -11,6 +11,8 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
 
+import { createHash } from "node:crypto";
+
 import pg from "pg";
 import { phoneticKeys, joinName } from "@recoveryos/shared";
 
@@ -122,14 +124,19 @@ function* holders(n: number, companyId: string, keys: ReturnType<typeof keysFrom
   }
 }
 
+const STATE = `(f.state = $1::"IndianState" OR f.state = 'UNKNOWN'::"IndianState")`;
+/** All India: every partition, no state filter ($1 is still bound, as the scope). */
+const ALL_INDIA_CLAUSE = `$1::text = 'ALL_INDIA'`;
+const scoped = (sql: string, scope: string) =>
+  scope === "ALL_INDIA" ? sql.replaceAll(STATE, ALL_INDIA_CLAUSE) : sql;
+
 /** The production search's two phases (apps/api/src/modules/search/search-engine.ts). */
 const PHASE1 = `
 SELECT f.id FROM unclaimed_folios f
-WHERE (f.state = $1::"IndianState" OR f.state = 'UNKNOWN'::"IndianState")
+WHERE ${STATE}
   AND f.first_name_key = $2 AND f.last_name_key = $3
 ORDER BY f.post_action_shares DESC
 LIMIT 50`;
-const STATE = `(f.state = $1::"IndianState" OR f.state = 'UNKNOWN'::"IndianState")`;
 const similarWords = (param: string) =>
   `(SELECT w.word FROM name_words w WHERE w.word % ${param} ORDER BY similarity(w.word, ${param}) DESC LIMIT 20)`;
 const PHASE2 = `
@@ -187,6 +194,8 @@ const QUERY_SETS: Record<string, [string, string][]> = {
   ],
 };
 const QUERY_STATES = ["MAHARASHTRA", "GUJARAT", "DELHI", "TAMIL_NADU", "KERALA"];
+
+const hash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);
 
 const pct = (xs: number[], p: number) =>
   [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor((p / 100) * xs.length))]!;
@@ -274,31 +283,49 @@ async function run(
     "SELECT state::text, count(*)::text AS n FROM unclaimed_folios GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
   );
   const report: Record<string, object> = {};
-  for (const [set, names] of Object.entries(QUERY_SETS)) {
-    const times: number[] = [];
-    let fuzzy = 0;
-    for (let i = 0; i < Number(values.queries); i++) {
-      const [first, last] = names[i % names.length]!;
-      const state = QUERY_STATES[i % QUERY_STATES.length]!;
-      const t = performance.now();
-      const r = await db.query(PHASE1, [state, phoneticKeys(first), phoneticKeys(last)]);
-      if ((r.rowCount ?? 0) < FUZZY_BELOW) {
-        fuzzy++;
-        await db.query("BEGIN");
-        await db.query("SET LOCAL pg_trgm.similarity_threshold = 0.45");
-        await db.query("SET LOCAL gin_fuzzy_search_limit = 500");
-        await db.query(PHASE2, [state, first, phoneticKeys(first), last, phoneticKeys(last)]);
-        await db.query("COMMIT");
+  // Like the API's search pool: prepared statements with cached generic plans,
+  // so a query over 38 partitions is planned once per connection, not per search.
+  const search = new pg.Client({
+    connectionString: url,
+    options:
+      "-c plan_cache_mode=force_generic_plan -c pg_trgm.similarity_threshold=0.45 -c gin_fuzzy_search_limit=500",
+  });
+  await search.connect();
+  const named = (sql: string, values: unknown[]) =>
+    search.query({ name: `q${hash(sql)}`, text: sql, values });
+  for (const scope of ["state", "ALL_INDIA"] as const)
+    for (const [set, names] of Object.entries(QUERY_SETS)) {
+      const times: number[] = [];
+      let fuzzy = 0;
+      for (let i = 0; i < Number(values.queries); i++) {
+        const [first, last] = names[i % names.length]!;
+        const state = scope === "ALL_INDIA" ? "ALL_INDIA" : QUERY_STATES[i % QUERY_STATES.length]!;
+        const t = performance.now();
+        const r = await named(scoped(PHASE1, scope), [
+          state,
+          phoneticKeys(first),
+          phoneticKeys(last),
+        ]);
+        if ((r.rowCount ?? 0) < FUZZY_BELOW) {
+          fuzzy++;
+          await named(scoped(PHASE2, scope), [
+            state,
+            first,
+            phoneticKeys(first),
+            last,
+            phoneticKeys(last),
+          ]);
+        }
+        times.push(performance.now() - t);
       }
-      times.push(performance.now() - t);
+      report[scope === "ALL_INDIA" ? `${set} (All India)` : set] = {
+        p50ms: Math.round(pct(times, 50) * 100) / 100,
+        p95ms: Math.round(pct(times, 95) * 100) / 100,
+        p99ms: Math.round(pct(times, 99) * 100) / 100,
+        fuzzyPhase: `${fuzzy}/${times.length}`,
+      };
     }
-    report[set] = {
-      p50ms: Math.round(pct(times, 50) * 100) / 100,
-      p95ms: Math.round(pct(times, 95) * 100) / 100,
-      p99ms: Math.round(pct(times, 99) * 100) / 100,
-      fuzzyPhase: `${fuzzy}/${times.length}`,
-    };
-  }
+  await search.end();
   console.log(
     JSON.stringify({
       rowsInTable: Number(count.rows[0]!.n),

@@ -1,8 +1,10 @@
 import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { decryptField, type Prisma } from "@recoveryos/db";
+import type { IndianState } from "@recoveryos/shared";
 import {
   holdingValuePaise,
   maskCompanyName,
+  maskPincode,
   resolveSearch,
   STAFF_ROLES,
   VALUATION_BASIS,
@@ -27,6 +29,16 @@ import type { SearchEngine, SearchHit } from "./search-engine.js";
 type FolioWithCompany = Prisma.UnclaimedFolioGetPayload<{ include: { company: true } }>;
 
 const RESULT_LIMIT = 50;
+
+/** Folio lookups by (state, ids); hits without a state (Meilisearch) fall back to id only. */
+function byState(hits: SearchHit[]): Prisma.UnclaimedFolioWhereInput[] {
+  const groups = new Map<string, string[]>();
+  for (const h of hits) groups.set(h.state ?? "", [...(groups.get(h.state ?? "") ?? []), h.id]);
+  const where = [...groups].map(([state, ids]) =>
+    state ? { state: state as IndianState, id: { in: ids } } : { id: { in: ids } },
+  );
+  return where.length ? where : [{ id: { in: [] } }];
+}
 const MAX_CLAIM_FOLIOS = 10;
 
 export function estimateValuePaise(f: FolioWithCompany): number {
@@ -63,6 +75,8 @@ export class SearchService {
       investorFullName: f.investorFullName,
       fatherOrSpouseName: f.fatherOrSpouseName,
       city: f.city,
+      pincodeMasked: maskPincode(f.pincode),
+      investorClusterId: f.investorClusterId,
       state: f.state,
       custodyStatus: f.custodyStatus,
       companyName: open ? f.company.name : maskCompanyName(f.company.name),
@@ -153,7 +167,8 @@ export class SearchService {
     for (const h of jointHits) if (!hits.has(h.id)) hits.set(h.id, { hit: h, holder: "joint" });
 
     const folios = await this.prisma.client.unclaimedFolio.findMany({
-      where: { id: { in: [...hits.keys()] } },
+      // Grouped by state, so Postgres prunes to the partitions that matched.
+      where: { OR: byState([...hits.values()].map((h) => h.hit)) },
       include: { company: true },
     });
     const byId = new Map(folios.map((f) => [f.id, f]));
@@ -217,6 +232,24 @@ export class SearchService {
       : null;
     const estimate = folios.reduce((s, f) => s + estimateValuePaise(f), 0);
     const now = new Date();
+    // Never mix claimants: a holding another client already has a case on, or
+    // that another person has asked for, is flagged for an analyst to review.
+    const [contestedCases, contestedLeads] = await Promise.all([
+      db.recoveryCase.findMany({
+        where: { folioId: { in: folioIds }, clientUserId: { not: user.id } },
+        select: { caseCode: true, folioId: true },
+      }),
+      db.leadInquiry.findMany({
+        where: {
+          phone: { not: user.phone },
+          matchedFolioIds: { hasSome: folioIds },
+          crmStage: { not: "CONVERTED_TO_CASE" },
+        },
+        select: { id: true },
+      }),
+    ]);
+    const reviewAlert =
+      contestedCases.length || contestedLeads.length ? "DUPLICATE_CLAIMANT_REVIEW" : null;
     const existing = await db.leadInquiry.findFirst({
       where: {
         phone: user.phone,
@@ -238,6 +271,7 @@ export class SearchService {
             unlockedAt: now,
             estimatedValuePaise: BigInt(Math.max(Number(existing.estimatedValuePaise), estimate)),
             associateId: existing.associateId ?? associate?.id ?? null,
+            reviewAlert: reviewAlert ?? existing.reviewAlert,
           },
         })
       : await db.leadInquiry.create({
@@ -253,6 +287,7 @@ export class SearchService {
             assignedAnalystId: await this.pickAnalyst(),
             estimatedValuePaise: BigInt(estimate),
             associateId: associate?.id ?? null,
+            reviewAlert,
             searchContext: {
               folios: folios.map((f) => ({ last: f.lastNameNorm, state: f.state })),
             },
@@ -267,8 +302,26 @@ export class SearchService {
       data: { folioIds, relationship: body.relationshipToHolder },
       ip,
     });
+    if (reviewAlert)
+      await this.audit.record({
+        actorId: user.id,
+        actorRole: user.role,
+        action: "lead.duplicate_claimant",
+        entityType: "lead",
+        entityId: lead.id,
+        data: {
+          folioIds,
+          otherCases: contestedCases.map((c) => c.caseCode),
+          otherLeads: contestedLeads.map((l) => l.id),
+        },
+        ip,
+      });
     await this.jobs.enqueue("lead.notify-analyst", { leadId: lead.id });
-    return { leadId: lead.id, folioCount: lead.matchedFolioIds.length };
+    return {
+      leadId: lead.id,
+      folioCount: lead.matchedFolioIds.length,
+      underReview: !!lead.reviewAlert,
+    };
   }
 
   /** The valuation analyst with the fewest open leads. */

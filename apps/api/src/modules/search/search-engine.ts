@@ -1,9 +1,14 @@
 import { Logger } from "@nestjs/common";
+import { createHash } from "node:crypto";
+
 import { Prisma, type PrismaClient } from "@recoveryos/db";
-import { phoneticKeys, type ResolvedSearch } from "@recoveryos/shared";
+import pg from "pg";
+import { ALL_INDIA, INDIAN_STATES, phoneticKeys, type ResolvedSearch } from "@recoveryos/shared";
 
 export interface SearchHit {
   id: string;
+  /** The row's partition, so follow-up reads touch only the partitions involved. */
+  state?: string;
   score: number;
   matchedBy: "exact" | "trigram" | "phonetic" | "sound-alike";
 }
@@ -33,7 +38,31 @@ const FUZZY_BELOW = 10;
 
 export class PostgresSearchEngine implements SearchEngine {
   readonly name = "postgres" as const;
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly pool: pg.Pool) {}
+
+  /**
+   * A pool of its own: every search runs as a named prepared statement with a
+   * cached generic plan, because planning a query over 38 partitions costs
+   * about 5 ms while running it costs under 1 ms. The connections also carry
+   * the fuzzy-match settings (trigram threshold 0.45, GIN result cap 500).
+   */
+  static pool(databaseUrl: string): pg.Pool {
+    return new pg.Pool({
+      connectionString: databaseUrl,
+      max: 10,
+      options:
+        "-c plan_cache_mode=force_generic_plan -c pg_trgm.similarity_threshold=0.45 -c gin_fuzzy_search_limit=500",
+    });
+  }
+
+  private async run<T extends pg.QueryResultRow>(sql: Prisma.Sql): Promise<T[]> {
+    const name = `s_${createHash("sha1").update(sql.text).digest("hex").slice(0, 20)}`;
+    return (await this.pool.query<T>({ name, text: sql.text, values: sql.values })).rows;
+  }
+
+  async onModuleDestroy() {
+    await this.pool.end();
+  }
 
   async search(q: ResolvedSearch, limit: number): Promise<SearchHit[]> {
     const exact = await this.byKeys(q, limit);
@@ -51,6 +80,8 @@ export class PostgresSearchEngine implements SearchEngine {
     const custody = q.custodyStatus
       ? Prisma.sql`AND f.custody_status = ${q.custodyStatus}::"CustodyStatus"`
       : Prisma.empty;
+    // All India: every partition is scanned (in parallel where the planner can).
+    if (q.state === ALL_INDIA) return Prisma.sql`TRUE ${custody}`;
     return Prisma.sql`(f.state = ${q.state}::"IndianState" OR f.state = 'UNKNOWN'::"IndianState") ${custody}`;
   }
 
@@ -67,16 +98,17 @@ export class PostgresSearchEngine implements SearchEngine {
     const exact = parts.map((p) =>
       q[p].length === 1 ? Prisma.sql`true` : Prisma.sql`${COLUMN[p].norm} = ${q[p]}`,
     );
-    const rows = await this.db.$queryRaw<{ id: string; exact: boolean }[]>`
-      SELECT f.id, (${Prisma.join(exact, " AND ")}) AS exact
+    const rows = await this.run<{ id: string; state: string; exact: boolean }>(Prisma.sql`
+      SELECT f.id, f.state::text AS state, (${Prisma.join(exact, " AND ")}) AS exact
       FROM unclaimed_folios f
       WHERE ${this.stateFilter(q)}
         AND ${Prisma.join(conditions, " AND ")}
       ORDER BY f.post_action_shares DESC
-      LIMIT ${limit}`;
+      LIMIT ${limit}`);
     return rows
       .map((r) => ({
         id: r.id,
+        state: r.state,
         score: r.exact ? 1 : 0.86,
         matchedBy: (r.exact ? "exact" : "phonetic") as SearchHit["matchedBy"],
       }))
@@ -137,34 +169,38 @@ export class PostgresSearchEngine implements SearchEngine {
     const drivers = words.filter((p) => p !== "middle");
     if (!drivers.length) return [];
     const branch = (cond: (p: (typeof drivers)[number]) => Prisma.Sql) =>
-      Prisma.sql`(SELECT f.id FROM unclaimed_folios f
+      Prisma.sql`(SELECT f.id, f.state FROM unclaimed_folios f
         WHERE ${this.stateFilter(q)} AND ${Prisma.join(drivers.map(cond), " AND ")}
         LIMIT 200)`;
     const soundAlike = branch(
       (p) => Prisma.sql`dmetaphone(${COLUMN[p].norm}) = dmetaphone(${q[p]})`,
     );
     const spelling = branch((p) => Prisma.sql`${COLUMN[p].norm} IN ${similar(q[p])}`);
-    const rows = await this.db.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe("SET LOCAL pg_trgm.similarity_threshold = 0.45");
-      await tx.$executeRawUnsafe("SET LOCAL gin_fuzzy_search_limit = 500");
-      return tx.$queryRaw<
-        { id: string; score: number; exact: boolean; phonetic: boolean; trigram: number }[]
-      >`
-        WITH cand AS (${soundAlike} UNION ${spelling})
-        SELECT f.id,
+    const rows = await this.run<{
+      id: string;
+      score: number;
+      exact: boolean;
+      phonetic: boolean;
+      trigram: number;
+      state: string;
+    }>(Prisma.sql`
+        WITH cand AS (${soundAlike} UNION ${spelling}),
+        -- Fetch only the candidates, by primary key, before any per-row scoring.
+        picked AS MATERIALIZED (
+          SELECT f.* FROM cand c JOIN unclaimed_folios f ON f.id = c.id AND f.state = c.state
+        )
+        SELECT f.id, f.state::text AS state,
                (${Prisma.join(scores, " + ")}) / ${parts.length}::float AS score,
                (${Prisma.join(exact, " AND ")}) AS exact,
                (${Prisma.join(phonetic, " AND ")}) AS phonetic,
                similarity(f.full_name_norm, ${[q.first, q.middle, q.last].filter(Boolean).join(" ")}) AS trigram
-        FROM unclaimed_folios f
-        WHERE ${this.stateFilter(q)}
-          AND f.id IN (SELECT id FROM cand)
-          AND ${Prisma.join(conditions, " AND ")}
+        FROM picked f
+        WHERE ${Prisma.join(conditions, " AND ")}
         ORDER BY score DESC, trigram DESC, f.post_action_shares DESC
-        LIMIT ${limit}`;
-    });
+        LIMIT ${limit}`);
     return rows.map((r) => ({
       id: r.id,
+      state: r.state,
       score: Math.round(Math.min(1, Number(r.score)) * 100) / 100,
       matchedBy: r.exact
         ? "exact"
@@ -199,6 +235,10 @@ export class MeiliSearchEngine implements SearchEngine {
     private readonly fallback: PostgresSearchEngine,
   ) {}
 
+  async onModuleDestroy() {
+    await this.fallback.onModuleDestroy();
+  }
+
   static indexFor(state: string): string {
     return `folios_${state.toLowerCase()}`;
   }
@@ -226,7 +266,12 @@ export class MeiliSearchEngine implements SearchEngine {
       const res = await fetch(`${this.host}/multi-search`, {
         method: "POST",
         headers: this.headers(),
-        body: JSON.stringify({ queries: [query(q.state), query("UNKNOWN")] }),
+        body: JSON.stringify({
+          queries:
+            q.state === ALL_INDIA
+              ? [...INDIAN_STATES, "UNKNOWN"].map(query)
+              : [query(q.state), query("UNKNOWN")],
+        }),
         signal: AbortSignal.timeout(800),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

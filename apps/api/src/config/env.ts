@@ -54,6 +54,11 @@ const schema = z
       .enum(["true", "false"])
       .optional()
       .transform((v) => (v === undefined ? process.env.NODE_ENV !== "test" : v === "true")),
+    /** Load the search indexes into cache on start-up. Off under test. */
+    PREWARM_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((v) => (v === undefined ? process.env.NODE_ENV !== "test" : v === "true")),
     /** Hours before the same company's published statements are fetched again. */
     LIVE_SYNC_TTL_HOURS: z.coerce.number().min(1).default(24),
     /** Live NSE/BSE price sync. Off by default under test. */

@@ -10,7 +10,7 @@ import {
   type FieldKeys,
   type PrismaClient,
 } from "@recoveryos/db";
-import type { IndianState } from "@recoveryos/shared";
+import type { SearchScope } from "@recoveryos/shared";
 import { Observable, Subject } from "rxjs";
 
 import { ENV, type Env } from "../../config/env.js";
@@ -37,7 +37,7 @@ export interface UpstreamResult {
 }
 
 export interface RefreshContext {
-  state: IndianState;
+  state: SearchScope;
   databaseUrl: string;
   keys: FieldKeys;
 }
@@ -171,7 +171,7 @@ export class LiveMcaSyncService {
   }
 
   /** Starts (or joins) a refresh for this search and returns its id, or null when disabled. */
-  trigger(state: IndianState): string | null {
+  trigger(state: SearchScope): string | null {
     if (!this.enabled) return null;
     this.sweep();
     const id = randomUUID();
@@ -221,7 +221,7 @@ export class LiveMcaSyncService {
     run.subject.complete();
   }
 
-  private async refreshAll(state: IndianState): Promise<UpstreamResult> {
+  private async refreshAll(state: SearchScope): Promise<UpstreamResult> {
     const total: UpstreamResult = { filesChecked: 0, inserted: 0, updated: 0 };
     for (const source of this.sources) {
       const r = await source.refresh(this.prisma.client, {

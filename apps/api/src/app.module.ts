@@ -4,6 +4,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 
 import { ENV, loadEnv, type Env } from "./config/env.js";
+import { PrewarmService } from "./common/prewarm.service.js";
 import { AuditService } from "./common/audit.service.js";
 import { AuthGuard } from "./common/auth/auth.guard.js";
 import { TokensService } from "./common/auth/tokens.service.js";
@@ -76,12 +77,13 @@ import { ValuationController } from "./modules/valuation/valuation.controller.js
       provide: SEARCH_ENGINE,
       inject: [ENV, PrismaService],
       useFactory: (env: Env, prisma: PrismaService) => {
-        const pg = new PostgresSearchEngine(prisma.client);
+        const pg = new PostgresSearchEngine(PostgresSearchEngine.pool(prisma.databaseUrl));
         return env.MEILI_HOST ? new MeiliSearchEngine(env.MEILI_HOST, env.MEILI_API_KEY, pg) : pg;
       },
     },
     PrismaService,
     AuditService,
+    PrewarmService,
     TokensService,
     JobQueueService,
     JobHandlersService,

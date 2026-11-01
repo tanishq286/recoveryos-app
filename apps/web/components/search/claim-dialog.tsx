@@ -30,7 +30,7 @@ export function ClaimDialog({
   folioIds: string[];
   referralCode?: string;
 }) {
-  const [done, setDone] = React.useState(false);
+  const [done, setDone] = React.useState<null | { underReview: boolean }>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [relationship, setRelationship] = React.useState<Relationship>("SELF");
@@ -40,7 +40,7 @@ export function ClaimDialog({
   function handleOpenChange(next: boolean) {
     if (!next) {
       setError(null);
-      setDone(false);
+      setDone(null);
     }
     onOpenChange(next);
   }
@@ -51,7 +51,7 @@ export function ClaimDialog({
     setBusy(true);
     setError(null);
     try {
-      await callApi("search/claim", {
+      const res = await callApi<{ underReview: boolean }>("search/claim", {
         body: {
           folioIds,
           relationshipToHolder: relationship,
@@ -60,7 +60,7 @@ export function ClaimDialog({
           consent: true,
         },
       });
-      setDone(true);
+      setDone({ underReview: res.underReview });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -76,8 +76,9 @@ export function ClaimDialog({
             <CheckCircle2Icon className="mx-auto size-12 text-confirmed" aria-hidden="true" />
             <DialogTitle className="mt-4 pr-0">Your free trace has started</DialogTitle>
             <DialogDescription>
-              A {BRAND.name} analyst has your request and will call you within one working day with
-              your custom quote. Nothing is payable upfront.
+              {done.underReview
+                ? `Another person has also asked about one of these holdings. A ${BRAND.name} analyst will verify the family details with each claimant separately before anything proceeds; nothing is shared between you.`
+                : `A ${BRAND.name} analyst has your request and will call you within one working day with your custom quote. Nothing is payable upfront.`}
             </DialogDescription>
             <Button className="mt-6 w-full" onClick={() => handleOpenChange(false)}>
               Done

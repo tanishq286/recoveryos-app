@@ -1071,6 +1071,242 @@ describe("bulk loader: partition rebuild", () => {
   });
 });
 
+describe("Pan-India isolation: namesakes never mix", () => {
+  const A = "9876511111";
+  const B = "9876522222";
+  const NAME = "Rajesh Kumar Sharma";
+  const tokenFor: Record<string, string> = {};
+  const as = (p: string) => ({ authorization: `Bearer ${tokenFor[p]}` });
+  let folioId: string;
+  let folioName: string;
+  let folioState: string;
+
+  beforeAll(async () => {
+    for (const phone of [A, B]) {
+      await request(http)
+        .post("/api/v1/auth/otp/request")
+        .send({ phone, purpose: "LOGIN" })
+        .expect(200);
+      const res = await request(http)
+        .post("/api/v1/auth/otp/verify")
+        .send({
+          phone,
+          code: otp.lastCode(`+91${phone}`),
+          name: NAME,
+          email: `${phone}@example.in`,
+        })
+        .expect(200);
+      tokenFor[phone] = res.body.token;
+    }
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const free = await db.query(
+      `SELECT id, investor_full_name, state::text FROM unclaimed_folios
+       WHERE id NOT IN (SELECT folio_id FROM recovery_cases WHERE folio_id IS NOT NULL)
+         AND id NOT IN (SELECT unnest(matched_folio_ids) FROM leads_and_inquiries)
+         AND state <> 'UNKNOWN' LIMIT 1`,
+    );
+    await db.end();
+    folioId = free.rows[0].id;
+    folioName = free.rows[0].investor_full_name;
+    folioState = free.rows[0].state;
+  });
+
+  it("gives namesakes different holder IDs and shows masked PINs", async () => {
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const ids = await db.query(
+      `SELECT investor_cluster_id($1, 'Mohan Lal Sharma', '400001', 'Mumbai', 'MAHARASHTRA') AS a,
+              investor_cluster_id($1, 'Suresh Sharma', '400001', 'Mumbai', 'MAHARASHTRA') AS b,
+              investor_cluster_id($1, 'Mohan Lal Sharma', '411001', 'Pune', 'MAHARASHTRA') AS c,
+              investor_cluster_id(' RAJESH KUMAR SHARMA ', 'mohan lal sharma', '400001', 'MUMBAI', 'MAHARASHTRA') AS d`,
+      [NAME],
+    );
+    await db.end();
+    const { a, b, c, d } = ids.rows[0];
+    expect(new Set([a, b, c]).size).toBe(3); // different father, or different PIN and city
+    expect(d).toBe(a); // same person, written differently
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" })
+      .expect(200);
+    for (const r of res.body.results) {
+      expect(r.investorClusterId).toMatch(/^[0-9a-f]{64}$/);
+      if (r.pincodeMasked) expect(r.pincodeMasked).toMatch(/^\d{3}\*\*\*$/);
+    }
+  });
+
+  it("searches all of India across every state partition", async () => {
+    const india = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "ALL_INDIA" })
+      .expect(200);
+    expect(india.body.query.state).toBe("ALL_INDIA");
+    const states = new Set(india.body.results.map((r: { state: string }) => r.state));
+    expect(states.has("DELHI")).toBe(true);
+    const delhi = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ lastName: "Agarwal", state: "DELHI" })
+      .expect(200);
+    expect(india.body.total).toBeGreaterThanOrEqual(delhi.body.total);
+  });
+
+  it("flags a second claimant on the same holding instead of mixing them", async () => {
+    const claim = (p: string) =>
+      request(http)
+        .post("/api/v1/search/claim")
+        .set(as(p))
+        .send({
+          folioIds: [folioId],
+          relationshipToHolder: "LEGAL_HEIR",
+          physicalCertStatus: "LOST",
+          consent: true,
+        })
+        .expect(200);
+    const first = await claim(A);
+    expect(first.body.underReview).toBe(false);
+    const second = await claim(B);
+    expect(second.body.underReview).toBe(true);
+    expect(second.body.leadId).not.toBe(first.body.leadId);
+    const board = await request(http).get("/api/v1/crm/board").set(auth("analyst")).expect(200);
+    const leads = board.body.columns.flatMap((c: { items: { id: string }[] }) => c.items);
+    expect(leads.find((l: { id: string }) => l.id === second.body.leadId).reviewAlert).toBe(
+      "DUPLICATE_CLAIMANT_REVIEW",
+    );
+
+    // The analyst releases the folio to A only: B, same name, still sees it masked.
+    await request(http)
+      .post(`/api/v1/crm/leads/${first.body.leadId}/release-folios`)
+      .set(auth("analyst"))
+      .send({ folioIds: [folioId] })
+      .expect(201);
+    const view = async (p: string) =>
+      (
+        await request(http)
+          .get("/api/v1/search/unclaimed")
+          .query({ fullName: folioName, state: folioState })
+          .set(as(p))
+          .expect(200)
+      ).body.results.find((r: { id: string }) => r.id === folioId);
+    expect((await view(A)).folioReleased).toBe(true);
+    const seenByB = await view(B);
+    expect(seenByB.folioReleased).toBe(false);
+    expect(seenByB.folioNumber).toContain("***");
+
+    // A's case opens; B's flagged lead cannot become a case until reviewed.
+    const caseA = await request(http)
+      .post(`/api/v1/crm/leads/${first.body.leadId}/convert`)
+      .set(auth("analyst"))
+      .send({ folioId, scenarioType: "DECEASED_TRANSMISSION" })
+      .expect(201);
+    await request(http)
+      .post(`/api/v1/crm/leads/${second.body.leadId}/convert`)
+      .set(auth("analyst"))
+      .send({ folioId, scenarioType: "DECEASED_TRANSMISSION" })
+      .expect(409);
+
+    // B can reach nothing of A's: the case, its list entry, mandate or documents.
+    const code = caseA.body.caseCode;
+    await request(http).get(`/api/v1/cases/${code}`).set(as(B)).expect(404);
+    await request(http).get(`/api/v1/cases/${code}/mandate`).set(as(B)).expect(404);
+    await request(http).get(`/api/v1/cases/${code}/documents/PAN/file`).set(as(B)).expect(404);
+    const listB = await request(http).get("/api/v1/cases").set(as(B)).expect(200);
+    expect(listB.body.map((c: { caseCode: string }) => c.caseCode)).not.toContain(code);
+    const listA = await request(http).get("/api/v1/cases").set(as(A)).expect(200);
+    expect(listA.body.map((c: { caseCode: string }) => c.caseCode)).toContain(code);
+  });
+
+  it("enforces the same isolation in Postgres row-level security", async () => {
+    await request(http)
+      .post("/api/v1/valuation/report")
+      .set(as(A))
+      .send({
+        holdings: [
+          { symbol: "RELIANCE", exchange: "NSE", purchaseYear: 1999, originalShares: 100 },
+        ],
+      })
+      .expect(200);
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const ids = await db.query("SELECT phone, id FROM users WHERE phone = ANY($1)", [
+      [`+91${A}`, `+91${B}`],
+    ]);
+    const idOf = Object.fromEntries(ids.rows.map((r) => [r.phone, r.id]));
+    const visible = async (userId: string) => {
+      await db.query("BEGIN");
+      await db.query("SET LOCAL ROLE finsol_app_client");
+      await db.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+      const r = await db.query(
+        `SELECT
+        (SELECT count(*)::int FROM recovery_cases WHERE client_user_id = $1) AS cases_a,
+        (SELECT count(*)::int FROM valuation_reports WHERE user_id = $1) AS reports_a,
+        (SELECT count(*)::int FROM leads_and_inquiries WHERE phone = $2) AS leads_a,
+        (SELECT count(*)::int FROM case_documents d JOIN recovery_cases c ON c.id = d.case_id
+          WHERE c.client_user_id = $1) AS docs_a`,
+        [idOf[`+91${A}`], `+91${A}`],
+      );
+      await db.query("ROLLBACK");
+      return r.rows[0];
+    };
+    const forA = await visible(idOf[`+91${A}`]);
+    const forB = await visible(idOf[`+91${B}`]);
+    await db.end();
+    expect(forA).toMatchObject({ cases_a: 1, reports_a: 1, leads_a: 1 });
+    expect(forB).toEqual({ cases_a: 0, reports_a: 0, leads_a: 0, docs_a: 0 });
+  });
+});
+
+describe("Pan-India drop folder and legacy ISINs", () => {
+  it("loads a BSE scrip list and maps a pre-split ISIN to the right company", async () => {
+    const { mkdtemp, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { createPrismaClient, processFile } = await import("@recoveryos/db");
+    const dir = await mkdtemp(join(tmpdir(), "drop-"));
+    const scrips = join(dir, "ListOfScrips.csv");
+    await writeFile(
+      scrips,
+      [
+        "Security Code,Issuer Name,Security Id,Security Name,Status,Group,Face Value,ISIN No,Industry,Instrument",
+        "500034,Bajaj Finance Limited,BAJFINANCE,BAJAJ FINANCE LTD.,Active,A ,1.00,INE296A01032,NBFC,Equity",
+        "500325,Reliance Industries Ltd,RELIANCE,RELIANCE INDUSTRIES LTD.,Active,A ,10.00,INE002A01018,Refineries,Equity",
+      ].join("\n"),
+    );
+    const statement = join(dir, "iepf2-old.csv");
+    await writeFile(
+      statement,
+      [
+        "Investor First Name,Investor Middle Name,Investor Last Name,Father/Husband First Name,Address,Country,State,District,Pin Code,Folio Number,ISIN,Investment Type,Amount transferred,Proposed Date of transfer to IEPF",
+        "Shobha,,Kulkarni,Vasant,Shaniwar Peth,India,Maharashtra,Pune,411030,BFL0000123,INE296A01024,Amount for unclaimed and unpaid dividend,450,01-Sep-2019",
+      ].join("\n"),
+    );
+    const db = createPrismaClient(process.env.DATABASE_URL);
+    try {
+      expect(await processFile(db, scrips)).toMatchObject({ kind: "bse-scrips", equities: 2 });
+      expect(await processFile(db, statement)).toMatchObject({ kind: "statement", inserted: 1 });
+    } finally {
+      await db.$disconnect();
+    }
+    const found = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Shobha Kulkarni", state: "MAHARASHTRA" })
+      .set(auth("analyst"))
+      .expect(200);
+    expect(found.body.results[0]).toMatchObject({
+      companyName: "Bajaj Finance Limited",
+      pincodeMasked: "411***",
+      unclaimedDividendPaise: 45000,
+    });
+    const bse = await request(http)
+      .get("/api/v1/market/equities")
+      .query({ q: "500034" })
+      .expect(200);
+    expect(bse.body.results).toEqual(
+      expect.arrayContaining([expect.objectContaining({ exchange: "BSE", symbol: "500034" })]),
+    );
+  });
+});
+
 describe("audit log", () => {
   it("is append-only, even for the table owner", async () => {
     const db = new pg.Client({ connectionString: process.env.DATABASE_URL });

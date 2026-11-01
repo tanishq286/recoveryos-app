@@ -105,6 +105,15 @@ automatically: download those statements and upload them.
 | `npm test`                                                 | Shared unit tests (22) and API tests (32) against a fresh `recoveryos_test` database |
 | `npm run typecheck` / `npm run lint` / `npm run build`     | Across all workspaces                                                                |
 
+**Drop folder.** Files placed in `data/pan-india-drop/` are loaded by
+`npm run ingest:pan-india -w @recoveryos/db` (`-- --watch` keeps polling): IEPF-2/IEPF-4 and
+registrar statements stream into the state partitions; BSE's "List of Scrips" export and NSE's
+equity lists fill the calculator's directory. Rows are matched to companies by CIN, current or
+legacy ISIN (Bajaj Finance's pre-split `INE296A01024` maps to `INE296A01032`) or name, or by a
+file name starting with a CIN, ISIN or slug. Download each file yourself from its source: the
+tools never fetch from sites that refuse automated clients, so BSE and registrar data arrive
+through this folder or a licensed feed.
+
 ### Environment
 
 Every integration has a local adapter, and setting its variables switches it to the real
@@ -165,6 +174,36 @@ crm/leads/:id/release-folios` or `POST cases/:code/release-folio`), or automatic
 client eSigns their Digital Mandate. `POST search/claim` turns
 the member's selection into a CRM lead with the least-loaded analyst. Members get
 `MEMBER_SEARCHES_PER_DAY` checks a day.
+
+**Namesakes and tenant isolation.** Thousands of shareholders share a name, even within one
+state, so nothing is ever grouped or unlocked by name:
+
+- `unclaimed_folios.investor_cluster_id` is a stored SHA-256 of the holder's name, father or
+  spouse, PIN, city and state (`investor_cluster_id()` in `migrations/20261103000000_isolation`).
+  Search results carry it as a "Holder ID" with the father/spouse, city and masked PIN
+  (`400***`). The web app warns when a selection spans more than one Holder ID.
+- A member sees a folio number only when it was released to _their_ verified mobile (an analyst
+  release on their lead, or their own signed mandate), never because they share a name.
+- Clients' case, document and lead reads run as the `finsol_app_client` role with `app.user_id`
+  set for the transaction, so Postgres row-level security on `recovery_cases`, `case_documents`,
+  `leads_and_inquiries` and `valuation_reports` returns only their own rows, whatever the query
+  asks for. Staff paths run as the owner. In production, grant `finsol_app_client` to the API's
+  database user.
+- `recovery_cases (folio_id, client_user_id)` is unique. When someone claims a holding that
+  another client already has a case or open request on, their lead is kept separate and flagged
+  `DUPLICATE_CLAIMANT_REVIEW` on the CRM board; it cannot become a case until an analyst marks it
+  reviewed.
+
+**All India.** The 3-Minute Check offers "All India (Pan-India Search)" for families who moved
+across states; it searches every partition. Searches run on a dedicated connection pool as named
+prepared statements with cached generic plans (`plan_cache_mode = force_generic_plan`): planning
+a query over 38 partitions costs about 5 ms, running it under 1 ms. The pool's connections also
+carry the fuzzy-match settings (trigram threshold 0.45, `gin_fuzzy_search_limit = 500`).
+
+**Warm after restarts.** On start-up the API runs `pg_prewarm` over every partition's search
+indexes (`PREWARM_ENABLED`, on outside tests), in the background. For a warm buffer cache across
+database restarts as well, add `pg_prewarm` to `shared_preload_libraries` so its autoprewarm
+worker restores it.
 
 **Live refresh.** Each search returns a `liveRefreshId`; `GET search/live/:id` streams
 server-sent events while `LiveMcaSyncService` (`apps/api/src/modules/search/live-mca-sync.service.ts`)
@@ -286,24 +325,29 @@ without Redis), then syncs Meilisearch when it is configured.
 
 Measured on the development machine (24 cores, embedded PostgreSQL 18) with
 `npm run bench:partitions`, which writes generated holders only to `recoveryos_bench`
-(dropped afterwards). 50,000,000 rows; the largest partition (Maharashtra) holds 8.79M.
+(dropped afterwards). 50,000,000 rows; the largest partition (Maharashtra) holds 8.79M. Search
+runs as the API does: prepared statements with cached generic plans, 400 queries per set.
 
-| Measure                                                       | Result                                |
-| ------------------------------------------------------------- | ------------------------------------- |
-| Streaming 50M rows with binary COPY (generation + encryption) | 814 s, ~61,000 rows/s (Node-bound)    |
-| Rebuild + swap, Maharashtra partition (8.79M rows)            | 177 s                                 |
-| Rebuild + swap, all 38 partitions (4 at a time)               | ~6.5 min                              |
-| Search, common names (key match), warm cache                  | p50 0.65 ms, p95 1.01 ms, p99 1.22 ms |
-| Search, misspelt names, warm cache                            | p50 0.58 ms, p95 0.91 ms, p99 1.25 ms |
-| Search, no phonetic match (fuzzy phase), warm cache           | p50 3.01 ms, p95 3.83 ms, p99 4.68 ms |
-| Re-import of a real 9,997-row Dabur statement (merge mode)    | 127 ms COPY + 628 ms merge            |
+| Measure                                                       | Result                             |
+| ------------------------------------------------------------- | ---------------------------------- |
+| Streaming 50M rows with binary COPY (generation + encryption) | 884 s, ~57,000 rows/s (Node-bound) |
+| Rebuild + swap of all 38 partitions (4 at a time)             | ~8.4 min (Maharashtra: 271 s)      |
+| Total load                                                    | ~23 min                            |
+| Re-import of a real 9,997-row Dabur statement (merge mode)    | 127 ms COPY + 628 ms merge         |
 
-With a cold cache (first queries after a database restart) common-name searches measured p50
-0.63 ms but p95 6.7 ms and p99 14.4 ms while index pages were read from disk; give the database
-enough memory to keep the search indexes cached. The generated data uses ~200 distinct name words, so the `name_words` vocabulary is tiny; real
-data will have hundreds of thousands of words, which makes the vocabulary trigram lookup a few
-milliseconds slower. Total 50M load time is about 20 minutes here, not 7–9: streaming is
-limited by row generation and AES encryption in one Node process.
+| Search (p50 / p95 / p99, ms) | One state          | All India          |
+| ---------------------------- | ------------------ | ------------------ |
+| Common names (key match)     | 0.40 / 3.83 / 7.24 | 0.58 / 0.88 / 9.58 |
+| Misspelt names               | 0.37 / 0.59 / 4.41 | 0.56 / 0.77 / 1.00 |
+| No phonetic match (fuzzy)    | 0.77 / 1.37 / 2.01 | 1.16 / 1.59 / 9.49 |
+
+The p99 values include each connection's first use of a statement, before its plan is cached.
+With an empty OS cache after a machine restart, an earlier run measured common-name p95 at 6.7 ms
+until the indexes were read in; the API's start-up `pg_prewarm` exists for this. Its effect on a
+truly cold machine was not measured here, since that needs root to drop the OS page cache. The
+generated data uses ~200 distinct name words; real data has far more, which makes the vocabulary
+lookup a little slower. Streaming is limited by row generation and AES encryption in one Node
+process.
 
 ## Web app (apps/web)
 

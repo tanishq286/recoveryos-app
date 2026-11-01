@@ -5,10 +5,18 @@ const ORDERED = [...INDIAN_STATES]
   .filter((s) => s !== "OUT_OF_INDIA")
   .sort((a, b) => STATE_LABELS[a].localeCompare(STATE_LABELS[b]));
 
-export function StateOptions({ placeholder = "Choose a state" }: { placeholder?: string }) {
+export function StateOptions({
+  placeholder = "Choose a state",
+  allIndia = false,
+}: {
+  placeholder?: string;
+  /** Offer the Pan-India search, for families who moved across states. */
+  allIndia?: boolean;
+}) {
   return (
     <>
       <option value="">{placeholder}</option>
+      {allIndia && <option value="ALL_INDIA">All India (Pan-India Search)</option>}
       {ORDERED.map((s) => (
         <option key={s} value={s}>
           {STATE_LABELS[s]}

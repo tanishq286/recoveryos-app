@@ -23,7 +23,8 @@
     "ingest:iepf": "node dist/cli/ingest-iepf.js",
     "fetch:iepf": "node dist/fetch-public-iepf-lists.js",
     "fixtures:test": "node dist/fixtures/test-fixtures.js",
-    "bench:partitions": "node dist/bench/partition-bench.js"
+    "bench:partitions": "node dist/bench/partition-bench.js",
+    "ingest:pan-india": "node dist/ingest-pan-india.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

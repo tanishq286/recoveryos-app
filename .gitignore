@@ -49,3 +49,7 @@ dist/
 .data/
 .uploads/
 packages/db/src/generated/
+
+# Pan-India drop folder: data files never go into git
+data/pan-india-drop/*
+!data/pan-india-drop/README.md

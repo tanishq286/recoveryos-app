@@ -17,6 +17,10 @@ import { normalizeName, splitName } from "./names.js";
  */
 export type SearchMode = "FULL" | "FIRST" | "MIDDLE" | "LAST";
 
+/** Searches every state partition at once, for families who moved across states. */
+export const ALL_INDIA = "ALL_INDIA" as const;
+export type SearchScope = IndianState | typeof ALL_INDIA;
+
 export interface SearchInput {
   /** A second name to check, e.g. a joint holder or another family member. */
   jointHolderName?: string;
@@ -24,7 +28,7 @@ export interface SearchInput {
   middleName?: string;
   lastName?: string;
   fullName?: string;
-  state: IndianState;
+  state: SearchScope;
   custodyStatus?: CustodyStatus;
 }
 
@@ -33,7 +37,7 @@ export interface ResolvedSearch {
   first: string;
   middle: string;
   last: string;
-  state: IndianState;
+  state: SearchScope;
   custodyStatus?: CustodyStatus;
 }
 
@@ -69,6 +73,13 @@ export interface SearchResultItem {
   investorFullName: string;
   fatherOrSpouseName: string | null;
   city: string | null;
+  /** "400***": enough to tell namesakes apart without exposing the address. */
+  pincodeMasked: string | null;
+  /**
+   * The holder's identity cluster: name, father/spouse, PIN, city and state.
+   * Rows with the same name but a different cluster are different people.
+   */
+  investorClusterId: string;
   /** The holder's state, or UNKNOWN when the statement gives none. */
   state: FolioState;
   custodyStatus: CustodyStatus;
@@ -99,7 +110,7 @@ export interface SearchResultItem {
 
 export interface SearchResponse {
   mode: SearchMode;
-  query: { first: string; middle: string; last: string; state: IndianState; jointHolder: string };
+  query: { first: string; middle: string; last: string; state: SearchScope; jointHolder: string };
   access: ResultAccess;
   total: number;
   results: SearchResultItem[];
@@ -128,6 +139,8 @@ export interface ClaimRequestBody {
 export interface ClaimResponse {
   leadId: string;
   folioCount: number;
+  /** True when another client already has a case or request on one of these holdings. */
+  underReview: boolean;
 }
 
 export const VALUATION_BASIS =

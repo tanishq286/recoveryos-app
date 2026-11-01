@@ -17,6 +17,8 @@ export interface ReferenceCompany {
   /** For bodies set up by statute rather than incorporated under the Companies Act. */
   statutoryBasis: string | null;
   isin: string | null;
+  /** Earlier ISINs still printed on old IEPF statements (e.g. before a face-value split). */
+  legacyIsins?: string[];
   sector: string;
   tickerNse: string | null;
   tickerBse: string | null;
@@ -257,7 +259,9 @@ export const REFERENCE_COMPANIES: ReferenceCompany[] = [
     slug: "bajaj-finance-limited",
     name: "Bajaj Finance Limited",
     cin: "L65910MH1987PLC042961",
-    isin: "INE296A01024",
+    // Face value Re 1 from 16 Jun 2025 (split from ₹2 with a 4:1 bonus); confirmed by the operations team.
+    isin: "INE296A01032",
+    legacyIsins: ["INE296A01024"],
     sector: "Non-banking finance",
     tickerNse: "BAJFINANCE",
     tickerBse: "500034",

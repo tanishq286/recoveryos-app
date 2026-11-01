@@ -51,6 +51,7 @@ export type Field =
   | "eventDate"
   | "companyName"
   | "cin"
+  | "isin"
   | "srn"
   | "investmentType"
   | "financialYear";
@@ -135,6 +136,7 @@ export const HEADER_ALIASES: Record<Field, string[]> = {
   ],
   companyName: ["Company Name", "Name of Company", "Name of the Company"],
   cin: ["CIN", "Company CIN", "Corporate Identification Number"],
+  isin: ["ISIN", "ISIN No", "ISIN Number", "ISIN Code"],
   srn: ["SRN", "Service Request Number"],
   investmentType: ["Investment Type", "Nature of Amount", "Nature of Investment"],
   financialYear: ["Financial Year", "Dividend Year", "Year"],
@@ -221,6 +223,7 @@ export interface ParsedRow {
   transferFinancialYear: string | null;
   companyName: string | null;
   cin: string | null;
+  isin: string | null;
   srn: string | null;
   investmentType: string | null;
 }
@@ -397,6 +400,7 @@ export function parseRow(
           : null,
       companyName: get("companyName") || null,
       cin: get("cin").toUpperCase() || null,
+      isin: get("isin").toUpperCase() || null,
       srn: get("srn") || null,
       investmentType: get("investmentType") || null,
     },
@@ -478,7 +482,7 @@ export async function ingestStatement(
   const form = opts.form ?? detectForm(map);
 
   const companies = await db.company.findMany({
-    select: { id: true, cin: true, slug: true, name: true },
+    select: { id: true, cin: true, slug: true, name: true, isin: true, legacyIsins: true },
   });
   const bySlugOrName = new Map<string, string>();
   for (const c of companies) {
@@ -486,6 +490,10 @@ export async function ingestStatement(
     bySlugOrName.set(norm(c.name.replace(/limited$/i, "ltd")), c.id);
   }
   const byCin = new Map(companies.filter((c) => c.cin).map((c) => [c.cin!, c.id]));
+  // Old statements print the ISIN of the day, including pre-split ones.
+  const byIsin = new Map(
+    companies.flatMap((c) => [...(c.isin ? [c.isin] : []), ...c.legacyIsins].map((i) => [i, c.id])),
+  );
   const actionsFor = new Map<string, CorporateActionLike[]>();
   async function actions(companyId: string) {
     if (!actionsFor.has(companyId)) {
@@ -529,11 +537,15 @@ export async function ingestStatement(
     const companyId =
       opts.companyId ??
       (r.cin && byCin.get(r.cin)) ??
+      (r.isin && byIsin.get(r.isin)) ??
       (r.companyName && bySlugOrName.get(norm(r.companyName))) ??
       null;
     if (!companyId) {
       skipped++;
-      keep({ row: r.row, message: `Unknown company ${r.cin ?? r.companyName ?? ""}`.trim() });
+      keep({
+        row: r.row,
+        message: `Unknown company ${r.cin ?? r.isin ?? r.companyName ?? ""}`.trim(),
+      });
       return;
     }
     const key = `${companyId}|${blindIndex(r.folio, keys)}|${[r.first, r.middle, r.last].join(" ").toUpperCase()}`;

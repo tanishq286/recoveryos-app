@@ -81,19 +81,39 @@ export class CasesService {
 
   /* ── Access ─────────────────────────────────────────────────────────── */
 
-  private async load(code: string): Promise<CaseFull> {
-    const c = await this.prisma.client.recoveryCase.findUnique({
-      where: { caseCode: code.toUpperCase() },
-      include: {
-        company: true,
-        folio: true,
-        client: true,
-        associate: { include: { user: true } },
-        documents: true,
-        events: { include: { actor: true }, orderBy: { createdAt: "asc" } },
-        lead: true,
-      },
+  /**
+   * Runs a read as the restricted finsol_app_client role with app.user_id set
+   * for the transaction, so Postgres row-level security returns only rows
+   * that belong to this user, whatever the query asks for.
+   */
+  private async asTenant<T>(
+    user: SessionClaims,
+    read: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SET LOCAL ROLE finsol_app_client");
+      await tx.$queryRaw`SELECT set_config('app.user_id', ${user.sub}, true)`;
+      return read(tx);
     });
+  }
+
+  private async load(code: string, user: SessionClaims): Promise<CaseFull> {
+    const db = (read: (tx: Prisma.TransactionClient) => Promise<CaseFull | null>) =>
+      isStaff(user) ? read(this.prisma.client) : this.asTenant(user, read);
+    const c = await db((tx) =>
+      tx.recoveryCase.findUnique({
+        where: { caseCode: code.toUpperCase() },
+        include: {
+          company: true,
+          folio: true,
+          client: true,
+          associate: { include: { user: true } },
+          documents: true,
+          events: { include: { actor: true }, orderBy: { createdAt: "asc" } },
+          lead: true,
+        },
+      }),
+    );
     if (!c) throw new NotFoundException("No case with that code.");
     return c;
   }
@@ -104,7 +124,7 @@ export class CasesService {
     user: SessionClaims,
     mode: "read" | "client-write" | "staff-write",
   ): Promise<CaseFull> {
-    const c = await this.load(code);
+    const c = await this.load(code, user);
     const staff = isStaff(user);
     const owner = c.clientUserId === user.sub;
     const referrer = c.associate?.userId === user.sub;
@@ -164,14 +184,16 @@ export class CasesService {
       : user.role === "ASSOCIATE_PARTNER"
         ? { OR: [{ associate: { userId: user.sub } }, { clientUserId: user.sub }] }
         : { clientUserId: user.sub };
-    const cases = await this.prisma.client.recoveryCase.findMany({
-      where,
-      include: {
-        company: { select: { name: true, slug: true } },
-        client: { select: { name: true } },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+    const read = (tx: Prisma.TransactionClient) =>
+      tx.recoveryCase.findMany({
+        where,
+        include: {
+          company: { select: { name: true, slug: true } },
+          client: { select: { name: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+    const cases = isStaff(user) ? await read(this.prisma.client) : await this.asTenant(user, read);
     return cases.map((c) => this.summary(c));
   }
 

@@ -1,6 +1,6 @@
 import Form from "next/form";
 import { LockIcon, PlusIcon, SearchIcon } from "lucide-react";
-import type { IndianState } from "@recoveryos/shared";
+import type { SearchScope } from "@recoveryos/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export interface SearchDefaults {
   name?: string;
   jointHolder?: string;
-  state?: IndianState | "";
+  state?: SearchScope | "";
 }
 
 /**
@@ -62,7 +62,7 @@ export function UnclaimedSearchForm({
               State *
             </label>
             <Select id={`${id}-state`} name="state" required defaultValue={defaults.state ?? ""}>
-              <StateOptions />
+              <StateOptions allIndia />
             </Select>
           </div>
         </div>

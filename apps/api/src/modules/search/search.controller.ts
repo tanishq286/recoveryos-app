@@ -14,6 +14,7 @@ import {
 import { map, type Observable } from "rxjs";
 import { Throttle } from "@nestjs/throttler";
 import {
+  ALL_INDIA,
   CUSTODY_STATUSES,
   INDIAN_STATES,
   PHYSICAL_CERT_STATUSES,
@@ -36,8 +37,8 @@ export const searchQuerySchema = z
     firstName: name,
     middleName: name,
     lastName: name,
-    state: z.enum(INDIAN_STATES, {
-      error: "Choose the state on the investor's last known address.",
+    state: z.enum([...INDIAN_STATES, ALL_INDIA], {
+      error: "Choose the state on the investor's last known address, or All India.",
     }),
     custodyStatus: z.enum(CUSTODY_STATUSES).optional(),
   })

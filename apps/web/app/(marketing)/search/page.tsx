@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { InfoIcon, SearchXIcon } from "lucide-react";
 import {
   BRAND,
+  ALL_INDIA,
   BRAND_EMAILS,
   isIndianState,
   STATE_LABELS,
-  type IndianState,
   type SearchResponse,
+  type SearchScope,
 } from "@recoveryos/shared";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -34,7 +35,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     one(p.name) || [one(p.firstName), one(p.middleName), one(p.lastName)].filter(Boolean).join(" ");
   const joint = one(p.joint);
   const stateRaw = one(p.state);
-  const state: IndianState | "" = isIndianState(stateRaw) ? stateRaw : "";
+  const state: SearchScope | "" =
+    stateRaw === ALL_INDIA ? ALL_INDIA : isIndianState(stateRaw) ? stateRaw : "";
   const ref = one(p.ref) || undefined;
   const asked = name.length > 0;
 
@@ -56,11 +58,13 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   }
 
   const who = [name, joint].filter(Boolean).join(" or ");
-  const where = data
-    ? data.query.state === "OUT_OF_INDIA"
-      ? "Out of India / NRI"
-      : STATE_LABELS[data.query.state]
-    : "";
+  const where = !data
+    ? ""
+    : data.query.state === ALL_INDIA
+      ? "all of India"
+      : data.query.state === "OUT_OF_INDIA"
+        ? "Out of India / NRI"
+        : STATE_LABELS[data.query.state];
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
