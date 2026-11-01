@@ -29,6 +29,8 @@ interface ApiOptions {
   revalidate?: number;
   method?: string;
   body?: unknown;
+  /** Abort after this many milliseconds (ApiError status 504). */
+  timeoutMs?: number;
 }
 
 /** Server-side call to the API. Throws ApiError with the API's own message. */
@@ -40,14 +42,25 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   }
   if (opts.body !== undefined) headers["content-type"] = "application/json";
   const personal = opts.session;
-  const res = await fetch(`${API_URL}/${path.replace(/^\//, "")}`, {
-    method: opts.method ?? "GET",
-    headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-    ...(personal || opts.revalidate === undefined
-      ? { cache: "no-store" as const }
-      : { next: { revalidate: opts.revalidate } }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/${path.replace(/^\//, "")}`, {
+      method: opts.method ?? "GET",
+      headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      ...(opts.timeoutMs ? { signal: AbortSignal.timeout(opts.timeoutMs) } : {}),
+      ...(personal || opts.revalidate === undefined
+        ? { cache: "no-store" as const }
+        : { next: { revalidate: opts.revalidate } }),
+    });
+  } catch (e) {
+    // Network failure or timeout: never mistaken for an empty answer.
+    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    throw new ApiError(
+      timedOut ? 504 : 503,
+      timedOut ? "The service took too long to answer." : "The service is not reachable.",
+    );
+  }
   const body = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
   if (!res.ok) throw new ApiError(res.status, messageOf(body, res.status));
   return body as T;

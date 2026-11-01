@@ -67,6 +67,8 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
               ["/unclaimed-shares", "Companies"],
               ["/partners", "Partners"],
               ["/login", "Client login"],
+              ["/privacy", "Privacy"],
+              ["/terms", "Terms"],
             ].map(([href, label]) => (
               <li key={href}>
                 <Link href={href} className="link text-fg-2">

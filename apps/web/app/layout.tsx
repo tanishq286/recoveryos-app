@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: "%s · Finsol Enterprises",
   },
   description:
-    "Turnkey recovery of unclaimed shares and dividends. Start a free 3-minute check. No upfront fee, no recovery no fee, 100% confidential.",
+    "Turnkey recovery of unclaimed shares and dividends. Start a free 3-minute check. No upfront fee, no recovery no fee, confidential handling.",
   // The share image itself is app/opengraph-image.tsx; these name the site
   // and ask X for the large card.
   openGraph: { siteName: "Finsol Enterprises", locale: "en_IN", type: "website" },

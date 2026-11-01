@@ -1,7 +1,16 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
-import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { normalizeIndianMobile, STAFF_ROLES } from "@finsol/shared";
+import {
+  BadGatewayException,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { BRAND_EMAILS, normalizeIndianMobile } from "@finsol/shared";
 
 import { ENV, type Env } from "../../config/env.js";
 import { PrismaService } from "../../common/prisma.service.js";
@@ -15,6 +24,11 @@ const RESEND_AFTER_MS = 30_000;
 const MAX_PER_HOUR = 5;
 const MAX_ATTEMPTS = 5;
 
+/** The development seed's administrator number. It must never sign in to production. */
+export const DEV_DEFAULT_ADMIN_PHONE = "+919000000001";
+
+export const OTP_PAUSED_MESSAGE = `Sign-in by mobile code is paused while our SMS provider is being connected. Search, company pages and the calculator still work. For help with a claim, email ${BRAND_EMAILS.support}.`;
+
 /**
  * One-time codes typed into this site by the person who asked for them.
  * Codes are 6 digits, live 5 minutes, allow 5 tries, and are stored only as
@@ -27,6 +41,23 @@ export class OtpService {
     @Inject(OTP_SENDER) private readonly sender: OtpSender,
     @Inject(ENV) private readonly env: Env,
   ) {}
+
+  private readonly log = new Logger("OTP");
+
+  /** Whether codes can be delivered at all, for the sign-in screen. Never reveals a code. */
+  status() {
+    return {
+      available: this.sender.available,
+      channel: this.sender.available ? "sms" : null,
+      message: this.sender.available ? null : OTP_PAUSED_MESSAGE,
+    };
+  }
+
+  private assertAllowed(phone: string) {
+    if (!this.sender.available) throw new ServiceUnavailableException(OTP_PAUSED_MESSAGE);
+    if (this.env.NODE_ENV === "production" && phone === DEV_DEFAULT_ADMIN_PHONE)
+      throw new BadRequestException("This number cannot be used to sign in.");
+  }
 
   phoneOrThrow(raw: string): string {
     const phone = normalizeIndianMobile(raw);
@@ -42,6 +73,7 @@ export class OtpService {
 
   async request(rawPhone: string, purpose: OtpPurpose, ip: string | null) {
     const phone = this.phoneOrThrow(rawPhone);
+    this.assertAllowed(phone);
     const db = this.prisma.client;
     const recent = await db.otpChallenge.findMany({
       where: { phone, purpose, createdAt: { gte: new Date(Date.now() - 3_600_000) } },
@@ -64,30 +96,35 @@ export class OtpService {
     }
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
     const expiresAt = new Date(Date.now() + TTL_MS);
-    await db.otpChallenge.create({
+    const challenge = await db.otpChallenge.create({
       data: { phone, purpose, codeHash: this.hash(phone, purpose, code), expiresAt, requestIp: ip },
     });
-    await this.sender.send(phone, code);
-    // Without an SMS provider the code is shown on screen, but never for a staff
-    // account: anyone could otherwise sign in as staff by typing their number.
-    let testCode: string | undefined;
-    if (this.sender.revealsCode) {
-      const account = await db.user.findUnique({ where: { phone }, select: { role: true } });
-      const staff = account && (STAFF_ROLES as readonly string[]).includes(account.role);
-      if (!staff) testCode = code;
+    try {
+      await this.sender.send(phone, code);
+    } catch (err) {
+      // An undelivered code must not stay usable; the failure is logged without it.
+      await db.otpChallenge.update({
+        where: { id: challenge.id },
+        data: { consumedAt: new Date() },
+      });
+      this.log.error(`OTP delivery failed via ${this.sender.name}: ${(err as Error).message}`);
+      throw new BadGatewayException(
+        "We could not send the code just now. Please try again in a few minutes.",
+      );
     }
+    // The code is never part of the response, in any environment.
     return {
       phone,
       expiresAt: expiresAt.toISOString(),
       resendAfterSeconds: RESEND_AFTER_MS / 1000,
-      channel: this.sender.name,
-      ...(testCode ? { testCode } : {}),
+      channel: "sms" as const,
     };
   }
 
   /** Consumes the code. Throws one generic error for every failure, so nothing leaks. */
   async verify(rawPhone: string, purpose: OtpPurpose, code: string): Promise<string> {
     const phone = this.phoneOrThrow(rawPhone);
+    this.assertAllowed(phone);
     const invalid = new BadRequestException(
       "That code is wrong or has expired. Ask for a new one.",
     );

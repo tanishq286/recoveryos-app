@@ -48,11 +48,22 @@ export interface StagedFolio {
   middleNameKey: string;
   lastNameKey: string;
   ingestionJobId: string | null;
+  /** Father/spouse text exactly as the source gave it. */
+  fatherOrSpouseRaw: string | null;
+  validationStatus: "VALID" | "WARNING" | "QUARANTINED";
+  validationIssues: string[];
+  /** QUARANTINED rows are stored but not searchable until reviewed. */
+  reviewStatus: "PUBLISHED" | "QUARANTINED";
+  sourceDocumentId: string | null;
+  sourceRowIds: string[];
+  quantityBasis: string | null;
+  quantityEffectiveDate: Date | null;
 }
 
 /* ── Binary COPY encoding ─────────────────────────────────────────────── */
 
-type ColType = "uuid" | "text" | "int4" | "jsonb" | "date";
+/** "list" columns travel as comma-joined text and are cast to arrays on insert. */
+type ColType = "uuid" | "text" | "int4" | "jsonb" | "date" | "list";
 
 const COLUMNS: [keyof StagedFolio | "id", string, ColType][] = [
   ["id", "id", "uuid"],
@@ -86,7 +97,21 @@ const COLUMNS: [keyof StagedFolio | "id", string, ColType][] = [
   ["middleNameKey", "middle_name_key", "text"],
   ["lastNameKey", "last_name_key", "text"],
   ["ingestionJobId", "ingestion_job_id", "uuid"],
+  ["fatherOrSpouseRaw", "father_or_spouse_raw", "text"],
+  ["validationStatus", "validation_status", "text"],
+  ["validationIssues", "validation_issues", "list"],
+  ["reviewStatus", "review_status", "text"],
+  ["sourceDocumentId", "source_document_id", "uuid"],
+  ["sourceRowIds", "source_row_ids", "list"],
+  ["quantityBasis", "quantity_basis", "text"],
+  ["quantityEffectiveDate", "quantity_effective_date", "date"],
 ];
+
+/** Array element type of each "list" column. */
+const LIST_TYPE: Record<string, string> = {
+  validation_issues: "text[]",
+  source_row_ids: "uuid[]",
+};
 
 const SQL_TYPE: Record<ColType, string> = {
   uuid: "uuid",
@@ -94,6 +119,7 @@ const SQL_TYPE: Record<ColType, string> = {
   int4: "integer",
   jsonb: "jsonb",
   date: "date",
+  list: "text",
 };
 
 const SIGNATURE = Buffer.from("PGCOPY\n\xff\r\n\0", "latin1");
@@ -112,6 +138,9 @@ function field(type: ColType, value: unknown): Buffer {
       break;
     case "text":
       data = Buffer.from(String(value), "utf8");
+      break;
+    case "list":
+      data = Buffer.from((value as string[]).join(","), "utf8");
       break;
     case "int4":
       data = Buffer.alloc(4);
@@ -175,7 +204,35 @@ const insertExpr = (c: string) =>
     ? `s.state::"IndianState"`
     : c === "custody_status"
       ? `s.custody_status::"CustodyStatus"`
-      : `s.${c}`;
+      : LIST_TYPE[c]
+        ? listExpr(`s.${c}`, c)
+        : `s.${c}`;
+
+function listExpr(expr: string, column: string) {
+  return `COALESCE(string_to_array(NULLIF(${expr}, ''), ',')::${LIST_TYPE[column]}, '{}')`;
+}
+
+/**
+ * Columns a provenance-aware re-import refreshes on an existing holder: the
+ * corrected normalised values, their raw source text and validation. A
+ * quarantine is never lifted here (only a reviewer publishes), and a
+ * withdrawn record stays withdrawn.
+ */
+const REFRESHED: Record<string, string> = {
+  father_or_spouse_name:
+    "CASE WHEN s.source_document_id IS NULL THEN f.father_or_spouse_name ELSE s.father_or_spouse_name END",
+  father_or_spouse_raw: "COALESCE(s.father_or_spouse_raw, f.father_or_spouse_raw)",
+  address_line: "COALESCE(s.address_line, f.address_line)",
+  validation_status:
+    "CASE WHEN s.source_document_id IS NULL THEN f.validation_status ELSE s.validation_status END",
+  validation_issues: `CASE WHEN s.source_document_id IS NULL THEN f.validation_issues ELSE ${listExpr("s.validation_issues", "validation_issues")} END`,
+  review_status:
+    "CASE WHEN f.review_status = 'WITHDRAWN' THEN 'WITHDRAWN' WHEN s.review_status = 'QUARANTINED' THEN 'QUARANTINED' ELSE f.review_status END",
+  source_document_id: "COALESCE(s.source_document_id, f.source_document_id)",
+  source_row_ids: `ARRAY(SELECT DISTINCT unnest(f.source_row_ids || ${listExpr("s.source_row_ids", "source_row_ids")}))`,
+  quantity_basis: "COALESCE(s.quantity_basis, f.quantity_basis)",
+  quantity_effective_date: "COALESCE(s.quantity_effective_date, f.quantity_effective_date)",
+};
 
 const MATCH = `f.company_id = s.company_id
     AND f.folio_number_hash = s.folio_number_hash
@@ -198,6 +255,9 @@ function mergeSet(form: Form) {
     investment_type = COALESCE(s.investment_type, f.investment_type),
     source_filing_srn = COALESCE(s.source_filing_srn, f.source_filing_srn),
     ingestion_job_id = COALESCE(s.ingestion_job_id, f.ingestion_job_id),
+    ${Object.entries(REFRESHED)
+      .map(([c, e]) => `${c} = ${e}`)
+      .join(",\n    ")},
     updated_at = now()`;
 }
 
@@ -420,6 +480,12 @@ async function rebuildOne(
     investment_type: "COALESCE(s.investment_type, f.investment_type)",
     source_filing_srn: "COALESCE(s.source_filing_srn, f.source_filing_srn)",
     ingestion_job_id: "COALESCE(s.ingestion_job_id, f.ingestion_job_id)",
+    ...Object.fromEntries(
+      Object.entries(REFRESHED).map(([c, e]) => [
+        c,
+        `CASE WHEN s.id IS NULL THEN f.${c} ELSE ${e} END`,
+      ]),
+    ),
     updated_at: "CASE WHEN s.id IS NULL THEN f.updated_at ELSE now() END",
   };
 

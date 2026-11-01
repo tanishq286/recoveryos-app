@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowRightIcon, CalculatorIcon, SearchIcon, TrendingUpIcon } from "lucide-react";
 import {
   BRAND,
+  describeQuote,
   computeEntitlement,
   CUSTODY_LABELS,
   holdingValuePaise,
@@ -14,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getCompany, listCompanies } from "@/lib/companies";
-import { formatCount, formatDate, formatDateTime, formatPaise } from "@/lib/format";
+import { formatCount, formatDate, formatPaise } from "@/lib/format";
 import { CHECK_CTA } from "@/components/site/cta";
 import { SITE_URL } from "@/lib/site";
 
@@ -34,7 +35,7 @@ export async function generateMetadata({
   if (!c) return {};
   return {
     title: `Recover unclaimed ${c.name} shares and dividends`,
-    description: `Unclaimed ${c.name} shares recovered end to end by Finsol Enterprises: bonus and split history, live share price and a free 3-Minute Check. No upfront fee.`,
+    description: `Unclaimed ${c.name} shares recovered end to end by Finsol Enterprises: bonus and split history, the latest available share price and a free 3-Minute Check. No upfront fee.`,
     alternates: { canonical: `/unclaimed-shares/${c.slug}` },
   };
 }
@@ -79,7 +80,15 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
   );
   const price = c.currentMarketPrice;
   const exampleValue = price !== null ? holdingValuePaise(example.shares, price) : null;
-  const totalFolios = c.records.reduce((n, r) => n + r.folios, 0);
+  const totalRecords = c.records.reduce((n, r) => n + r.folios, 0);
+  const quote = describeQuote({
+    price,
+    quoteAt: c.priceQuoteAt ?? null,
+    retrievedAt: c.priceUpdatedAt,
+    attemptedAt: c.priceAttemptedAt ?? null,
+    error: c.priceError ?? null,
+    source: c.priceSource,
+  });
 
   return (
     <article className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
@@ -274,14 +283,12 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                 <p className="mt-2 text-3xl font-semibold text-fg tnum [font-stretch:104%]">
                   {formatPaise(Math.round(price * 100), { exact: true })}
                 </p>
-                <p className="mt-1 text-sm text-fg-3">
-                  {c.priceSource}
-                  {c.priceUpdatedAt ? ` · updated ${formatDateTime(c.priceUpdatedAt)}` : ""}
-                </p>
+                <p className="mt-1 text-sm font-medium text-fg-2">{quote.label}</p>
+                <p className="mt-1 text-sm text-fg-3">{quote.detail}</p>
               </>
             ) : (
               <p className="mt-2 text-sm text-fg-2">
-                Waiting for the first price from the exchange feed.
+                {quote.label}. {quote.detail}
               </p>
             )}
           </section>
@@ -308,27 +315,42 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
             </dl>
           </section>
 
-          {totalFolios > 0 && (
-            <section aria-labelledby="records-heading" className="panel p-5 sm:p-6">
-              <h2 id="records-heading" className="text-lg font-semibold text-fg">
-                Unclaimed {c.name} holders on record
-              </h2>
-              <ul className="mt-3 grid gap-2 text-sm">
-                {c.records.map((r) => (
-                  <li key={r.custodyStatus} className="flex justify-between gap-4">
-                    <span className="text-fg-2">{CUSTODY_LABELS[r.custodyStatus]}</span>
-                    <span className="text-fg tnum">{formatCount(r.folios)} holders</span>
-                  </li>
-                ))}
-              </ul>
-              <Button asChild variant="outline" size="sm" className="mt-4">
-                <Link href="/search">
-                  Check your family&apos;s name
-                  <ArrowRightIcon aria-hidden="true" />
-                </Link>
-              </Button>
-            </section>
-          )}
+          <section aria-labelledby="records-heading" className="panel p-5 sm:p-6">
+            <h2 id="records-heading" className="text-lg font-semibold text-fg">
+              {c.name} holder records we hold
+            </h2>
+            {totalRecords > 0 ? (
+              <>
+                <ul className="mt-3 grid gap-2 text-sm">
+                  {c.records.map((r) => (
+                    <li key={r.custodyStatus} className="flex justify-between gap-4">
+                      <span className="text-fg-2">
+                        {r.shares > 0
+                          ? CUSTODY_LABELS[r.custodyStatus]
+                          : "Unclaimed dividend listings (no share count stated)"}
+                      </span>
+                      <span className="text-fg tnum">{formatCount(r.folios)} records</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-sm text-fg-3">
+                  Records from statements {c.name} published. One person can appear in several
+                  records; this is not a count of people.
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-fg-2">
+                We have not imported any {c.name} holder statements yet. That does not mean there
+                are no unclaimed holdings: ask us for a free trace.
+              </p>
+            )}
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <Link href="/search">
+                Check your family&apos;s name
+                <ArrowRightIcon aria-hidden="true" />
+              </Link>
+            </Button>
+          </section>
         </aside>
       </div>
     </article>

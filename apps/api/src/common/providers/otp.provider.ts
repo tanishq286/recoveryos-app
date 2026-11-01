@@ -9,30 +9,30 @@ export function otpMessage(code: string): string {
   return `${code} is your ${BRAND.name} login code. It expires in 5 minutes. Never share it with anyone, including our staff.`;
 }
 
-/** Sends a one-time code. The code is generated and checked by AuthService, never here. */
+/** Sends a one-time code. The code is generated and checked by OtpService, never here. */
 export interface OtpSender {
-  readonly name: string;
-  /**
-   * True when no SMS goes out, so the sign-in screen must show the code itself.
-   * OtpService never reveals a staff account's code; staff read it from the server log.
-   */
-  readonly revealsCode?: boolean;
+  readonly name: "console" | "disabled" | "msg91" | "twilio";
+  /** False when no provider can deliver codes: sign-in is paused rather than weakened. */
+  readonly available: boolean;
   send(phoneE164: string, code: string): Promise<void>;
 }
 
 export const OTP_SENDER = Symbol("OTP_SENDER");
 
 /**
- * Development and tests: prints the code to the API log and remembers the
- * latest one per phone so end-to-end tests can read it. Refused in production
- * by the env schema.
+ * Development and tests only: prints the code to the API log and remembers the
+ * latest one per phone so end-to-end tests can read it. The env schema refuses
+ * it in production, and it refuses to run there itself.
  */
 export class ConsoleOtpSender implements OtpSender {
   readonly name = "console";
+  readonly available = true;
   private readonly log = new Logger("OTP");
   private readonly last = new Map<string, string>();
 
   async send(phone: string, code: string) {
+    if (process.env.NODE_ENV === "production")
+      throw new Error("The console OTP sender cannot run in production.");
     this.last.set(phone, code);
     this.log.warn(`Development OTP for ${phone}: ${code}`);
   }
@@ -43,23 +43,22 @@ export class ConsoleOtpSender implements OtpSender {
 }
 
 /**
- * Production stand-in until MSG91's DLT registration completes: no SMS is
- * sent. Investors see their code on the sign-in screen (marked as test mode);
- * staff codes are never shown and appear only in the server log.
+ * No SMS provider is configured. Codes are never generated, shown, returned
+ * or logged; OtpService answers with an honest "sign-in is paused" message.
  */
-export class InternalOtpSender implements OtpSender {
-  readonly name = "internal";
-  readonly revealsCode = true;
-  private readonly log = new Logger("OTP");
+export class DisabledOtpSender implements OtpSender {
+  readonly name = "disabled";
+  readonly available = false;
 
-  async send(phone: string, code: string) {
-    this.log.warn(`Internal OTP for ${phone.slice(0, -4)}****: ${code}`);
+  async send(): Promise<void> {
+    throw new Error("No OTP provider is configured.");
   }
 }
 
 /** MSG91 OTP API v5 with a DLT-approved template. */
 export class Msg91OtpSender implements OtpSender {
   readonly name = "msg91";
+  readonly available = true;
   constructor(
     private readonly authKey: string,
     private readonly templateId: string,
@@ -81,6 +80,7 @@ export class Msg91OtpSender implements OtpSender {
 /** Twilio Programmable Messaging. */
 export class TwilioOtpSender implements OtpSender {
   readonly name = "twilio";
+  readonly available = true;
   constructor(
     private readonly sid: string,
     private readonly token: string,
@@ -117,8 +117,8 @@ export function createOtpSender(env: Env): OtpSender {
       if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_FROM)
         throw new Error("TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM are required.");
       return new TwilioOtpSender(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_FROM);
-    case "internal":
-      return new InternalOtpSender();
+    case "disabled":
+      return new DisabledOtpSender();
     default:
       return new ConsoleOtpSender();
   }

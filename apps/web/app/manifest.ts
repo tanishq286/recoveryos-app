@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Finsol Enterprises",
     short_name: "Finsol",
     description:
-      "Turnkey recovery of unclaimed shares and dividends. No upfront fee, no recovery no fee, 100% confidential.",
+      "Turnkey recovery of unclaimed shares and dividends. No upfront fee, no recovery no fee, confidential handling.",
     start_url: "/",
     display: "standalone",
     background_color: "#05080E",

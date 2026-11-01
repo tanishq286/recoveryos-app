@@ -24,7 +24,7 @@ import { LiveCounters } from "@/components/search/live-counters";
 import { CHECK_CTA } from "@/components/site/cta";
 import { HeroReveal } from "@/components/marketing/hero-reveal";
 import { RouteField } from "@/components/marketing/route-field";
-import { RevealBatch, Stages, type Stage } from "@/components/marketing/scroll-choreo";
+import { Stages, type Stage } from "@/components/marketing/scroll-choreo";
 import { Magnetic } from "@/components/motion/magnetic";
 import { PageTransition } from "@/components/motion/page-transition";
 
@@ -36,7 +36,7 @@ const STEP_DETAIL: string[][] = [
     "Add a joint holder or another family member in the same check.",
   ],
   [
-    "Shares today after every bonus and split, valued at the live market price.",
+    "Shares today after every bonus and split, estimated at the latest available market price.",
     "Unclaimed dividends added up.",
     "A custom quote after the free trace. Nothing to pay upfront.",
   ],
@@ -73,8 +73,8 @@ const PROMISES: { title: string; body: string; Icon: LucideIcon }[] = [
     Icon: HandshakeIcon,
   },
   {
-    title: "100% Confidential",
-    body: "Your details and documents are used only for your recovery, never shared or sold.",
+    title: "Confidential Handling",
+    body: "Your details and documents are used for your recovery and never sold. We share them only with the parties your claim needs, such as the company, its registrar and the IEPF Authority, and with the service providers that run this site.",
     Icon: LockKeyholeIcon,
   },
 ];
@@ -185,7 +185,8 @@ export default function LandingPage() {
             </h2>
             <p className="mt-5 max-w-[52ch] text-lg text-fg-2">
               Bonuses and splits multiply old holdings. Add each stock your family held and see the
-              total wealth, at today&apos;s live price, with dividends paid since.
+              estimated value at the latest available price, with dividends declared since shown
+              separately.
             </p>
           </div>
           <div className="lg:col-span-5">
@@ -229,7 +230,7 @@ export default function LandingPage() {
               {[
                 "No Upfront Fee: nothing to start, trace or file.",
                 "No Recovery, No Fee: if nothing is credited, you owe nothing.",
-                "100% Confidential: your quote and documents stay between you and Finsol.",
+                "Confidential Handling: your quote is private, and documents go only to the parties your claim needs.",
               ].map((t) => (
                 <li key={t} className="flex gap-3">
                   <ShieldCheckIcon
@@ -290,9 +291,10 @@ export default function LandingPage() {
           >
             Talk to the right desk
           </h2>
-          <RevealBatch as="ul" className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Contact routes are essential: no entrance animation, always visible. */}
+          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {BRAND_DESKS.map((d) => (
-              <li key={d.key} data-reveal-item>
+              <li key={d.key}>
                 <a
                   href={`mailto:${d.email}`}
                   className="panel vault-glass-hover flex h-full flex-col gap-2 p-5 focus-visible:outline-2 focus-visible:outline-signal"
@@ -307,7 +309,7 @@ export default function LandingPage() {
                 </a>
               </li>
             ))}
-          </RevealBatch>
+          </ul>
         </div>
       </section>
 

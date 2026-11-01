@@ -74,6 +74,20 @@ export interface EntitlementOptions {
   asOf?: string;
 }
 
+/**
+ * Order of actions sharing an ex-date: cash first (paid on the shares held
+ * before the record date), then splits, then bonuses issued on the post-split
+ * shares (how combined announcements such as Bajaj Finance 2016 and 2025
+ * work), then mergers.
+ */
+const SAME_DAY_ORDER: Record<CorporateActionType, number> = {
+  DIVIDEND: 0,
+  CASH_ENTITLEMENT: 1,
+  SPLIT: 2,
+  BONUS: 3,
+  MERGER: 4,
+};
+
 /** Replays actions in ex-date order from the acquisition date. */
 export function computeEntitlement(
   originalShares: number,
@@ -82,7 +96,11 @@ export function computeEntitlement(
 ): EntitlementResult {
   const ordered = [...actions]
     .filter((a) => a.exDate >= opts.acquiredOn && (!opts.asOf || a.exDate <= opts.asOf))
-    .sort((a, b) => a.exDate.localeCompare(b.exDate));
+    .sort(
+      (a, b) =>
+        a.exDate.localeCompare(b.exDate) ||
+        SAME_DAY_ORDER[a.actionType] - SAME_DAY_ORDER[b.actionType],
+    );
   let shares = Math.max(0, Math.floor(originalShares));
   let dividendPaise = 0;
   let cashPaise = 0;

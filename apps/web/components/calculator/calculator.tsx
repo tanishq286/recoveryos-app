@@ -14,9 +14,11 @@ import {
   ZapIcon,
 } from "lucide-react";
 import {
+  describeQuote,
   MIN_PURCHASE_YEAR,
   POPULAR_EXAMPLES,
   portfolioTotals,
+  VALUATION_ASSUMPTIONS,
   valueHolding,
   type CorporateActionLike,
   type HoldingValuation,
@@ -30,13 +32,7 @@ import { readWho } from "@/components/auth/account-link";
 import { LoginGatewayDialog } from "@/components/auth/login-gateway-dialog";
 import { CHECK_CTA } from "@/components/site/cta";
 import { callApi, ClientApiError } from "@/lib/api/client";
-import {
-  formatCount,
-  formatDateTime,
-  formatPaise,
-  formatPaiseCompact,
-  formatPaisePlus,
-} from "@/lib/format";
+import { formatCount, formatPaise, formatPaiseCompact, formatPaisePlus } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface Listing {
@@ -47,8 +43,13 @@ interface Listing {
 
 interface EquityDetail extends Listing {
   price: number | null;
+  priceQuoteAt: string | null;
+  priceRetrievedAt: string | null;
   priceUpdatedAt: string | null;
   priceSource: string | null;
+  priceError: string | null;
+  priceAttemptedAt: string | null;
+  actionsKnown: boolean;
   actions: CorporateActionLike[];
   actionsBasis: "verified" | "exchange";
   dividends: { exDate: string; amount: number }[];
@@ -88,8 +89,32 @@ function value(
     },
     detail.actions,
     detail.dividends,
+    detail.actionsKnown,
   );
 }
+
+/** The same price description the company page and the PDF use. */
+function quoteOf(d: EquityDetail, manual: boolean, price: number | null) {
+  return describeQuote({
+    price,
+    quoteAt: d.priceQuoteAt,
+    retrievedAt: d.priceRetrievedAt,
+    attemptedAt: d.priceAttemptedAt,
+    error: d.priceError,
+    manual,
+    source: d.priceSource,
+  });
+}
+
+/** "₹1.2 lakh", or "Not available" when there is no price (never ₹0). */
+const valueText = (paise: number | null, compact = true) =>
+  paise === null ? "Not available" : compact ? formatPaiseCompact(paise) : formatPaise(paise);
+
+/** "25,600" or "12,800–25,600" when events in the purchase year make it depend on the date. */
+const sharesText = (v: HoldingValuation) =>
+  v.currentSharesRange.min === v.currentSharesRange.max
+    ? formatCount(v.currentShares)
+    : `${formatCount(v.currentSharesRange.min)}–${formatCount(v.currentShares)}`;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const growth = (x: number) => `${x >= 10 ? Math.round(x) : x.toFixed(x % 1 ? 1 : 0)}x`;
@@ -97,7 +122,7 @@ const growth = (x: number) => `${x >= 10 ? Math.round(x) : x.toFixed(x % 1 ? 1 :
 /**
  * One-click examples. Labels are never typed in: each is computed with the
  * same valueHolding() call the calculator uses, from the verified history
- * and the live price, so a pill always matches the result it adds.
+ * and the latest available price, so a pill always matches the result it adds.
  */
 function QuickTry({ onPick }: { onPick: (d: EquityDetail, year: number, shares: number) => void }) {
   const [details, setDetails] = React.useState<Record<string, EquityDetail>>({});
@@ -134,8 +159,8 @@ function QuickTry({ onPick }: { onPick: (d: EquityDetail, year: number, shares: 
                   {v ? (
                     <>
                       {" "}
-                      → <span className="tnum">{formatCount(v.currentShares)}</span> shares
-                      {v.marketValuePaise ? (
+                      → <span className="tnum">{sharesText(v)}</span> shares
+                      {v.marketValuePaise !== null ? (
                         <>
                           {" "}
                           = <span className="tnum">{formatPaisePlus(v.marketValuePaise)}</span>
@@ -273,9 +298,10 @@ function CompanyPicker({
 
 /**
  * The Family Wealth Calculator: add each stock the family held, see shares
- * today after every bonus and split, the live market value and the
- * dividends paid since purchase. Computed in the browser with the same
- * shared rules the API uses for the valuation report.
+ * today after every bonus and split, an estimated market value at the latest
+ * available price, and (separately) the dividends declared since purchase.
+ * Computed in the browser with the same shared rules the API uses for the
+ * PDF, so Quick Try labels, totals and the report agree.
  */
 export function Calculator() {
   const [listing, setListing] = React.useState<Listing | null>(null);
@@ -444,7 +470,7 @@ export function Calculator() {
                 id="calc-price"
                 inputMode="decimal"
                 value={price}
-                placeholder={detail ? "No live price" : "Pick a company"}
+                placeholder={detail ? "Price unavailable" : "Pick a company"}
                 onChange={(e) => {
                   setPrice(e.target.value.replace(/[^\d.]/g, ""));
                   setManual(true);
@@ -465,12 +491,17 @@ export function Calculator() {
                 ₹ Sync
               </Button>
             </div>
-            <p className="mt-1 text-xs text-fg-3">
-              {manual
-                ? "Price entered by you."
-                : detail?.price
-                  ? `Live: ${detail.priceSource ?? "market data"}${detail.priceUpdatedAt ? `, ${formatDateTime(detail.priceUpdatedAt)}` : ""}`
-                  : "Synced from NSE/BSE when available; you can type a price."}
+            <p className="mt-1 text-xs text-fg-3" aria-live="polite">
+              {detail ? (
+                <>
+                  <span className="font-medium text-fg-2">
+                    {quoteOf(detail, manual, priceNum).label}.
+                  </span>{" "}
+                  {quoteOf(detail, manual, priceNum).detail}
+                </>
+              ) : (
+                "Fetched from market data when available; you can type a price."
+              )}
             </p>
           </div>
         </div>
@@ -484,20 +515,29 @@ export function Calculator() {
             <span className="text-fg-3">
               {" "}
               ·{" "}
-              {detail.actionsBasis === "verified"
-                ? "history verified against company filings"
-                : "from the exchange record"}
+              {!detail.actionsKnown
+                ? "no history available, so shares are not adjusted"
+                : detail.actionsBasis === "verified"
+                  ? "history checked against company filings"
+                  : "from the exchange record"}
             </span>
             {preview && (
               <>
                 {" "}
                 →{" "}
                 <span className="font-semibold text-fg tnum">
-                  {formatCount(preview.currentShares)} shares today
+                  {sharesText(preview)} shares today
                 </span>
               </>
             )}
           </p>
+        )}
+        {preview && preview.assumptions.length > 0 && (
+          <ul className="grid gap-1 text-sm text-pending">
+            {preview.assumptions.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
         )}
         <div>
           <Button type="submit" size="lg" disabled={!detail || original <= 0}>
@@ -519,10 +559,15 @@ export function Calculator() {
           <>
             <dl className="vault-glass grid grid-cols-1 gap-x-6 gap-y-5 rounded-[20px] p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
               <div className="sm:col-span-2 lg:col-span-1">
-                <dt className="text-sm text-fg-3">Total Estimated Family Wealth</dt>
+                <dt className="text-sm text-fg-3">Estimated Share Value</dt>
                 <dd className="display text-gradient-cyan mt-1 text-[clamp(1.75rem,3.4vw,2.5rem)] tnum">
                   {formatPaiseCompact(totals.totalPaise)}
                 </dd>
+                {!totals.complete && (
+                  <dd className="mt-1 text-sm text-pending">
+                    Excludes {plural(totals.unvaluedLines, "holding")} with no price.
+                  </dd>
+                )}
               </div>
               <div>
                 <dt className="text-sm text-fg-3">Total Current Shares</dt>
@@ -533,16 +578,14 @@ export function Calculator() {
                   </span>
                 </dd>
               </div>
-              <div>
-                <dt className="text-sm text-fg-3">Share Market Value</dt>
-                <dd className="mt-1 text-2xl font-semibold text-fg tnum">
-                  {formatPaiseCompact(totals.marketValuePaise)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-fg-3">Est. Unclaimed Dividends</dt>
+              <div className="sm:col-span-2">
+                <dt className="text-sm text-fg-3">Dividends declared while held (not included)</dt>
                 <dd className="mt-1 text-2xl font-semibold text-fg tnum">
                   {formatPaiseCompact(totals.dividendPaise)}
+                </dd>
+                <dd className="mt-1 text-sm text-fg-3">
+                  Historical figures, not confirmed unpaid. Whether any went unclaimed is checked
+                  during verification.
                 </dd>
               </div>
             </dl>
@@ -561,20 +604,28 @@ export function Calculator() {
                     </p>
                     <p className="mt-1 text-sm text-fg-2 tnum">
                       {formatCount(r.valuation.originalShares)} in {r.valuation.purchaseYear} →{" "}
-                      {formatCount(r.valuation.currentShares)} shares (
-                      {growth(r.valuation.growthMultiple)}, {plural(r.valuation.events, "event")}) ·{" "}
+                      {sharesText(r.valuation)} shares ({growth(r.valuation.growthMultiple)},{" "}
+                      {plural(r.valuation.events, "event")}) ·{" "}
                       {r.valuation.pricePerShare === null
                         ? "no price"
-                        : `${formatPaise(Math.round(r.valuation.pricePerShare * 100), { exact: true })}/share${r.valuation.priceIsManual ? " (yours)" : ""}`}
+                        : `${formatPaise(Math.round(r.valuation.pricePerShare * 100), { exact: true })}/share${r.valuation.priceIsManual ? " (entered by you)" : ""}`}
                     </p>
                     <p className="mt-1 text-sm text-fg-3 tnum">
-                      Market value {formatPaise(r.valuation.marketValuePaise)} · dividends{" "}
-                      {formatPaise(r.valuation.dividendPaise)}
+                      {r.valuation.priceIsManual
+                        ? "Your price"
+                        : quoteOf(r.detail, false, r.valuation.pricePerShare).label}{" "}
+                      · dividends declared while held {formatPaise(r.valuation.dividendPaise)} (not
+                      included)
                     </p>
+                    {r.valuation.assumptions.map((a) => (
+                      <p key={a} className="mt-1 text-sm text-pending">
+                        {a}
+                      </p>
+                    ))}
                   </div>
                   <div className="flex items-center gap-3 sm:justify-end">
                     <span className="text-lg font-semibold text-fg tnum">
-                      {formatPaiseCompact(r.valuation.totalPaise)}
+                      {valueText(r.valuation.totalPaise)}
                     </span>
                     <Button
                       type="button"
@@ -593,11 +644,12 @@ export function Calculator() {
               <div>
                 <p className="flex items-center gap-2 font-semibold text-fg">
                   <FileTextIcon className="size-4 text-signal" aria-hidden="true" />
-                  Official Share Valuation PDF Report
+                  Estimated Share Valuation (PDF)
                 </p>
                 <p className="mt-1 text-sm text-fg-3">
-                  With a Report ID, the total in words and the basis of every figure. Free after a
-                  sign-in; two reports a day per mobile number.
+                  The same figures as above, with a Report ID, the price times and every assumption.
+                  An estimate, not a certified valuation. Free after a sign-in; two reports a day
+                  per mobile number.
                 </p>
                 {report.message && (
                   <p className="mt-2 text-sm text-fg-2" role="status">
@@ -628,17 +680,20 @@ export function Calculator() {
             </div>
           </>
         )}
-        <p className="text-sm text-fg-3">
-          Shares are counted from 1 January of the purchase year, after every recorded bonus and
-          split. Dividends are those paid per share on each ex-date while held, as if never
-          encashed. Estimates only; the exact entitlement is confirmed during verification.
-        </p>
+        <div className="text-sm text-fg-3">
+          <p className="font-medium text-fg-2">Assumptions</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {VALUATION_ASSUMPTIONS.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       <LoginGatewayDialog
         open={gateway}
         onOpenChange={setGateway}
-        reason="to download your Share Valuation Report"
+        reason="to download your Estimated Share Valuation"
         onSignedIn={() => void downloadReport()}
       />
     </div>

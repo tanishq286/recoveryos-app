@@ -19,7 +19,7 @@
     "dev:api": "npm run dev -w @finsol/api",
     "dev:worker": "npm run dev:worker -w @finsol/api",
     "dev:web": "npm run dev -w @finsol/web",
-    "test": "npm test -w @finsol/shared && npm test -w @finsol/api",
+    "test": "npm test -w @finsol/shared && npm test -w @finsol/db && npm test -w @finsol/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",

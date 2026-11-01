@@ -26,8 +26,18 @@ export interface EquityListing {
 
 export interface EquityDetail extends EquityListing {
   price: number | null;
+  /** When the exchange printed the price (provider timestamp), if known. */
+  priceQuoteAt: string | null;
+  /** When we fetched it. */
+  priceRetrievedAt: string | null;
+  /** @deprecated Same as priceRetrievedAt; kept for older clients. */
   priceUpdatedAt: string | null;
   priceSource: string | null;
+  /** Set when the latest fetch failed and the price shown is the last one on record. */
+  priceError: string | null;
+  priceAttemptedAt: string | null;
+  /** False when no bonus/split history could be loaded (shares cannot be adjusted). */
+  actionsKnown: boolean;
   /** Bonuses and splits, oldest first. */
   actions: CorporateActionLike[];
   /** "verified": checked by hand against company filings; "exchange": the exchange split record. */
@@ -244,22 +254,56 @@ export class EquitiesService implements OnApplicationBootstrap {
     }));
 
     const dbPrice = company?.currentMarketPrice ? num(company.currentMarketPrice) : null;
+    const fetchedAt = new Date();
+    const fresh = history?.price ?? null;
+    // One price per company everywhere: a fresh quote newer than the stored one is
+    // written through, so the company page, calculator and PDF agree.
+    if (company && fresh !== null) {
+      const newer =
+        !company.priceQuoteAt || !history?.tradedAt || history.tradedAt >= company.priceQuoteAt;
+      if (newer)
+        await this.prisma.client.company
+          .update({
+            where: { id: company.id },
+            data: {
+              currentMarketPrice: fresh,
+              priceQuoteAt: history?.tradedAt ?? null,
+              priceUpdatedAt: fetchedAt,
+              priceAttemptedAt: fetchedAt,
+              priceError: null,
+              priceSource: `Yahoo Finance (${exchange})`,
+            },
+          })
+          .catch((e: Error) => this.log.warn(`Price write-through failed: ${e.message}`));
+    }
+    const useFresh = fresh !== null;
     const value: EquityDetail = {
       symbol: symbol.toUpperCase(),
       name: verified?.name ?? company?.name ?? listing?.name ?? history?.name ?? symbol,
       exchange,
       isin: listing?.isin ?? null,
-      price: history?.price ?? dbPrice,
-      priceUpdatedAt: history?.price
-        ? (history.tradedAt ?? new Date()).toISOString()
+      // No invented fallback: a fresh quote, else the last real one on record, else unknown.
+      price: fresh ?? dbPrice,
+      priceQuoteAt: useFresh
+        ? (history?.tradedAt?.toISOString() ?? null)
+        : (company?.priceQuoteAt?.toISOString() ?? null),
+      priceRetrievedAt: useFresh
+        ? fetchedAt.toISOString()
         : (company?.priceUpdatedAt?.toISOString() ?? null),
-      priceSource: history?.price
+      priceUpdatedAt: useFresh
+        ? fetchedAt.toISOString()
+        : (company?.priceUpdatedAt?.toISOString() ?? null),
+      priceSource: useFresh
         ? `Yahoo Finance (${exchange})`
         : dbPrice !== null
           ? company!.priceSource
           : null,
+      // A fetch that failed while an older price exists makes that price stale.
+      priceError: !useFresh && this.online ? "The latest price fetch failed." : null,
+      priceAttemptedAt: fetchedAt.toISOString(),
       actions,
       actionsBasis: verified ? "verified" : "exchange",
+      actionsKnown: !!verified || !!history,
       dividends,
     };
     this.details.set(key, { at: Date.now(), value });

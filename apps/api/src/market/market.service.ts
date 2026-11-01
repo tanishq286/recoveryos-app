@@ -84,26 +84,42 @@ export class MarketService implements OnApplicationBootstrap, OnModuleDestroy {
     const failed: string[] = [];
     for (const c of companies) {
       let done = false;
+      const problems: string[] = [];
       for (const p of this.providers) {
         try {
           const q = await p.quote(c);
-          if (!q) continue;
+          if (!q) {
+            problems.push(`${p.name}: no price`);
+            continue;
+          }
+          const now = new Date();
           await db.company.update({
             where: { id: c.id },
             data: {
               currentMarketPrice: q.price,
-              priceUpdatedAt: new Date(),
+              // The exchange's quote time and our fetch time are different facts.
+              priceQuoteAt: q.tradedAt,
+              priceUpdatedAt: now,
+              priceAttemptedAt: now,
+              priceError: null,
               priceSource: q.source,
             },
           });
           updated.push({ slug: c.slug, price: q.price, source: q.source });
           done = true;
           break;
-        } catch {
-          // Try the next provider.
+        } catch (e) {
+          problems.push(`${p.name}: ${(e as Error).message}`.slice(0, 200));
         }
       }
-      if (!done) failed.push(c.slug);
+      if (!done) {
+        failed.push(c.slug);
+        // The last real price stays, marked stale by the failed attempt; nothing is guessed.
+        await db.company.update({
+          where: { id: c.id },
+          data: { priceAttemptedAt: new Date(), priceError: problems.join("; ").slice(0, 500) },
+        });
+      }
       // Be gentle with public endpoints.
       await new Promise((r) => setTimeout(r, this.env.NODE_ENV === "test" ? 0 : 300));
     }

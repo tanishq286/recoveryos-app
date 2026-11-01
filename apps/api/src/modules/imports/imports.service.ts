@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { formatOf, ingestStatement, mapHeaders, readStatement } from "@finsol/db";
+import { decryptField, formatOf, ingestStatement, mapHeaders, readStatement } from "@finsol/db";
 import type { IngestionForm } from "@finsol/shared";
 
 import { AuditService } from "../../common/audit.service.js";
@@ -121,6 +121,11 @@ export class ImportsService {
       insertedRows: j.insertedRows,
       updatedRows: j.updatedRows,
       skippedRows: j.skippedRows,
+      warningRows: j.warningRows,
+      quarantinedRows: j.quarantinedRows,
+      parserVersion: j.parserVersion,
+      sourceDocumentId: j.sourceDocumentId,
+      retryOfId: j.retryOfId,
       errors: (j.errors as { row: number; message: string }[] | null) ?? [],
       uploadedBy:
         j.uploadedBy?.name ??
@@ -131,6 +136,268 @@ export class ImportsService {
       startedAt: isoTime(j.startedAt),
       finishedAt: isoTime(j.finishedAt),
     };
+  }
+
+  /** Runs a failed or finished import again from its stored file, as a new job. */
+  async retry(user: SessionClaims, id: string) {
+    const old = await this.prisma.client.ingestionJob.findUnique({ where: { id } });
+    if (!old) throw new NotFoundException("No such import.");
+    if (old.status === "PROCESSING" || old.status === "QUEUED")
+      throw new BadRequestException("This import is still running.");
+    if (old.storageKey.startsWith("cli:") || old.storageKey.startsWith("file:"))
+      throw new BadRequestException("This import came from the command line; run it there again.");
+    const job = await this.prisma.client.ingestionJob.create({
+      data: {
+        formType: old.formType,
+        fileName: old.fileName,
+        storageKey: old.storageKey,
+        sourceUrl: old.sourceUrl,
+        companyId: old.companyId,
+        uploadedById: user.sub,
+        retryOfId: old.id,
+      },
+    });
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "imports.retry",
+      entityType: "ingestion_job",
+      entityId: job.id,
+      data: { retryOf: old.id },
+    });
+    await this.jobs.enqueue("ingestion.process", { jobId: job.id });
+    return this.view(job.id);
+  }
+
+  /**
+   * Aggregate coverage for the admin dashboard: counts only, never names or
+   * folio numbers. Listed equities, company profiles, prices and holder
+   * records are reported separately, because they measure different things.
+   */
+  async coverage() {
+    const db = this.prisma.client;
+    const [
+      listedEquities,
+      companies,
+      byCompany,
+      byStatus,
+      sources,
+      jobs,
+      prices,
+      actions,
+      quarantine,
+      groups,
+    ] = await Promise.all([
+      db.listedEquity.count(),
+      db.company.findMany({
+        select: { id: true, name: true, slug: true, irPageUrl: true, contactsVerifiedAt: true },
+        orderBy: { name: "asc" },
+      }),
+      db.$queryRaw<
+        {
+          company_id: string;
+          custody_status: string;
+          records: bigint;
+          folios: bigint;
+          groups: bigint;
+        }[]
+      >`SELECT company_id, custody_status::text, count(*) AS records,
+               count(DISTINCT folio_number_hash) AS folios,
+               count(DISTINCT investor_cluster_id) AS groups
+          FROM unclaimed_folios GROUP BY 1, 2`,
+      db.$queryRaw<{ validation_status: string; review_status: string; records: bigint }[]>`
+        SELECT validation_status, review_status, count(*) AS records
+          FROM unclaimed_folios GROUP BY 1, 2 ORDER BY 1, 2`,
+      db.sourceDocument.findMany({
+        orderBy: { retrievedAt: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          companyId: true,
+          fileName: true,
+          sourceUrl: true,
+          documentType: true,
+          reportingPeriod: true,
+          publishedAt: true,
+          publishedAtBasis: true,
+          retrievedAt: true,
+          sha256: true,
+          parserVersion: true,
+          status: true,
+          reviewStatus: true,
+          publicationStatus: true,
+          quantityBasis: true,
+          rowCount: true,
+          validRows: true,
+          warningRows: true,
+          quarantinedRows: true,
+        },
+      }),
+      db.ingestionJob.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+        _max: { finishedAt: true },
+      }),
+      db.company.findMany({
+        select: {
+          slug: true,
+          currentMarketPrice: true,
+          priceQuoteAt: true,
+          priceUpdatedAt: true,
+          priceAttemptedAt: true,
+          priceError: true,
+          priceSource: true,
+        },
+      }),
+      db.corporateAction.groupBy({ by: ["companyId"], _count: { _all: true } }),
+      db.sourceRow.groupBy({
+        by: ["validationStatus", "reviewStatus"],
+        _count: { _all: true },
+      }),
+      db.$queryRaw<
+        { n: bigint }[]
+      >`SELECT count(DISTINCT investor_cluster_id) AS n FROM unclaimed_folios`,
+    ]);
+    const n = (v: bigint | number) => Number(v);
+    const holders = new Map<
+      string,
+      { records: number; folios: number; groups: number; byCustody: Record<string, number> }
+    >();
+    for (const r of byCompany) {
+      const h = holders.get(r.company_id) ?? { records: 0, folios: 0, groups: 0, byCustody: {} };
+      h.records += n(r.records);
+      h.folios += n(r.folios);
+      h.groups += n(r.groups);
+      h.byCustody[r.custody_status] = n(r.records);
+      holders.set(r.company_id, h);
+    }
+    const actionCount = new Map(actions.map((a) => [a.companyId, a._count._all]));
+    const priceBy = new Map(prices.map((p) => [p.slug, p]));
+    return {
+      asOf: new Date().toISOString(),
+      listedEquities,
+      companyProfiles: companies.length,
+      holderRecords: [...holders.values()].reduce((a, h) => a + h.records, 0),
+      recordGroups: n(groups[0]?.n ?? 0),
+      byValidation: byStatus.map((b) => ({ ...b, records: n(b.records) })),
+      companies: companies.map((c) => {
+        const h = holders.get(c.id);
+        const p = priceBy.get(c.slug);
+        return {
+          name: c.name,
+          slug: c.slug,
+          holderRecords: h?.records ?? 0,
+          distinctFolios: h?.folios ?? 0,
+          recordGroups: h?.groups ?? 0,
+          byCustody: h?.byCustody ?? {},
+          corporateActions: actionCount.get(c.id) ?? 0,
+          hasIrPage: !!c.irPageUrl,
+          price: p?.currentMarketPrice === null || !p ? null : Number(p.currentMarketPrice),
+          priceSource: p?.priceSource ?? null,
+          priceQuoteAt: isoTime(p?.priceQuoteAt ?? null),
+          priceRetrievedAt: isoTime(p?.priceUpdatedAt ?? null),
+          priceAttemptedAt: isoTime(p?.priceAttemptedAt ?? null),
+          priceError: p?.priceError ?? null,
+        };
+      }),
+      sources: sources.map((d) => ({
+        ...d,
+        sha256: d.sha256.slice(0, 12),
+        publishedAt: isoTime(d.publishedAt),
+        retrievedAt: isoTime(d.retrievedAt),
+      })),
+      jobs: jobs.map((j) => ({
+        status: j.status,
+        count: j._count._all,
+        latestFinishedAt: isoTime(j._max.finishedAt),
+      })),
+      sourceRows: quarantine.map((q) => ({
+        validationStatus: q.validationStatus,
+        reviewStatus: q.reviewStatus,
+        rows: q._count._all,
+      })),
+    };
+  }
+
+  /** Quarantined rows for review. Raw cells are decrypted for staff and the read is audited. */
+  async quarantine(user: SessionClaims, documentId?: string) {
+    const rows = await this.prisma.client.sourceRow.findMany({
+      where: {
+        validationStatus: "QUARANTINED",
+        reviewStatus: "PENDING_REVIEW",
+        ...(documentId ? { sourceDocumentId: documentId } : {}),
+      },
+      orderBy: [{ sourceDocumentId: "asc" }, { rowIndex: "asc" }],
+      take: 50,
+      include: { document: { select: { fileName: true, sourceUrl: true } } },
+    });
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "imports.quarantine.read",
+      entityType: "source_document",
+      entityId: documentId ?? null,
+      data: { rows: rows.map((r) => r.id) },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      document: r.document.fileName,
+      sourceUrl: r.document.sourceUrl,
+      rowRef: r.rowRef,
+      issues: r.issues,
+      extractionNotes: r.extractionNotes,
+      rawCells: JSON.parse(decryptField(r.rawCellsEnc, this.prisma.fieldKeys)) as Record<
+        string,
+        unknown
+      >,
+      hasRecord: !!r.folioId,
+    }));
+  }
+
+  /**
+   * A reviewer's decision on a quarantined row. APPROVED publishes the holder
+   * record it fed (searchable again); REJECTED withdraws it. Nothing is deleted.
+   */
+  async reviewRow(
+    user: SessionClaims,
+    rowId: string,
+    decision: "APPROVED" | "REJECTED",
+    note: string,
+  ) {
+    const db = this.prisma.client;
+    const row = await db.sourceRow.findUnique({ where: { id: rowId } });
+    if (!row || row.validationStatus !== "QUARANTINED")
+      throw new NotFoundException("No quarantined row with that id.");
+    await db.$transaction(async (tx) => {
+      await tx.sourceRow.update({
+        where: { id: rowId },
+        data: { reviewStatus: decision, reviewedById: user.sub, reviewedAt: new Date() },
+      });
+      if (row.folioId && row.folioState) {
+        // A holder record is published only when none of its rows still waits for review.
+        const pending = await tx.sourceRow.count({
+          where: {
+            folioId: row.folioId,
+            validationStatus: "QUARANTINED",
+            reviewStatus: "PENDING_REVIEW",
+          },
+        });
+        const status = decision === "REJECTED" ? "WITHDRAWN" : pending ? null : "PUBLISHED";
+        if (status)
+          await tx.$executeRaw`
+            UPDATE unclaimed_folios SET review_status = ${status}, updated_at = now()
+            WHERE id = ${row.folioId}::uuid AND state = ${row.folioState}::"IndianState"`;
+      }
+    });
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "imports.quarantine.review",
+      entityType: "source_row",
+      entityId: rowId,
+      data: { decision, note },
+    });
+    return { id: rowId, decision };
   }
 
   /** The job body. Runs in the worker (BullMQ) or inline. Safe to re-run: rows upsert. */
@@ -151,6 +418,16 @@ export class ImportsService {
           form: job.formType,
           jobId: job.id,
           databaseUrl: this.prisma.databaseUrl,
+          source: {
+            url: job.sourceUrl,
+            retrievedAt: job.createdAt,
+            // A staff upload with no public URL is an authorised upload.
+            documentType: job.sourceUrl
+              ? job.formType === "IEPF_4"
+                ? "IEPF_4_STATEMENT"
+                : "IEPF_2_STATEMENT"
+              : "AUTHORISED_UPLOAD",
+          },
         },
       );
       await db.ingestionJob.update({
@@ -161,6 +438,10 @@ export class ImportsService {
           insertedRows: r.insertedRows,
           updatedRows: r.updatedRows,
           skippedRows: r.skippedRows,
+          warningRows: r.warningRows,
+          quarantinedRows: r.quarantinedRows,
+          parserVersion: r.parserVersion,
+          sourceDocumentId: r.sourceDocumentId,
           errors: r.errors,
           finishedAt: new Date(),
         },

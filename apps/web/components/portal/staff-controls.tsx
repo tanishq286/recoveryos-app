@@ -27,6 +27,8 @@ export function StaffControls({ detail }: { detail: CaseDetail }) {
   const [busy, setBusy] = React.useState<"advance" | "save" | "fee" | "release" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
+  const [releaseReason, setReleaseReason] = React.useState("");
+  const [competingReview, setCompetingReview] = React.useState("");
   const internal = detail.internal!;
   const [track, setTrack] = React.useState({
     rtaEntitlementStatus: internal.rtaEntitlementStatus,
@@ -151,13 +153,38 @@ export function StaffControls({ detail }: { detail: CaseDetail }) {
             {detail.folioReleasedAt ? "released to the client" : "masked for the client"}.
           </p>
           {!detail.folioReleasedAt && (
+            <Input
+              aria-label="Reason for releasing the folio number"
+              placeholder="Reason: PAN verified, relationship checked…"
+              value={releaseReason}
+              onChange={(e) => setReleaseReason(e.target.value)}
+              className="min-w-[16rem] flex-1"
+            />
+          )}
+          {!detail.folioReleasedAt && (
+            <Input
+              aria-label="Outcome of the competing-claim review, if another person claims this holding"
+              placeholder="Only if another person claims it: review outcome"
+              value={competingReview}
+              onChange={(e) => setCompetingReview(e.target.value)}
+              className="min-w-[16rem] flex-1"
+            />
+          )}
+          {!detail.folioReleasedAt && (
             <Button
               size="sm"
               variant="outline"
-              disabled={!!busy || !detail.holding}
+              disabled={!!busy || !detail.holding || releaseReason.trim().length < 10}
               onClick={() =>
                 void run("release", () =>
-                  callApi(`cases/${detail.caseCode}/release-folio`, { body: {} }),
+                  callApi(`cases/${detail.caseCode}/release-folio`, {
+                    body: {
+                      reason: releaseReason.trim(),
+                      ...(competingReview.trim()
+                        ? { competingClaimReview: competingReview.trim() }
+                        : {}),
+                    },
+                  }),
                 )
               }
             >

@@ -51,6 +51,9 @@ export class CompaniesController {
       tickerBse: c.tickerBse,
       currentMarketPrice: numOrNull(c.currentMarketPrice),
       priceUpdatedAt: isoTime(c.priceUpdatedAt),
+      priceQuoteAt: isoTime(c.priceQuoteAt),
+      priceAttemptedAt: isoTime(c.priceAttemptedAt),
+      priceError: c.priceError ? "The latest refresh failed." : null,
       priceSource: c.priceSource,
       corporateActions: c.corporateActions.map((a) => ({
         actionType: a.actionType,
@@ -75,7 +78,7 @@ async function loadCompany(prisma: PrismaService, slug: string) {
   if (!company) throw new NotFoundException("No company with that name in our records.");
   const custody = await db.unclaimedFolio.groupBy({
     by: ["custodyStatus"],
-    where: { companyId: company.id },
+    where: { companyId: company.id, reviewStatus: "PUBLISHED" },
     _count: { _all: true },
     _sum: { postActionShares: true, unclaimedDividendAmount: true },
   });

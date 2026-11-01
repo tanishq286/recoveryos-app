@@ -21,7 +21,10 @@ export async function AppHeader() {
           { href: "/admin/companies", label: "Company files" },
           ...(viewer.role === "VALUATION_ANALYST"
             ? []
-            : [{ href: "/admin/ingestion", label: "Imports" }]),
+            : [
+                { href: "/admin/ingestion", label: "Imports" },
+                { href: "/admin/coverage", label: "Coverage" },
+              ]),
           { href: "/search", label: "Search" },
         ]
       : viewer.role === "ASSOCIATE_PARTNER"

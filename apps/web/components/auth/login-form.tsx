@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KeyRoundIcon, LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
 import type { Role } from "@finsol/shared";
@@ -28,23 +29,29 @@ export function LoginForm({
   const router = useRouter();
   const [form, setForm] = React.useState({ name: "", phone: "", email: "", code: "" });
   const [sent, setSent] = React.useState(false);
-  /** Set only while SMS is not live: the API returns the code for non-staff numbers. */
-  const [testCode, setTestCode] = React.useState<string | null>(null);
-  const [channel, setChannel] = React.useState<string | null>(null);
+  /** null while checking; a message when sign-in codes cannot be delivered. */
+  const [paused, setPaused] = React.useState<string | null | undefined>(undefined);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  React.useEffect(() => {
+    let live = true;
+    callApi<{ available: boolean; message: string | null }>("auth/otp/status")
+      .then((s) => live && setPaused(s.available ? null : (s.message ?? "Sign-in is paused.")))
+      // If the check itself fails, let the request show the real error.
+      .catch(() => live && setPaused(null));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await callApi<{ channel?: string; testCode?: string }>("auth/otp/request", {
-        body: { phone: form.phone, purpose: "LOGIN" },
-      });
-      setTestCode(res.testCode ?? null);
-      setChannel(res.channel ?? null);
+      await callApi("auth/otp/request", { body: { phone: form.phone, purpose: "LOGIN" } });
       setSent(true);
     } catch (err) {
       setError((err as Error).message);
@@ -73,7 +80,7 @@ export function LoginForm({
       }
       // Only same-site paths are followed after sign-in.
       const target =
-        next && next.startsWith("/") && !next.startsWith("//") ? next : homeFor(res.user.role);
+        next && /^\/(?![/\\])/.test(next) && !next.includes("\\") ? next : homeFor(res.user.role);
       router.push(target);
       router.refresh();
     } catch (err) {
@@ -90,8 +97,12 @@ export function LoginForm({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {!sent ? (
-        <form onSubmit={send} className="grid gap-4">
+      {paused ? (
+        <Alert variant="pending" role="status" data-testid="otp-paused">
+          <AlertDescription>{paused}</AlertDescription>
+        </Alert>
+      ) : !sent ? (
+        <form onSubmit={send} className="grid gap-4" aria-busy={paused === undefined}>
           <div>
             <label htmlFor={id("name")} className="mb-1.5 block text-sm text-fg-2">
               Full name *
@@ -135,7 +146,7 @@ export function LoginForm({
               onChange={(e) => set("email", e.target.value)}
             />
           </div>
-          <Button type="submit" size="lg" disabled={busy}>
+          <Button type="submit" size="lg" disabled={busy || paused === undefined}>
             {busy ? (
               <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
             ) : (
@@ -146,20 +157,6 @@ export function LoginForm({
         </form>
       ) : (
         <form onSubmit={verify} className="grid gap-4">
-          {testCode ? (
-            <Alert role="status" data-testid="otp-test-code">
-              <AlertDescription>
-                SMS delivery is not live yet. Your test code is{" "}
-                <strong className="tnum font-mono tracking-[0.2em]">{testCode}</strong>
-              </AlertDescription>
-            </Alert>
-          ) : channel === "internal" ? (
-            <Alert role="status">
-              <AlertDescription>
-                SMS delivery is not live yet. Staff codes are in the server log.
-              </AlertDescription>
-            </Alert>
-          ) : null}
           <div>
             <label htmlFor={id("code")} className="mb-1.5 block text-sm text-fg-2">
               6-digit code sent to {form.phone}
@@ -191,8 +188,18 @@ export function LoginForm({
       )}
       <p className="mt-5 flex items-start gap-2 border-t border-(--glass-border) pt-4 text-sm text-fg-3">
         <ShieldCheckIcon className="mt-0.5 size-4 shrink-0 text-signal" aria-hidden="true" />
-        Type the code only into this page. We never ask for it by phone, WhatsApp or email. Your
-        details stay 100% confidential.
+        <span>
+          Type the code only into this page. We never ask for it by phone, WhatsApp or email. We use
+          your details only to handle your request; see our{" "}
+          <Link href="/privacy" className="link">
+            privacy notice
+          </Link>{" "}
+          and{" "}
+          <Link href="/terms" className="link">
+            terms
+          </Link>
+          .
+        </span>
       </p>
     </div>
   );

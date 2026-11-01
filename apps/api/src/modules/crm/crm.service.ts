@@ -17,6 +17,7 @@ import {
   type ScenarioType,
 } from "@finsol/shared";
 
+import { competingClaims, isContested, lockFolios } from "../../common/claims.js";
 import { AuditService } from "../../common/audit.service.js";
 import { PrismaService } from "../../common/prisma.service.js";
 import type { SessionClaims } from "../../common/auth/tokens.service.js";
@@ -181,7 +182,14 @@ export class CrmService {
     },
   ) {
     const lead = await this.lead(id);
-    if (lead.crmStage === "CONVERTED_TO_CASE")
+    // A converted lead accepts only one change: clearing a duplicate-claimant
+    // review that a later claim raised on its holding.
+    const onlyClearingReview =
+      patch.clearReviewAlert === true &&
+      patch.crmStage === undefined &&
+      patch.assignedAnalystId === undefined &&
+      patch.notes === undefined;
+    if (lead.crmStage === "CONVERTED_TO_CASE" && !onlyClearingReview)
       throw new ConflictException("This lead is already a case; work it on the case.");
     if (patch.crmStage === "CONVERTED_TO_CASE")
       throw new BadRequestException("Use Convert to open a case.");
@@ -221,15 +229,40 @@ export class CrmService {
     };
   }
 
-  /** Releases folio numbers to the claimant; everything not released stays masked for them. */
-  async releaseFolios(id: string, user: SessionClaims, folioIds: string[]) {
+  /**
+   * Releases folio numbers to the claimant; everything not released stays
+   * masked for them. A reviewed decision: the reviewer records why the
+   * claimant is entitled, and nothing is released while another person's
+   * claim on the same record is unresolved.
+   */
+  async releaseFolios(
+    id: string,
+    user: SessionClaims,
+    folioIds: string[],
+    reason: string,
+    /** Required when someone else also claims these holdings: how the review was resolved. */
+    competingClaimReview?: string,
+  ) {
     const lead = await this.lead(id);
     const unknown = folioIds.filter((f) => !lead.matchedFolioIds.includes(f));
     if (unknown.length) throw new BadRequestException("Release only holdings on this lead.");
-    const released = [...new Set([...lead.releasedFolioIds, ...folioIds])];
-    await this.prisma.client.leadInquiry.update({
-      where: { id },
-      data: { releasedFolioIds: released },
+    const released = await this.prisma.client.$transaction(async (tx) => {
+      await lockFolios(tx, folioIds);
+      const fresh = await tx.leadInquiry.findUniqueOrThrow({ where: { id } });
+      if (fresh.reviewAlert)
+        throw new ConflictException(
+          "Another person has claimed one of these holdings. Resolve the duplicate-claimant review before releasing anything.",
+        );
+      if (
+        isContested(await competingClaims(tx, folioIds, fresh.phone)) &&
+        !competingClaimReview?.trim()
+      )
+        throw new ConflictException(
+          "Another person's case or request covers one of these holdings. Review both claims and record the outcome first.",
+        );
+      const next = [...new Set([...fresh.releasedFolioIds, ...folioIds])];
+      await tx.leadInquiry.update({ where: { id }, data: { releasedFolioIds: next } });
+      return next;
     });
     await this.audit.record({
       actorId: user.sub,
@@ -237,7 +270,7 @@ export class CrmService {
       action: "lead.folio.release",
       entityType: "lead",
       entityId: id,
-      data: { folioIds },
+      data: { folioIds, reason, competingClaimReview: competingClaimReview ?? null },
     });
     return { id, releasedFolioIds: released };
   }
@@ -256,7 +289,13 @@ export class CrmService {
   async convert(
     id: string,
     user: SessionClaims,
-    body: { folioId: string; scenarioType: ScenarioType; agreedSuccessFeePct?: number | null },
+    body: {
+      folioId: string;
+      scenarioType: ScenarioType;
+      agreedSuccessFeePct?: number | null;
+      /** Required when another client already has a case on this holding. */
+      competingClaimReview?: string;
+    },
   ) {
     const lead = await this.lead(id);
     if (lead.crmStage === "CONVERTED_TO_CASE")
@@ -275,14 +314,25 @@ export class CrmService {
     const mine = existing.find((c) => c.client.phone === lead.phone);
     if (mine)
       throw new ConflictException(`This client already has case ${mine.caseCode} on this holding.`);
-    if (existing.length && lead.reviewAlert === "DUPLICATE_CLAIMANT_REVIEW")
+    // Another client's case on this holding: a second case opens only after a
+    // recorded review (co-heirs, for example), never by default.
+    if (existing.length && (lead.reviewAlert || !body.competingClaimReview?.trim()))
       throw new ConflictException(
-        `Duplicate claimant: case ${existing[0]!.caseCode} already covers this holding for another client. Review both claims before opening a case.`,
+        `Duplicate claimant: case ${existing[0]!.caseCode} already covers this holding for another client. Review both claims, clear the review flag and record the outcome before opening a second case.`,
       );
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const created = await db.$transaction(async (tx) => {
+          await lockFolios(tx, [folio.id]);
+          // Re-checked under the lock: a case opened meanwhile for someone else stops this one.
+          const others = await tx.recoveryCase.count({
+            where: { folioId: folio.id, client: { phone: { not: lead.phone } } },
+          });
+          if (others > existing.filter((c) => c.client.phone !== lead.phone).length)
+            throw new ConflictException(
+              "Another client's case was opened on this holding meanwhile. Review both claims.",
+            );
           const client = await tx.user.upsert({
             where: { phone: lead.phone },
             update: {},

@@ -39,6 +39,24 @@ export interface ResolvedSearch {
   last: string;
   state: SearchScope;
   custodyStatus?: CustodyStatus;
+  /**
+   * One word typed into the single name box. It could be any part of a name
+   * (people often type just the surname), so it is searched as first, middle
+   * and last name.
+   */
+  singleWord?: boolean;
+}
+
+/** The three searches a single typed word stands for: as surname, first name and middle name. */
+export function expandSingleWord(q: ResolvedSearch): ResolvedSearch[] {
+  if (!q.singleWord) return [q];
+  const w = q.first || q.middle || q.last;
+  const base = { state: q.state, custodyStatus: q.custodyStatus };
+  return [
+    { ...base, mode: "LAST", first: "", middle: "", last: w },
+    { ...base, mode: "FIRST", first: w, middle: "", last: "" },
+    { ...base, mode: "MIDDLE", first: "", middle: w, last: "" },
+  ];
 }
 
 /** Works out which of the four searches the input asks for, or null when no name was given. */
@@ -46,16 +64,26 @@ export function resolveSearch(input: SearchInput): ResolvedSearch | null {
   let first = normalizeName(input.firstName);
   let middle = normalizeName(input.middleName);
   let last = normalizeName(input.lastName);
+  let singleWord = false;
   if (!first && !middle && !last && input.fullName) {
     const parts = splitName(input.fullName);
     first = parts.first;
     middle = parts.middle;
     last = parts.last;
+    singleWord = !!first && !middle && !last && first.length > 1;
   }
   const given = [first, middle, last].filter(Boolean).length;
   if (given === 0) return null;
   const mode: SearchMode = given >= 2 ? "FULL" : first ? "FIRST" : middle ? "MIDDLE" : "LAST";
-  return { mode, first, middle, last, state: input.state, custodyStatus: input.custodyStatus };
+  return {
+    mode,
+    first,
+    middle,
+    last,
+    state: input.state,
+    custodyStatus: input.custodyStatus,
+    ...(singleWord ? { singleWord } : {}),
+  };
 }
 
 /**
@@ -76,8 +104,10 @@ export interface SearchResultItem {
   /** "400***": enough to tell namesakes apart without exposing the address. */
   pincodeMasked: string | null;
   /**
-   * The holder's identity cluster: name, father/spouse, PIN, city and state.
-   * Rows with the same name but a different cluster are different people.
+   * Record group: a hash of name, father/spouse, PIN, city and state, used to
+   * group lines of the same statement entry. It is not proof of identity:
+   * different groups may still relate to the same person, and one group can
+   * hold namesakes. Identity is verified separately, by people.
    */
   investorClusterId: string;
   /** The holder's state, or UNKNOWN when the statement gives none. */
@@ -90,9 +120,16 @@ export interface SearchResultItem {
   /** "RIL***21" unless released to this client or the viewer is staff. */
   folioNumber: string;
   folioReleased: boolean;
-  /** Shares after bonuses and splits. Null for the public. */
+  /** Shares after bonuses and splits. Null for the public, and when the statement states no share count. */
   postActionShares: number | null;
-  /** Shares × the last synced price + unclaimed amounts, in paise. Null for the public. */
+  /** True when the statement lists a share count; false for amount-only (IEPF-2 dividend) records. */
+  sharesStated: boolean;
+  /** "SHARES" or "UNCLAIMED_AMOUNT" (an unclaimed dividend listing with no share count). */
+  recordKind: "SHARES" | "UNCLAIMED_AMOUNT";
+  /**
+   * Shares × the last synced price + unclaimed amounts, in paise. Null for the
+   * public, and null when there is no share count or no price (unknown, not zero).
+   */
   estimatedTotalValuePaise: number | null;
   /** Last synced market price per share, in paise. Null for the public or before the first sync. */
   sharePricePaise: number | null;
@@ -106,6 +143,36 @@ export interface SearchResultItem {
   /** 0..1, how closely the name matched. */
   matchScore: number;
   matchedBy: "exact" | "trigram" | "phonetic" | "sound-alike";
+  /**
+   * exact:   every name part given matches exactly
+   * partial: matched exactly on the one name part given (other parts not checked)
+   * variant: a spelling or sound-alike variant, not the name as typed
+   */
+  matchClass: "exact" | "partial" | "variant";
+  /** Statement the record came from, for freshness: its publication and our retrieval. */
+  source: { publishedAt: string | null; retrievedAt: string | null } | null;
+}
+
+/** What the search covers, shown beside every result list and every "no match". */
+export interface SearchCoverage {
+  /** Holder records searchable now (one statement entry each; not people, not unique folios). */
+  holderRecords: number;
+  /**
+   * Companies with at least one imported holder record. Empty for the public,
+   * whose results mask company names: the count is given instead.
+   */
+  companiesWithRecords: { name: string; records: number }[];
+  companiesWithRecordsCount: number;
+  /** Company profiles in the directory (most have no holder records). */
+  companyProfiles: number;
+  /** Listed equities known to the calculator (no holder data). */
+  listedEquities: number;
+  /** Most recent statement publication and retrieval among imported sources, when known. */
+  latestSourcePublishedAt: string | null;
+  latestSourceRetrievedAt: string | null;
+  /** Statements whose newest record is older than this many days are described as old. */
+  oldestRecordYear: number | null;
+  newestRecordYear: number | null;
 }
 
 export interface SearchResponse {
@@ -114,6 +181,12 @@ export interface SearchResponse {
   access: ResultAccess;
   total: number;
   results: SearchResultItem[];
+  /** Most results returned for one search. */
+  limit: number;
+  /** True when more records matched than were returned: narrow the search. */
+  truncated: boolean;
+  /** What these records cover. A "no match" only speaks for this coverage. */
+  coverage: SearchCoverage;
   /** How the estimate is worked out, shown under every result list. */
   valuationBasis: string;
   engine: "meilisearch" | "postgres";
@@ -144,4 +217,8 @@ export interface ClaimResponse {
 }
 
 export const VALUATION_BASIS =
-  "Estimate = shares after bonuses and splits × the latest NSE price, plus the unclaimed amount on record. The final share count is confirmed during verification, and value is fixed only on the day shares are credited.";
+  "Estimate = shares after bonuses and splits × the latest available market price (which can be delayed), plus the unclaimed amount the statement lists. Records that list only an unclaimed dividend amount state no share count, so no share value is estimated for them. A listed amount is what the company reported on its statement date, not a confirmed amount payable today. The entitlement is confirmed during verification, and value is fixed only when shares or money are credited.";
+
+/** Said under every search, matched or not. */
+export const COVERAGE_DISCLAIMER =
+  "These records come only from the statements we have imported. No match here does not mean there are no unclaimed holdings: many companies and years are not covered yet. A match is a lead to verify, not proof of ownership.";

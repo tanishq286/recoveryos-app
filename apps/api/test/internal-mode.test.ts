@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { loadEnv } from "../src/config/env.js";
-import { InternalOtpSender } from "../src/common/providers/otp.provider.js";
+import { ConsoleOtpSender, DisabledOtpSender } from "../src/common/providers/otp.provider.js";
 import { DatabaseEncryptedStorage } from "../src/common/providers/storage.provider.js";
 import { OtpService } from "../src/modules/auth/otp.service.js";
 
 const JWT = "a-production-session-secret-of-at-least-32-chars";
 
 describe("production environment without SMS or eSign keys", () => {
-  it("starts on the internal stand-ins and derives the other secrets", () => {
+  it("pauses OTP sign-in (no code shown anywhere) and derives the other secrets", () => {
     const env = loadEnv({ NODE_ENV: "production", JWT_SECRET: JWT });
-    expect(env.OTP_PROVIDER).toBe("internal");
+    expect(env.OTP_PROVIDER).toBe("disabled");
     expect(env.ESIGN_PROVIDER).toBe("mock");
     expect(env.STORAGE_PROVIDER).toBe("db");
     expect(env.OTP_SECRET).not.toBe(JWT);
@@ -33,32 +33,74 @@ describe("production environment without SMS or eSign keys", () => {
   it("still refuses to start without JWT_SECRET", () => {
     expect(() => loadEnv({ NODE_ENV: "production" })).toThrow(/JWT_SECRET/);
   });
+
+  it("treats the old OTP_PROVIDER=internal as disabled and refuses the console sender", () => {
+    expect(
+      loadEnv({ NODE_ENV: "production", JWT_SECRET: JWT, OTP_PROVIDER: "internal" }).OTP_PROVIDER,
+    ).toBe("disabled");
+    expect(() =>
+      loadEnv({ NODE_ENV: "production", JWT_SECRET: JWT, OTP_PROVIDER: "console" }),
+    ).toThrow(/development and tests only/);
+  });
 });
 
-function otpService(role: string | null) {
+function otpService(sender: ConsoleOtpSender | DisabledOtpSender, nodeEnv = "test") {
+  const created: unknown[] = [];
   const prisma = {
     client: {
-      otpChallenge: { findMany: async () => [], create: async () => ({}) },
-      user: { findUnique: async () => (role ? { role } : null) },
+      otpChallenge: {
+        findMany: async () => [],
+        create: async (a: unknown) => {
+          created.push(a);
+          return { id: "c1" };
+        },
+        update: async () => ({}),
+      },
+      user: { findUnique: async () => ({ role: "INVESTOR" }) },
     },
   };
-  const env = loadEnv({ NODE_ENV: "test" });
-  return new OtpService(prisma as never, new InternalOtpSender(), env);
+  const env = { ...loadEnv({ NODE_ENV: "test" }), NODE_ENV: nodeEnv } as ReturnType<typeof loadEnv>;
+  return { service: new OtpService(prisma as never, sender, env), created };
 }
 
-describe("internal OTP", () => {
-  it("shows the code to a new or investor number", async () => {
-    for (const role of [null, "INVESTOR", "ASSOCIATE"]) {
-      const res = await otpService(role).request("9876543210", "LOGIN", null);
-      expect(res.channel).toBe("internal");
-      expect(res.testCode).toMatch(/^\d{6}$/);
-    }
+describe("OTP without an SMS provider", () => {
+  it("refuses honestly, creates no challenge and returns no code", async () => {
+    const { service, created } = otpService(new DisabledOtpSender());
+    expect(service.status()).toMatchObject({ available: false });
+    await expect(service.request("9876543210", "LOGIN", null)).rejects.toMatchObject({
+      status: 503,
+    });
+    await expect(service.verify("9876543210", "LOGIN", "123456")).rejects.toMatchObject({
+      status: 503,
+    });
+    expect(created).toHaveLength(0);
+  });
+});
+
+describe("OTP responses", () => {
+  it("never include the code, in any environment", async () => {
+    const { service } = otpService(new ConsoleOtpSender());
+    const res = await service.request("9876543210", "LOGIN", null);
+    expect(res).not.toHaveProperty("testCode");
+    expect(JSON.stringify(res)).not.toMatch(/\b\d{6}\b/);
   });
 
-  it("never shows a staff account's code", async () => {
-    for (const role of ["SUPER_ADMIN", "VALUATION_ANALYST", "LEGAL_OPS_EXEC"]) {
-      const res = await otpService(role).request("9000000001", "LOGIN", null);
-      expect(res).not.toHaveProperty("testCode");
+  it("refuse the development administrator number in production", async () => {
+    const { service } = otpService(new ConsoleOtpSender(), "production");
+    await expect(service.request("9000000001", "LOGIN", null)).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  it("refuse to print codes from the console sender in production", async () => {
+    const before = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      await expect(new ConsoleOtpSender().send("+919876543210", "123456")).rejects.toThrow(
+        /production/,
+      );
+    } finally {
+      process.env.NODE_ENV = before;
     }
   });
 });

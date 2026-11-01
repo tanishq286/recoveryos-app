@@ -30,6 +30,13 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
+  /** Whether sign-in codes can be delivered right now. Never returns a code. */
+  @Public()
+  @Get("otp/status")
+  status() {
+    return this.otp.status();
+  }
+
   /** Sends a sign-in code to the mobile number. */
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })

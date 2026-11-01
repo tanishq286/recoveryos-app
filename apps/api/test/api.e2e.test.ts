@@ -304,10 +304,33 @@ describe("Login Gateway, claims and analyst folio release", () => {
       .set(asha)
       .send({ folioIds: [folioId] })
       .expect(403);
+    // A release is a reviewed decision: without a recorded reason it is refused.
     await request(http)
       .post(`/api/v1/crm/leads/${res.body.leadId}/release-folios`)
       .set(auth("analyst"))
       .send({ folioIds: [folioId] })
+      .expect(400);
+    // Another client already has a case on this holding, so Asha's request is in review
+    // and nothing is released until the reviewer records the outcome.
+    expect(res.body.underReview).toBe(true);
+    await request(http)
+      .post(`/api/v1/crm/leads/${res.body.leadId}/release-folios`)
+      .set(auth("analyst"))
+      .send({ folioIds: [folioId], reason: "PAN and relationship documents checked by phone." })
+      .expect(409);
+    await request(http)
+      .patch(`/api/v1/crm/leads/${res.body.leadId}`)
+      .set(auth("analyst"))
+      .send({ clearReviewAlert: true })
+      .expect(200);
+    await request(http)
+      .post(`/api/v1/crm/leads/${res.body.leadId}/release-folios`)
+      .set(auth("analyst"))
+      .send({
+        folioIds: [folioId],
+        reason: "PAN and relationship documents checked by phone.",
+        competingClaimReview: "Asha and the existing client are co-heirs; both verified.",
+      })
       .expect(201);
     const after = await request(http)
       .get("/api/v1/search/unclaimed")
@@ -517,20 +540,85 @@ describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
       .set(auth("analyst"))
       .send({ feePct: 12 })
       .expect(409); // fixed once the mandate is issued
-    // Signing the mandate released the folio to the client.
+    // Signing the mandate does not release the folio: release is a separate, reviewed step.
+    expect(signed.body.events.map((e: { message: string }) => e.message).join(" ")).toMatch(
+      /development simulator.*not a signature/,
+    );
+    expect(signed.body.esign.method).toBe("development-simulator");
     const clientView = await request(http)
       .get("/api/v1/cases/RC-2026-1001")
       .set(auth("sunita"))
       .expect(200);
     expect(clientView.body.holding).toMatchObject({
-      folioNumber: "RIL0012345621",
-      folioReleased: true,
+      folioNumber: "RIL***21",
+      folioReleased: false,
     });
+    // No reason: refused. Reason but no verified PAN: refused.
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/release-folio")
+      .set(auth("analyst"))
+      .send({})
+      .expect(400);
+    // Without a verified PAN the release is refused.
+    const pan = clientView.body.vault.find((v: { docType: string }) => v.docType === "PAN");
+    if (pan?.status !== "VERIFIED") {
+      await request(http)
+        .post("/api/v1/cases/RC-2026-1001/release-folio")
+        .set(auth("analyst"))
+        .send({
+          reason: "Client identity and relationship confirmed.",
+          competingClaimReview: "Co-heirs; both verified.",
+        })
+        .expect(409);
+      await request(http)
+        .post("/api/v1/cases/RC-2026-1001/documents/PAN")
+        .set(auth("sunita"))
+        .attach("file", Buffer.from("%PDF-1.4\n% test PAN\n"), {
+          filename: "pan.pdf",
+          contentType: "application/pdf",
+        })
+        .expect(201);
+      await request(http)
+        .patch("/api/v1/cases/RC-2026-1001/documents/PAN")
+        .set(auth("legal"))
+        .send({ status: "VERIFIED" })
+        .expect(200);
+    }
+    // Asha's earlier request put this case's own lead into review too; a reviewer clears it.
+    const caseLead = await (async () => {
+      const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await db.connect();
+      const r = await db.query(
+        "SELECT l.id, l.review_alert FROM leads_and_inquiries l JOIN recovery_cases c ON c.id = l.converted_case_id WHERE c.case_code = 'RC-2026-1001'",
+      );
+      await db.end();
+      return r.rows[0] as { id: string; review_alert: string | null } | undefined;
+    })();
+    if (caseLead?.review_alert)
+      await request(http)
+        .patch(`/api/v1/crm/leads/${caseLead.id}`)
+        .set(auth("analyst"))
+        .send({ clearReviewAlert: true })
+        .expect(200);
+    // Asha's request is still open on the same holding: the review outcome is required.
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/release-folio")
+      .set(auth("analyst"))
+      .send({ reason: "Client identity and relationship confirmed." })
+      .expect(409);
     const released = await request(http)
       .post("/api/v1/cases/RC-2026-1001/release-folio")
       .set(auth("analyst"))
+      .send({
+        reason: "Client identity and relationship confirmed.",
+        competingClaimReview: "Co-heirs; both verified.",
+      })
       .expect(200);
     expect(released.body.folioReleasedAt).toBeTruthy();
+    expect(released.body.holding).toMatchObject({
+      folioNumber: "RIL0012345621",
+      folioReleased: true,
+    });
 
     await request(http)
       .post("/api/v1/cases/RC-2026-1001/advance")
@@ -1033,6 +1121,14 @@ describe("bulk loader: partition rebuild", () => {
       investmentType: null,
       sourceFilingSrn: null,
       ingestionJobId: null,
+      fatherOrSpouseRaw: null,
+      validationStatus: "VALID" as const,
+      validationIssues: [],
+      reviewStatus: "PUBLISHED" as const,
+      sourceDocumentId: null,
+      sourceRowIds: [],
+      quantityBasis: "AMOUNT_ONLY",
+      quantityEffectiveDate: null,
       ...folioSearchColumns({ first, last }),
     });
     const first = await bulkUpsertFolios(
@@ -1174,12 +1270,36 @@ describe("Pan-India isolation: namesakes never mix", () => {
       "DUPLICATE_CLAIMANT_REVIEW",
     );
 
-    // The analyst releases the folio to A only: B, same name, still sees it masked.
-    await request(http)
-      .post(`/api/v1/crm/leads/${first.body.leadId}/release-folios`)
+    // Both claimants are now in review; nothing is released until a person resolves it.
+    const boardAfter = await request(http)
+      .get("/api/v1/crm/board")
       .set(auth("analyst"))
-      .send({ folioIds: [folioId] })
-      .expect(201);
+      .expect(200);
+    const allLeads = boardAfter.body.columns.flatMap((c: { items: { id: string }[] }) => c.items);
+    expect(allLeads.find((l: { id: string }) => l.id === first.body.leadId).reviewAlert).toBe(
+      "DUPLICATE_CLAIMANT_REVIEW",
+    );
+    const release = (body: Record<string, unknown>) =>
+      request(http)
+        .post(`/api/v1/crm/leads/${first.body.leadId}/release-folios`)
+        .set(auth("analyst"))
+        .send({
+          folioIds: [folioId],
+          reason: "Death certificate and succession papers checked.",
+          ...body,
+        });
+    await release({}).expect(409);
+    await request(http)
+      .patch(`/api/v1/crm/leads/${first.body.leadId}`)
+      .set(auth("analyst"))
+      .send({ clearReviewAlert: true })
+      .expect(200);
+    // Still contested by B's open request: the outcome of the review must be recorded.
+    await release({}).expect(409);
+    // The analyst releases the folio to A only: B, same name, still sees it masked.
+    await release({
+      competingClaimReview: "Second claimant could not show a link to the holder; A verified.",
+    }).expect(201);
     const view = async (p: string) =>
       (
         await request(http)
@@ -1214,6 +1334,74 @@ describe("Pan-India isolation: namesakes never mix", () => {
     expect(listB.body.map((c: { caseCode: string }) => c.caseCode)).not.toContain(code);
     const listA = await request(http).get("/api/v1/cases").set(as(A)).expect(200);
     expect(listA.body.map((c: { caseCode: string }) => c.caseCode)).toContain(code);
+  });
+
+  it("puts two simultaneous claims on one record into review (no race)", async () => {
+    const C = "9876533333";
+    const D = "9876544444";
+    for (const phone of [C, D]) {
+      await request(http)
+        .post("/api/v1/auth/otp/request")
+        .send({ phone, purpose: "LOGIN" })
+        .expect(200);
+      const res = await request(http)
+        .post("/api/v1/auth/otp/verify")
+        .send({
+          phone,
+          code: otp.lastCode(`+91${phone}`),
+          name: NAME,
+          email: `${phone}@example.in`,
+        })
+        .expect(200);
+      tokenFor[phone] = res.body.token;
+    }
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const free = await db.query(
+      `SELECT id FROM unclaimed_folios
+       WHERE id NOT IN (SELECT folio_id FROM recovery_cases WHERE folio_id IS NOT NULL)
+         AND id NOT IN (SELECT unnest(matched_folio_ids) FROM leads_and_inquiries)
+       LIMIT 1`,
+    );
+    const target = free.rows[0].id as string;
+    const claim = (p: string) =>
+      request(http)
+        .post("/api/v1/search/claim")
+        .set(as(p))
+        .send({
+          folioIds: [target],
+          relationshipToHolder: "LEGAL_HEIR",
+          physicalCertStatus: "AVAILABLE",
+          consent: true,
+        })
+        .expect(200);
+    const [a, b] = await Promise.all([claim(C), claim(D)]);
+    // Exactly one arrived second and saw the other; both requests are now in review.
+    expect([a.body.underReview, b.body.underReview].sort()).toEqual([false, true]);
+    const flags = await db.query(
+      "SELECT count(*)::int AS n FROM leads_and_inquiries WHERE $1 = ANY(matched_folio_ids) AND review_alert IS NOT NULL",
+      [target],
+    );
+    await db.end();
+    expect(flags.rows[0].n).toBe(2);
+    // Neither response names or hints at the other claimant.
+    for (const r of [a, b]) expect(JSON.stringify(r.body)).not.toMatch(/9876533333|9876544444/);
+  });
+
+  it("refuses unauthorised direct requests for records, imports and reviews", async () => {
+    await request(http).get("/api/v1/admin/ingestion/coverage").set(as(A)).expect(403);
+    await request(http).get("/api/v1/admin/ingestion/quarantine").set(as(A)).expect(403);
+    await request(http)
+      .post(`/api/v1/crm/leads/00000000-0000-4000-8000-000000000000/release-folios`)
+      .set(as(A))
+      .send({ folioIds: [folioId], reason: "I would like to see it please." })
+      .expect(403);
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/release-folio")
+      .set(as(A))
+      .send({ reason: "I would like to see it please." })
+      .expect(403);
+    await request(http).get("/api/v1/cases/RC-2026-1001").set(as(A)).expect(404);
   });
 
   it("enforces the same isolation in Postgres row-level security", async () => {
@@ -1367,5 +1555,93 @@ describe("companies and stats", () => {
     const stats = await request(http).get("/api/v1/stats").expect(200);
     expect(stats.body.companies).toBe(15);
     expect(stats.body.folios).toBeGreaterThan(10);
+  });
+});
+
+describe("audit regressions: search contract, quarantine and sign-in status", () => {
+  it("reports coverage, limits and match classes with every search, and never shows unknown shares as zero", async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Ramesh Kumar Agarwal", state: "DELHI" })
+      .expect(200);
+    expect(res.body).toMatchObject({ limit: 50, truncated: false });
+    expect(res.body.coverage.holderRecords).toBeGreaterThan(0);
+    // Company names stay masked for the public, including in the coverage block.
+    expect(res.body.coverage.companiesWithRecords).toEqual([]);
+    expect(res.body.coverage.companiesWithRecordsCount).toBeGreaterThan(0);
+    const classes = new Set(res.body.results.map((r: { matchClass: string }) => r.matchClass));
+    for (const c of classes) expect(["exact", "partial", "variant"]).toContain(c);
+    expect(res.body.results[0].matchClass).toBe("exact");
+
+    const noMatch = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Zzyzx Qwertyuiop", state: "ALL_INDIA" })
+      .expect(200);
+    expect(noMatch.body.total).toBe(0);
+    expect(noMatch.body.coverage.holderRecords).toBeGreaterThan(0);
+  });
+
+  it("searches a single typed word as a surname too, not only as a first name", async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Agarwal", state: "DELHI" })
+      .expect(200);
+    const names = res.body.results.map((r: { investorFullName: string }) => r.investorFullName);
+    expect(names).toContain("Ramesh Kumar Agarwal");
+    expect(
+      res.body.results.every((r: { state: string }) => ["DELHI", "UNKNOWN"].includes(r.state)),
+    ).toBe(true);
+  });
+
+  it("keeps quarantined records out of search until a reviewer publishes them", async () => {
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const row = (
+      await db.query(
+        "SELECT id, investor_full_name, state::text AS state FROM unclaimed_folios WHERE review_status = 'PUBLISHED' AND state <> 'UNKNOWN' LIMIT 1",
+      )
+    ).rows[0];
+    const find = async () =>
+      (
+        await request(http)
+          .get("/api/v1/search/unclaimed")
+          .query({ fullName: row.investor_full_name, state: row.state })
+          .set(auth("admin"))
+          .expect(200)
+      ).body.results.some((r: { id: string }) => r.id === row.id);
+    expect(await find()).toBe(true);
+    await db.query("UPDATE unclaimed_folios SET review_status = 'QUARANTINED' WHERE id = $1", [
+      row.id,
+    ]);
+    expect(await find()).toBe(false);
+    await db.query("UPDATE unclaimed_folios SET review_status = 'PUBLISHED' WHERE id = $1", [
+      row.id,
+    ]);
+    await db.end();
+  });
+
+  it("says whether sign-in codes can be sent, and never returns a code", async () => {
+    const status = await request(http).get("/api/v1/auth/otp/status").expect(200);
+    expect(status.body).toEqual({ available: true, channel: "sms", message: null });
+    const sent = await request(http)
+      .post("/api/v1/auth/otp/request")
+      .send({ phone: "9876599999", purpose: "LOGIN" })
+      .expect(200);
+    expect(sent.body).not.toHaveProperty("testCode");
+    expect(Object.keys(sent.body).sort()).toEqual(
+      ["channel", "expiresAt", "phone", "resendAfterSeconds"].sort(),
+    );
+  });
+
+  it("serves the admin coverage report as aggregates only", async () => {
+    const res = await request(http)
+      .get("/api/v1/admin/ingestion/coverage")
+      .set(auth("admin"))
+      .expect(200);
+    expect(res.body.holderRecords).toBeGreaterThan(0);
+    expect(res.body.companyProfiles).toBeGreaterThan(0);
+    const text = JSON.stringify(res.body);
+    // No holder names or folio numbers in the dashboard payload.
+    expect(text).not.toMatch(/Ramesh|Agarwal|RIL0012345621/);
   });
 });

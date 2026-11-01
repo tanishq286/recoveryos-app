@@ -212,6 +212,8 @@ model User {
   ingestionJobs     IngestionJob[]
   valuationReports  ValuationReport[]
   reviewedDocuments CaseDocument[]    @relation("DocumentReviewer")
+  reviewedSources   SourceDocument[]  @relation("SourceReviewer")
+  reviewedRows      SourceRow[]       @relation("SourceRowReviewer")
 
   @@index([role])
   @@map("users")
@@ -251,6 +253,12 @@ model Company {
   priceUpdatedAt       DateTime? @map("price_updated_at") @db.Timestamptz(6)
   /// Which feed the price came from, e.g. "NSE" or "Yahoo Finance (NSE)".
   priceSource          String?   @map("price_source")
+  /// When the exchange printed the price (provider timestamp). priceUpdatedAt is when we fetched it.
+  priceQuoteAt         DateTime? @map("price_quote_at") @db.Timestamptz(6)
+  /// Last refresh attempt, successful or not.
+  priceAttemptedAt     DateTime? @map("price_attempted_at") @db.Timestamptz(6)
+  /// Why the last attempt failed; null after a success.
+  priceError           String?   @map("price_error")
   rtaName              RtaName   @default(OTHER) @map("rta_name")
   rtaDisplayName       String?   @map("rta_display_name")
   rtaAddress           String?   @map("rta_address")
@@ -275,6 +283,7 @@ model Company {
   corporateActions CorporateAction[]
   folios           UnclaimedFolio[]
   cases            RecoveryCase[]
+  sourceDocuments  SourceDocument[]
 
   @@map("companies")
 }
@@ -346,6 +355,20 @@ model UnclaimedFolio {
   /// Generated: sha256 of name, father/spouse, PIN, city and state. Namesakes never share one.
   investorClusterId       String         @default(dbgenerated()) @map("investor_cluster_id")
   ingestionJobId          String?        @map("ingestion_job_id") @db.Uuid
+  /// The statement this record was last imported from (see source_documents).
+  sourceDocumentId        String?        @map("source_document_id") @db.Uuid
+  /// source_rows behind this record (one per statement line).
+  sourceRowIds            String[]       @default([]) @map("source_row_ids") @db.Uuid
+  /// Father/spouse text as the source gave it, before placeholders were removed.
+  fatherOrSpouseRaw       String?        @map("father_or_spouse_raw")
+  /// UNVERIFIED | VALID | WARNING | QUARANTINED
+  validationStatus        String         @default("UNVERIFIED") @map("validation_status")
+  validationIssues        String[]       @default([]) @map("validation_issues")
+  /// PUBLISHED (searchable) | QUARANTINED (awaiting review) | WITHDRAWN
+  reviewStatus            String         @default("PUBLISHED") @map("review_status")
+  /// What original_shares means, e.g. SHARES_AS_STATED_ON_EVENT_DATE or AMOUNT_ONLY.
+  quantityBasis           String?        @map("quantity_basis")
+  quantityEffectiveDate   DateTime?      @map("quantity_effective_date") @db.Date
   createdAt               DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -543,12 +566,19 @@ model IngestionJob {
   /// First few row-level problems: [{row, message}].
   errors       Json?
   uploadedById String?         @map("uploaded_by_id") @db.Uuid
+  sourceDocumentId String?     @map("source_document_id") @db.Uuid
+  parserVersion    String?     @map("parser_version")
+  dryRun           Boolean     @default(false) @map("dry_run")
+  retryOfId        String?     @map("retry_of_id") @db.Uuid
+  warningRows      Int         @default(0) @map("warning_rows")
+  quarantinedRows  Int         @default(0) @map("quarantined_rows")
   startedAt    DateTime?       @map("started_at") @db.Timestamptz(6)
   finishedAt   DateTime?       @map("finished_at") @db.Timestamptz(6)
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   uploadedBy User?            @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   folios     UnclaimedFolio[]
+  sourceDocuments SourceDocument[]
 
   @@index([createdAt(sort: Desc)])
   @@map("ingestion_jobs")
@@ -616,4 +646,80 @@ model StoredObject {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("stored_objects")
+}
+
+/// One statement file version (by checksum) as retrieved, with its review state.
+/// Identity columns are immutable (trigger in migrations/20261105000000_provenance).
+model SourceDocument {
+  id                    String    @id @default(uuid()) @db.Uuid
+  companyId             String?   @map("company_id") @db.Uuid
+  sourceUrl             String?   @map("source_url")
+  fileName              String    @map("file_name")
+  /// IEPF_2_STATEMENT | IEPF_4_STATEMENT | AUTHORISED_UPLOAD | LICENSED_FEED
+  documentType          String    @map("document_type")
+  reportingPeriod       String?   @map("reporting_period")
+  publishedAt           DateTime? @map("published_at") @db.Timestamptz(6)
+  /// HTTP_LAST_MODIFIED | STATED_IN_DOCUMENT | UNKNOWN
+  publishedAtBasis      String    @default("UNKNOWN") @map("published_at_basis")
+  retrievedAt           DateTime  @map("retrieved_at") @db.Timestamptz(6)
+  sha256                String
+  bytes                 Int
+  contentType           String?   @map("content_type")
+  parserVersion         String    @map("parser_version")
+  /// RETRIEVED | PARSED | PARSE_FAILED | IMPORTED | IMPORT_FAILED
+  status                String    @default("RETRIEVED")
+  statusDetail          String?   @map("status_detail")
+  /// PENDING_REVIEW | APPROVED | REJECTED
+  reviewStatus          String    @default("PENDING_REVIEW") @map("review_status")
+  /// UNPUBLISHED | PUBLISHED | WITHDRAWN
+  publicationStatus     String    @default("UNPUBLISHED") @map("publication_status")
+  quantityBasis         String?   @map("quantity_basis")
+  quantityEffectiveDate DateTime? @map("quantity_effective_date") @db.Date
+  rowCount              Int       @default(0) @map("row_count")
+  validRows             Int       @default(0) @map("valid_rows")
+  warningRows           Int       @default(0) @map("warning_rows")
+  quarantinedRows       Int       @default(0) @map("quarantined_rows")
+  ingestionJobId        String?   @map("ingestion_job_id") @db.Uuid
+  reviewedById          String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt            DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "source_documents_company_fkey")
+  ingestionJob IngestionJob? @relation(fields: [ingestionJobId], references: [id], onDelete: SetNull, map: "source_documents_job_fkey")
+  reviewedBy   User?         @relation("SourceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull, map: "source_documents_reviewer_fkey")
+  rows         SourceRow[]
+
+  @@unique([sha256, parserVersion], map: "source_documents_sha_parser_key")
+  @@index([companyId, retrievedAt(sort: Desc)], map: "source_documents_company_idx")
+  @@map("source_documents")
+}
+
+/// One extracted statement line: raw cells (encrypted, immutable) and validation.
+model SourceRow {
+  id               String       @id @default(uuid()) @db.Uuid
+  sourceDocumentId String       @map("source_document_id") @db.Uuid
+  rowIndex         Int          @map("row_index")
+  rowRef           String       @map("row_ref")
+  /// AES-256-GCM ciphertext of {header: value}; holds the folio, so never plaintext.
+  rawCellsEnc      String       @map("raw_cells_enc")
+  rawHash          String       @map("raw_hash")
+  extractionNotes  String[]     @default([]) @map("extraction_notes")
+  /// VALID | WARNING | QUARANTINED
+  validationStatus String       @map("validation_status")
+  issues           String[]     @default([])
+  folioId          String?      @map("folio_id") @db.Uuid
+  folioState       IndianState? @map("folio_state")
+  /// PENDING_REVIEW | APPROVED | REJECTED | NOT_REQUIRED
+  reviewStatus     String       @default("PENDING_REVIEW") @map("review_status")
+  reviewedById     String?      @map("reviewed_by_id") @db.Uuid
+  reviewedAt       DateTime?    @map("reviewed_at") @db.Timestamptz(6)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document   SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Restrict, map: "source_rows_document_fkey")
+  reviewedBy User?          @relation("SourceRowReviewer", fields: [reviewedById], references: [id], onDelete: SetNull, map: "source_rows_reviewer_fkey")
+
+  @@unique([sourceDocumentId, rowIndex], map: "source_rows_document_row_key")
+  @@index([validationStatus, reviewStatus], map: "source_rows_status_idx")
+  @@index([folioId], map: "source_rows_folio_idx")
+  @@map("source_rows")
 }

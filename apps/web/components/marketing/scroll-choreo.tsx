@@ -6,7 +6,11 @@ import { gsap, ScrollTrigger, useGSAP, MOTION_QUERIES } from "@/lib/motion/gsap"
 
 /**
  * A list that appears as a list: items settle in once, 60ms apart.
- * Content is visible by default; motion only runs when allowed.
+ * Content is visible by default; motion only runs when allowed, and never
+ * makes content unreachable: items already on screen are left alone, hidden
+ * items stay focusable (opacity, not visibility), focus reveals an item at
+ * once, and everything is shown after a short fallback even if no scroll
+ * event ever fires.
  */
 export function RevealBatch({
   children,
@@ -22,14 +26,25 @@ export function RevealBatch({
     () => {
       const mm = gsap.matchMedia();
       mm.add(MOTION_QUERIES.motion, () => {
-        const items = gsap.utils.toArray<HTMLElement>("[data-reveal-item]", scope.current);
-        gsap.set(items, { autoAlpha: 0, y: 16 });
-        ScrollTrigger.batch(items, {
-          start: "top 88%",
-          once: true,
-          onEnter: (batch) =>
-            gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.06, overwrite: true }),
-        });
+        const all = gsap.utils.toArray<HTMLElement>("[data-reveal-item]", scope.current);
+        const items = all.filter(
+          (el) => el.getBoundingClientRect().top > window.innerHeight * 0.88,
+        );
+        if (!items.length) return;
+        const show = (els: Element[]) =>
+          gsap.to(els, { opacity: 1, y: 0, duration: 0.7, stagger: 0.06, overwrite: true });
+        gsap.set(items, { opacity: 0, y: 16 });
+        ScrollTrigger.batch(items, { start: "top 88%", once: true, onEnter: show });
+        const onFocus = (e: FocusEvent) => {
+          const item = (e.target as HTMLElement).closest("[data-reveal-item]");
+          if (item) gsap.set(item, { opacity: 1, y: 0, overwrite: true });
+        };
+        scope.current?.addEventListener("focusin", onFocus);
+        const fallback = window.setTimeout(() => show(items), 2500);
+        return () => {
+          scope.current?.removeEventListener("focusin", onFocus);
+          window.clearTimeout(fallback);
+        };
       });
     },
     { scope },

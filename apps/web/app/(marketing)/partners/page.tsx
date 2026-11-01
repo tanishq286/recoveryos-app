@@ -134,10 +134,31 @@ export default async function PartnersPage({
 
         {partners === null ? (
           <p className="mt-6 text-fg-3">The partner directory is not available right now.</p>
+        ) : partners.length === 0 && !state && !city ? (
+          <p className="mt-6 text-fg-2" role="status" data-testid="partners-empty-global">
+            There are no verified partners listed yet. You can still{" "}
+            <Link href="/search" className="link">
+              check for unclaimed holdings
+            </Link>{" "}
+            or write to{" "}
+            <a href={`mailto:${BRAND_EMAILS.partners}`} className="link">
+              {BRAND_EMAILS.partners}
+            </a>
+            .
+          </p>
         ) : partners.length === 0 ? (
-          <p className="mt-6 text-fg-2">
-            No verified partners {city ? `in ${city}` : state ? `in ${STATE_LABELS[state]}` : "yet"}
-            . Try a neighbouring state, or search for your holding directly.
+          <p className="mt-6 text-fg-2" role="status" data-testid="partners-empty-filtered">
+            No verified partners{" "}
+            {city && state
+              ? `in ${city}, ${STATE_LABELS[state]}`
+              : city
+                ? `in ${city}`
+                : `in ${STATE_LABELS[state as IndianState]}`}
+            .{" "}
+            <Link href="/partners" className="link">
+              Clear the filter
+            </Link>{" "}
+            to see every listed partner, or search for your holding directly.
           </p>
         ) : (
           <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

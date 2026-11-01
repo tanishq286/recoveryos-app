@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 // Geist, since the image renderer cannot read the site's WOFF2 fonts.
 
 export const alt =
-  "Finsol Enterprises: your family's forgotten shares, recovered for you. No upfront fee, no recovery no fee, 100% confidential.";
+  "Finsol Enterprises: your family's forgotten shares, recovered for you. No upfront fee, no recovery no fee, confidential handling.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -171,7 +171,7 @@ export default function Image() {
           <span style={{ color: FG3 }}>·</span>
           <span>No Recovery, No Fee</span>
           <span style={{ color: FG3 }}>·</span>
-          <span>100% Confidential</span>
+          <span>Confidential handling</span>
         </div>
       </div>
     </div>,
