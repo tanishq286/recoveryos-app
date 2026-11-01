@@ -201,7 +201,7 @@ export async function stampSigned(
     color: rgb(0.02, 0.47, 0.34),
   });
   page.drawText(
-    `${signedAt.toISOString().replace("T", " ").slice(0, 16)} UTC · ${provider === "mock" ? "Simulated eSign (development)" : provider === "internal" ? "Electronic acceptance, mobile OTP (not Aadhaar eSign)" : `Aadhaar eSign via ${provider}`} · ${requestId.slice(0, 18)}`,
+    `${signedAt.toISOString().replace("T", " ").slice(0, 16)} UTC · ${provider === "mock" ? "Simulated eSign (development)" : provider === "internal" ? "Electronic acceptance via Finsol Enterprises (finsolenterprises.com — mobile OTP, not Aadhaar eSign)" : `Aadhaar eSign via ${provider}`} · ${requestId.slice(0, 18)}`,
     { x: 68, y: 80, size: 8, font: regular, color: MUTED },
   );
   return Buffer.from(await doc.save());
