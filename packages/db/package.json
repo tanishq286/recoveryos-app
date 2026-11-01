@@ -1,0 +1,47 @@
+{
+  "name": "@recoveryos/db",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Prisma schema, SQL migrations, seed and a local Postgres for RecoveryOS.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "start": "node scripts/local-postgres.mjs",
+    "migrate": "prisma migrate deploy",
+    "seed": "node dist/seed/index.js",
+    "reset": "node scripts/reset.mjs",
+    "ingest:iepf": "node dist/cli/ingest-iepf.js",
+    "fetch:iepf": "node dist/fetch-public-iepf-lists.js",
+    "fixtures:test": "node dist/fixtures/test-fixtures.js",
+    "bench:partitions": "node dist/bench/partition-bench.js",
+    "ingest:pan-india": "node dist/ingest-pan-india.js"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "@recoveryos/shared": "*",
+    "pdfjs-dist": "^6.4.299",
+    "pg": "^8.23.1",
+    "pg-copy-streams": "^7.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/pg-copy-streams": "^1.2.5",
+    "dotenv": "^17.2.0",
+    "embedded-postgres": "18.4.0-beta.17",
+    "prisma": "7.10.1",
+    "typescript": "^5"
+  }
+}

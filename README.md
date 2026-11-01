@@ -1,278 +1,375 @@
-# RecoveryOS
+# Finsol Enterprises
 
-An AI-first recovery room for unclaimed investments in India. The first wedge is
-**IEPF shares and dividends**: shares a company moved to the Investor Education and
-Protection Fund after seven years of unclaimed dividends, which the holder (or their heirs)
-can claim back on Form IEPF-5.
+Turnkey recovery of unclaimed shares and dividends in India. Visitors start a **3-Minute
+Check** with only a name and a state; signed-in members see what is held and its value;
+Finsol's case team does everything else. **No Upfront Fee • No Recovery, No Fee • 100%
+Confidential.**
 
-This repository is the **MVP slice**: the marketing site, a guided triage, a case overview
-and an evidence room. They run on a typed mock data layer, and a production Postgres schema
-is ready for a Supabase free-tier project.
+The platform (internal package scope `@recoveryos/*`) has:
 
-> **Demo only.** Every case, person, company, folio, checksum and price in this build is
-> fictional. Uploads are switched off. Do not put real documents into it. See the
-> [launch-gate checklist](#launch-gate-checklist).
+- a public 3-Minute Check over companies' IEPF-2/IEPF-4 filings, in a state-partitioned
+  PostgreSQL table, with a live refresh of company-published statements behind every search;
+- a Login Gateway (full name, mobile OTP, email) in front of company names, share counts, values
+  and valuation PDFs; folio numbers stay masked for clients until their analyst releases them;
+- a multi-stock Family Wealth Calculator with live NSE/BSE prices, verified bonus and split
+  histories, dividends since purchase and an OTP-gated Share Valuation PDF (Report ID
+  `FE-VAL-…`, total in words, two per mobile per day);
+- a client portal showing Finsol's 4-step service, a Digital Mandate with a fee the case team
+  sets per case (custom pricing), Aadhaar eSign and a document vault;
+- a staff workspace: CRM board, internal company files (nodal officers, registrars, CIN/ISIN),
+  folio release, fee setting and a bulk importer.
+
+**What the public never sees.** No links to government or registrar self-service sites, no
+nodal officer or registrar contacts, no CIN/ISIN registry and no step-by-step filing
+instructions appear on public or client pages; they live only in the staff screens and the
+`/admin/companies` API.
+
+> **Real data only.** The database holds no fabricated investors. The seed loads the 15
+> companies and their sourced corporate actions; investor records come only from companies'
+> published IEPF-2 / IEPF-4 statements; prices come from the live exchange sync. The scale
+> benchmark (`npm run bench:partitions`) writes generated rows only to a separate database whose
+> name must end in `_bench`.
 
 ---
 
+## Monorepo
+
+```
+apps/
+  web/        Next.js 16 (App Router) + Tailwind 4 + shadcn/ui + Recharts: site, portal, partner desk, admin
+  api/        NestJS 12 (ESM) API + BullMQ worker: 3-Minute Check, Login Gateway, live refresh,
+              market data and valuation reports, cases, CRM, associates, ETL
+packages/
+  shared/     Domain enums, name phonetics, masking, corporate-action and fee maths, R.E.C.O.V.E.R.
+              rules, document checklists, reference companies and services (used by api, web and seed)
+  db/         Prisma 7 schema, SQL migrations (pg_trgm + fuzzystrmatch), seed, field encryption,
+              and a local PostgreSQL 18 that needs no install
+```
+
 ## Setup
 
-Requirements: Node.js 20.9 or newer, npm.
+Requirements: Node.js 20.19+ (24 recommended) and npm 11. No Docker, Postgres or Redis needed for
+development.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000 — no environment variables needed
+npm run build:packages        # shared + db (generates the Prisma client)
+npm run db:start              # terminal 1: PostgreSQL 18 on :54329, data in .data/pg
+npm run db:migrate
+npm run db:seed               # catalogue + first admin (see below)
+npm run build -w @recoveryos/api && npm run dev:api     # terminal 2: API on :4000/api/v1
+npm run dev:web               # terminal 3: web on :3000
 ```
 
-| Script                     | What it does                                                                                              |
-| -------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `npm run dev`              | Development server                                                                                        |
-| `npm run build`            | Production build (Turbopack), including the TypeScript check                                              |
-| `npm start`                | Serve the production build                                                                                |
-| `npm run lint`             | ESLint (Next.js core-web-vitals + TypeScript rules)                                                       |
-| `npm run typecheck`        | Generate route types, then `tsc --noEmit`                                                                 |
-| `npm run format`           | Prettier                                                                                                  |
-| `scripts/verify-schema.sh` | Apply the migration to a throwaway local Postgres and run 25 behaviour checks (see [Database](#database)) |
+The seed creates a `SUPER_ADMIN` on `SEED_ADMIN_PHONE`, or, outside production, on the default
+development number 9000000001. Production never gets the default: whoever holds that number
+would receive the admin's login code. Sign in at `/login`; in development the code is printed in
+the API log (`Development OTP for +91…`). Staff, partners and clients are created from the app
+(clients when a lead is converted, partners at `/partners/join`); role changes are an admin task.
 
-Optional environment variables (none are required):
+### Loading real investor data
 
-| Variable                 | Default | Meaning                                                                                     |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------- |
-| `RECOVERYOS_DATA_SOURCE` | `mock`  | Which adapter `lib/data.ts` returns. Anything else fails loudly — only `mock` exists today. |
-| `MOCK_LATENCY_MS`        | `0`     | Adds delay to every mock call, to see loading states.                                       |
+Investor records come from the statutory statements companies publish under the IEPF Rules.
 
-## Screens
+```bash
+# One statement, from a file or straight from the company's site (.xlsx, .xls, .csv or .pdf)
+npm run ingest:iepf -w @recoveryos/db -- --cin L24230DL1975PLC007908 \
+  --file https://www.dabur.com/sites/default/files/2021-06/61617-l24230dl1975plc007908_6.pdf
+npm run ingest:iepf -w @recoveryos/db -- --slug state-bank-of-india --file ./sbi-iepf4.xlsx --dry-run
 
-| Route                  | What it shows                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/`                    | Landing page: the promise and quick-scan bar, the seven-year rule and the way back, how it works (evidence room → recovery engine → trust layer), what we don't do, free official routes beside paid help, pricing, and an anti-fraud notice.                                                                                                                                                                            |
-| `/check`               | Guided triage: one question per screen with a clickable stepper (jump back to any answered step and forward again), four holding cards, and a diagnostic receipt to review answers. Accepts `?asset=&issuer=&ref=` from the home page's quick-scan bar. The result gives a route assessment, exact "insufficient evidence" states and a timestamped **sources checked** receipt.                                         |
-| `/cases`               | The three sample cases.                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `/cases/rc-2026-0147`  | Mid-review case: value at stake and a KPI strip, then two panes. Milestones: the next-step card, the six-stage IEPF lifecycle tracker (over the 12 case states), tasks and activity. Document inspector: a forensic page preview, proof cards with a grounded confidence line and an Approve / Flag a discrepancy switch, the quote, holdings and consents. Below `lg` the panes become a Milestones / Documents switch. |
-| `/cases/rc-2026-0132`  | A case blocked by a company query (signature mismatch). Shows the red blocker state.                                                                                                                                                                                                                                                                                                                                     |
-| `/cases/rc-2026-0161`  | A legal-heir case that has just started. Shows empty states: no documents, no estimate.                                                                                                                                                                                                                                                                                                                                  |
-| `/cases/[id]/evidence` | Evidence room: documents with category, upload date, SHA-256 checksum and extraction status (read, needs checking, reading now, couldn't read); proof-card detail per document via `?doc=`.                                                                                                                                                                                                                              |
-
-Things to try:
-
-- On the home page, pick a holding in the quick-scan bar, type a company and start: the
-  check opens at the first question you haven't answered.
-- On the review step of the check, use **Edit** or the stepper to change an answer, then
-  **Back to review**. Change the holding type and jump forward: the stepper stops at the
-  reference step, because the old reference no longer applies.
-- Press ⌘K / Ctrl+K anywhere and arrow through cases, actions and fraud reporting. Type
-  a detail such as "folio": picking it opens the case on that document, opens the
-  Documents pane on a phone and marks the detail.
-- On RC-2026-0147, use the document chips above the inspector to read any other document
-  in place.
-- Approve the three waiting details on RC-2026-0147. The "what happens next" card counts
-  down, then hands the next step to the name-change upload. Each review is added to the
-  timeline and written to the mock audit log.
-- In the triage, choose **I don't remember** for the year. You get an "insufficient
-  evidence" result instead of a guess.
-
-## Architecture
-
-```
-app/
-  layout.tsx                  root: fonts, skip link, metadata
-  (marketing)/                public site — layout + landing page
-  (app)/                      product — demo banner, app header
-    check/                    guided triage
-    cases/                    list, [id] overview, [id]/evidence
-      [id]/loading.tsx, not-found.tsx
-    error.tsx                 error boundary for the product
-  not-found.tsx, global-error.tsx
-components/
-  ui/                         shadcn/ui primitives re-themed, plus VaultCard, StatusBadge, StepBreadcrumb, MetricCounter
-  case/                       lifecycle tracker, case panes, status tones, next-step card, tasks, timeline, quote, consents, holdings
-  evidence/                   evidence list, detail, proof card, document preview, copy button
-  triage/                     triage flow, diagnostic receipt, assessment result
-  command/                    ⌘K palette (client) + server index wrapper
-  viz/                        route timeline, value waterfall, reading summary, route progress, hash glyph
-  motion/                     Framer Motion provider, page transitions, cursor glow, magnetic CTA, count interpolation
-  theme/                      theme store + toggle
-  brand/                      wordmark, route loader, route illustrations
-  marketing/, site/, brand/
-lib/
-  data.ts                     ← the only door to data: RecoveryDataSource interface + getDataSource()
-  mock/adapter.ts             in-memory implementation (resets on restart)
-  mock/seed.ts                fictional sample cases
-  actions.ts                  server actions; re-validate every input (they are public endpoints)
-  rules/triage.ts             versioned, deterministic route rules (iepf-triage-2026.09-r1)
-  rules/case-states.ts        the 12 case states, rail logic, labels
-  rules/lifecycle.ts          the six display stages over those states (dates from history only)
-  triage-prefill.ts           reads ?asset=&issuer=&ref= for the check
-  motion/springs.ts, gsap.ts  the Framer Motion spring set; GSAP setup
-  types.ts                    domain types, mirroring the SQL schema
-  pricing.ts, sources.ts      one source of truth for fee terms and official links
-  labels.ts, format.ts        display labels; INR / IST formatting (en-IN, tabular numerals)
-supabase/
-  migrations/0001_init.sql    Postgres schema, triggers, RLS
-  verify/                     local stub for Supabase's auth schema + behaviour checks
-scripts/verify-schema.sh
+# Find and download statement files linked from companies' investor pages (polite, robots-aware)
+npm run fetch:iepf -w @recoveryos/db -- --all [--ingest]
+npm run fetch:iepf -w @recoveryos/db -- --company dabur-india-limited --url <investor page>
 ```
 
-**Data flow.** Server components call `getDataSource()` and render. Client components never
-touch data directly; they call server actions in `lib/actions.ts`, which re-validate input,
-call the same data source, and `revalidatePath` the affected pages. `lib/data.ts` imports
-`server-only`, so no adapter can end up in a browser bundle.
+Admins can also upload statements at `/admin/ingestion`. The parser reads the MCA statutory
+columns as filed (investor and father/husband name parts, address, country, state, district, PIN,
+folio or DP ID-client ID, investment type, amount transferred or number of shares, date of event
+or proposed transfer date), including MCA's own e-form template, title blocks, multi-line
+headers, "Number of underlying Shares" rows and PDF tables (including sideways pages). A missing
+state is taken from the PIN code; with neither, the holder is kept as "state not on the
+statement" and appears in every state's search. Amounts are kept per statement date, so a later
+year's statement adds to a holder's total and re-importing a file never double counts. Bonuses
+and splits dated after a row's transfer date are applied to its share count.
 
-**Honesty is structural, not just copy.**
+Checked against real published statements: three Dabur IEPF-2 PDFs (8,481–9,870 holders each,
+16,539 distinct holders loaded locally), MCA's IEPF-2 e-form `.xls` from Info Edge (22,975 rows,
+none skipped), and IEPF-2 PDFs from Tata Capital and StockHolding. Pages that load their lists
+through forms or scripts (Reliance's year picker, Wipro's KFin search form) cannot be fetched
+automatically: download those statements and upload them.
 
-- An extracted field's `value` is `null` when it was not found. The UI says "Not found.
-  Left blank, not estimated." The database enforces the same rule (`not_found_means_no_value`,
-  `value_has_provenance`).
-- The triage never claims a match. Registries without a live connector report
-  `not_connected` with `checkedAt: null` ("Last checked: never, not queried"). Only the rules
-  engine reports `checked`, with a real timestamp and the rule version.
-- Quotes carry an indicative value only with a stated basis (`value_needs_basis` in SQL).
-  Unconfirmed amounts are listed as "left out", not guessed.
+| Script (root)                                              | What it does                                                                         |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `npm run db:start` / `db:migrate` / `db:seed` / `db:reset` | Local Postgres; apply migrations; seed; drop and rebuild (local only)                |
+| `npm run dev:api` / `dev:worker` / `dev:web`               | API (tsc watch + node --watch), BullMQ worker (needs `REDIS_URL`), web               |
+| `npm test`                                                 | Shared unit tests (22) and API tests (32) against a fresh `recoveryos_test` database |
+| `npm run typecheck` / `npm run lint` / `npm run build`     | Across all workspaces                                                                |
 
-**Design system.** "The Sovereign Vault": an abyss canvas (`#05080E`) under a soft radial
-mesh, acrylic glass panels with a specular rim and a lit top edge, one electric-cyan action
-gradient (`#00F2FE` to `#4FACFE`), and four status hues with fixed meanings: emerald
-`#10B981` (confirmed, credited), amber `#F59E0B` (in review, waiting on a third party), red
-`#EF4444` (blockers, mismatches) and purple `#8B5CF6` (IEPF and regulatory milestones). Text
-steps of those hues are tuned so every pair is AA, noted in the CSS. Dark is the default; a
-frosted light theme restates the same tokens (toggle in the header, remembered per browser,
-restored before first paint). Utilities: `.panel`, `.vault-glass`, `.vault-glass-hover`,
-`.vault-card` (cursor glow), `.text-gradient-cyan`, `.bg-brand`, `.font-tabular` (slashed
-zeros for IDs, money and dates). Mona Sans Variable is self-hosted from `public/fonts` and preloaded (no late font swap,
-no layout shift); Geist Mono comes through `@fontsource-variable`. Icons are Lucide, at one stroke weight.
+**Drop folder.** Files placed in `data/pan-india-drop/` are loaded by
+`npm run ingest:pan-india -w @recoveryos/db` (`-- --watch` keeps polling): IEPF-2/IEPF-4 and
+registrar statements stream into the state partitions; BSE's "List of Scrips" export and NSE's
+equity lists fill the calculator's directory. Rows are matched to companies by CIN, current or
+legacy ISIN (Bajaj Finance's pre-split `INE296A01024` maps to `INE296A01032`) or name, or by a
+file name starting with a CIN, ISIN or slug. `scripts/download-open-masters.sh` fills the folder
+with what can be fetched openly: NSE's equity lists, and the holder-wise statements linked from
+the companies' investor-relations pages on record (notices and FAQs found there are skipped). Download each file yourself from its source: the
+tools never fetch from sites that refuse automated clients, so BSE and registrar data arrive
+through this folder or a licensed feed.
 
-Charts draw from dedicated fills (`--color-chart-signal`, `--color-chart-credit`,
-`--color-chart-muted`), stepped into the categorical lightness band for each theme and checked
-with a colour-vision validator (adjacent CVD ΔE 14.1 dark, 15.8 light). Text never wears a
-series colour. A semantic layer (`--surface`, `--surface-raised`, `--text-secondary`,
-`--success`, `--danger`, `--chart-1..3`, `--gradient-route`, durations and z-index) sits on
-top of the ink ladder for new components.
+### Environment
 
-Where the system is written down:
+Every integration has a local adapter, and setting its variables switches it to the real
+service. `/api/v1/health` reports which adapter each one is running on. Production refuses
+to start with development secrets or adapters.
 
-- `MASTER.md`: canonical tokens, motion rules and components.
-- `DESIGN.md` and `.impeccable/design.json`: the system as built, in the DESIGN.md format.
-- `design/recoveryos.dna.json`: the structured Design DNA (system, style, visual effects).
-- `PRODUCT.md`: product truth and principles, including the trust rule (only copy the
-  product can fully deliver).
+| Variable                                               | Default                                    | Purpose                                                                                            |
+| ------------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                         | local embedded Postgres                    | Any PostgreSQL 15+ with `pg_trgm` and `fuzzystrmatch` (Supabase works)                             |
+| `JWT_SECRET`, `OTP_SECRET`                             | dev values                                 | 32+ chars each; sessions and OTP hashes                                                            |
+| `FOLIO_ENCRYPTION_KEY`, `FOLIO_HASH_KEY`               | derived dev keys                           | 32 bytes base64: AES-256-GCM for folio numbers, HMAC blind index                                   |
+| `OTP_PROVIDER`                                         | `console`                                  | `msg91` (`MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_*`)                           |
+| `ESIGN_PROVIDER`                                       | `mock`                                     | `digio` (`DIGIO_CLIENT_ID/SECRET`) or `leegality` (`LEEGALITY_AUTH_TOKEN`); `ESIGN_WEBHOOK_SECRET` |
+| `STORAGE_PROVIDER`                                     | `local` (AES-256-GCM files in `.uploads/`) | `s3` with `S3_BUCKET`, `S3_REGION`, `S3_KMS_KEY_ID` (SSE-KMS)                                      |
+| `REDIS_URL`                                            | unset: jobs run inline                     | BullMQ queue; run `npm run dev:worker`                                                             |
+| `MEILI_HOST`, `MEILI_API_KEY`                          | unset: Postgres search                     | Meilisearch, with automatic fallback to Postgres on any error                                      |
+| `MARKET_SYNC_ENABLED`, `MARKET_SYNC_INTERVAL_MINUTES`  | on (off under test), 15                    | Live prices from NSE, falling back to Yahoo Finance (.NS, then .BO); daily dividend history        |
+| `SEED_ADMIN_PHONE`, `SEED_ADMIN_NAME`                  | unset                                      | First administrator created by `npm run db:seed`                                                   |
+| `VALUATION_REPORTS_PER_DAY`, `MEMBER_SEARCHES_PER_DAY` | 2, 60                                      | Per-mobile report limit; member checks per day                                                     |
+| `LIVE_SYNC_ENABLED`, `LIVE_SYNC_TTL_HOURS`             | on (off under test), 24                    | Live refresh of company-published statements behind each search                                    |
+| `FINSOL_API_URL` (web)                                 | `http://localhost:4000/api/v1`             | Where the web server reaches the API (`RECOVERYOS_API_URL` still read)                             |
+| `NEXT_PUBLIC_SITE_URL` (web)                           | `http://localhost:3000`                    | Canonical URLs, sitemap, referral links                                                            |
 
-**Motion layer.** Design layer only; no logic, routes or data flow depend on it.
+See `.env.example` for the full list.
 
-- Landing: GSAP (`lib/motion/gsap.ts`) drives a SplitText line-mask hero reveal, batched
-  ScrollTrigger reveals, a scroll-drawn staged route (DrawSVG) and the pricing ledger print.
-- The hero's route field (`components/marketing/route-field*.ts(x)`) is vanilla three.js with
-  custom shaders, loaded on idle after first paint. The route draws in, then signal pulses
-  travel it and wake nearby records, the field swells slowly, a cursor lens lifts records
-  on fine pointers, and the credit mark ripples when a pulse arrives. The route glow is a
-  second additive point layer, not a post-processing pass. The loop runs only while the
-  canvas is on screen and the tab is visible, caps pixel ratio, and falls back to an SVG
-  route when WebGL is unavailable, Save-Data is on, or the device is low-end. Reduced
-  motion renders one still frame.
-- Product screens use Framer Motion springs (`components/motion/motion-provider.tsx`,
-  LazyMotion with `strict` and lazily loaded features, `reducedMotion="user"`): the check's
-  steps slide and blur in from the side you are heading, shared layout springs move the nav
-  rule, tab pills, the ⌘K highlight and the pane switch, and the lifecycle stages open as
-  accordions. Hover and press stay in CSS. Figures on the case page count up once with
-  `MetricCounter` (the final value is server-rendered and is all a screen reader hears).
-- An inline `<head>` script sets `data-motion="on"` only without a reduced-motion preference,
-  and a CSS failsafe reveals hidden hero text after 2.4s, so content is never stuck hidden.
+## Platform architecture
 
-**Interface layer.** Also presentation only, built on the same data the pages already read:
+**3-Minute Check.** `GET /api/v1/search/unclaimed` takes `fullName` (or first/middle/last), a
+mandatory `state` and an optional `jointHolderName`; both names are searched and each result says
+which one matched. Search runs in two phases inside the state's partition (plus `UNKNOWN`, holders
+whose statement gives no state):
 
-- **Command palette** (`components/command/`): ⌘K / Ctrl+K anywhere, or the header Search
-  button. Searches pages, sample cases, evidence rooms, documents (by name, reference,
-  category or checksum prefix) and the details read from each document (by label only:
-  values such as folio numbers or PAN never enter the index, which every page carries).
-  Remembers recent picks, orders result groups by their best match, and follows the
-  WAI-ARIA combobox pattern. The index (`lib/command-index.ts`) is built on the server
-  from the data source; with real data it must be scoped to the signed-in viewer.
-- **Visualizations** (`components/viz/`), every one drawn from real case data with its
-  numbers also in text: the time-scaled route timeline (Stages / Timeline tabs in the case
-  page's lifecycle tracker), the "what reaches you" waterfall in the quote (value, fee, planned protection, net
-  before GST), the evidence reading summary (confirmed / waiting / no check needed / not
-  found), route progress on the cases list, and each document's checksum drawn as a
-  fingerprint mark.
-- **Page transitions**: React `<ViewTransition>` with typed navigations. Deeper links slide
-  forward, breadcrumbs slide back, the header stays fixed, and case titles carry a shared
-  name between list, case and evidence room. Browsers without the API simply swap pages.
-- **Signature surfaces**: a fixed radial mesh and grain behind every page, a cursor glow
-  on vault cards (fine pointers only), a sheen and a 3px magnetic lean on the main
-  CTA, a branded route loader, and route illustrations on 404, error and empty states.
+1. exact Indian phonetic keys for every name part (Agarwal, Agrawal and Aggarwal all give AGRVL),
+   answered from a composite `(last_name_key, first_name_key)` index;
+2. only if that finds fewer than 10: a fuzzy phase whose candidates come from two bounded
+   branches (200 rows each), both answered by B-tree lookups:
+   - **sound-alike:** Double Metaphone of surname and first name together, from a composite
+     `(dmetaphone(last), dmetaphone(first))` index;
+   - **spelling:** the 20 closest real spellings of each name part, found by trigram similarity
+     (`pg_trgm`, threshold 0.45, `gin_fuzzy_search_limit = 500`) in `name_words`, a vocabulary of
+     distinct name words kept up to date by every import, then looked up exactly in a
+     `(last_name_norm, first_name_norm)` index.
 
-**shadcn/ui.** `components.json` is configured (new-york style, CSS variables, Lucide).
-The primitives in `components/ui/` were added by hand in shadcn's current source style,
-because the shadcn registry was not reachable from the build environment.
-`npx shadcn add <component>` works as normal from here.
+   The candidates are then checked against every part, including initials, the generated
+   `name_tokens` word array and the phonetic key, and scored. Trigram scans never touch the folio
+   table: on a partition holding millions of rows they cost 13–40 ms even when nothing matched.
 
-## What is mocked vs real
+What a row reveals depends on the caller (`access` on every result):
 
-| Area                                                            | In this build                                                                | Real version needs                                                                                                         |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Case data                                                       | In-memory fictional seed; resets on server restart                           | A Supabase adapter implementing `RecoveryDataSource`                                                                       |
-| Sign-in                                                         | None. The viewer is always the sample case's client                          | Supabase Auth with email magic link or passkeys — deliberately not SMS OTP, so "we never ask for an OTP" stays simply true |
-| Route rules                                                     | **Real**, deterministic and versioned, but marked `demo`                     | Counsel review, then publish into `rule_versions`                                                                          |
-| Registry lookups (IEPF, company lists, UDGAM, EPFO, MF Central) | Not connected. Receipts say "Not queried"                                    | Official APIs or user-driven lookups only. No scraping behind captchas or logins                                           |
-| Document upload and storage                                     | Switched off                                                                 | Private Supabase Storage bucket, SHA-256 on arrival, malware scan, short-lived signed URLs                                 |
-| Extraction                                                      | Pre-written sample fields                                                    | OCR + model extraction that must emit page + snippet; the schema rejects anything else                                     |
-| Approve / correct                                               | **Real** server action with validation; in-memory; writes a mock audit event | `public.review_extracted_field` RPC (already in the migration)                                                             |
-| Audit log                                                       | In-memory list                                                               | `audit_events`: append-only, hash-chained (in the migration)                                                               |
-| Share prices and values                                         | Fictional sample prices, labelled                                            | Exchange closing price on the credit date, with evidence attached to the invoice                                           |
-| Insurance allocation                                            | Shown as a planned, conditional benefit only                                 | A licensed partner; IRDAI-compliant referral model; explicit opt-in                                                        |
+| Caller                 | Sees                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| public                 | holder, father/spouse, city, state, custody; company and folio masked        |
+| member (Login Gateway) | + company, shares after bonuses/splits, value, dividends; folio still masked |
+| staff                  | everything, including the decrypted folio                                    |
 
-## Database
+A member's folio numbers unmask only once released: by an analyst (`POST
+crm/leads/:id/release-folios` or `POST cases/:code/release-folio`), or automatically when the
+client eSigns their Digital Mandate. `POST search/claim` turns
+the member's selection into a CRM lead with the least-loaded analyst. Members get
+`MEMBER_SEARCHES_PER_DAY` checks a day.
 
-`supabase/migrations/0001_init.sql` creates 17 tables: `users`, `organizations`, `cases`,
-`claimants`, `assets`, `evidence_files`, `extracted_fields`, `consents`,
-`eligibility_assessments`, `tasks`, `submissions`, `external_events`, `messages`, `quotes`,
-`invoices`, `audit_events` and `rule_versions`.
+**Namesakes and tenant isolation.** Thousands of shareholders share a name, even within one
+state, so nothing is ever grouped or unlocked by name:
 
-- **Every mutable record** has `created_at`, `updated_at`, `actor_id` and `version`.
-  Every **case-scoped** record also has `case_id` (`cases` exposes it as a generated copy of
-  its own id). `users`, `organizations` and `rule_versions` are not case-scoped, so they have
-  no `case_id`. `audit_events` is append-only, so it has no `updated_at` or `version`.
-- A `BEFORE` trigger sets the timestamps and increments `version`. It also resolves
-  `actor_id`: the signed-in user, or `set local app.actor_id = '<uuid>'` for trusted server
-  writes. A write with no actor fails. Sending a stale `version` raises
-  `serialization_failure` (optimistic locking).
-- An `AFTER` trigger writes every insert, update and delete to `audit_events`, with a
-  SHA-256 hash chain. Updating, deleting or truncating the audit log raises an error, even for
-  the table owner.
-- **RLS is enabled on every table, deny by default.** `anon` has no grants and no policies.
-  `authenticated` gets `SELECT` only, and only on cases the user belongs to (client, case
-  lead, or a reviewer or admin in the same organization). There are no insert, update or
-  delete policies. All writes go through server code or the one audited RPC,
-  `review_extracted_field`, which checks the caller owns the case.
-- Published rule versions are immutable. Cases are never hard-deleted: erasure means
-  redacting personal data and deleting the storage objects, while the audit trail stays.
+- `unclaimed_folios.investor_cluster_id` is a stored SHA-256 of the holder's name, father or
+  spouse, PIN, city and state (`investor_cluster_id()` in `migrations/20261103000000_isolation`).
+  Search results carry it as a "Holder ID" with the father/spouse, city and masked PIN
+  (`400***`). The web app warns when a selection spans more than one Holder ID.
+- A member sees a folio number only when it was released to _their_ verified mobile (an analyst
+  release on their lead, or their own signed mandate), never because they share a name.
+- Clients' case, document and lead reads run as the `finsol_app_client` role with `app.user_id`
+  set for the transaction, so Postgres row-level security on `recovery_cases`, `case_documents`,
+  `leads_and_inquiries` and `valuation_reports` returns only their own rows, whatever the query
+  asks for. Staff paths run as the owner. In production, grant `finsol_app_client` to the API's
+  database user.
+- `recovery_cases (folio_id, client_user_id)` is unique. When someone claims a holding that
+  another client already has a case or open request on, their lead is kept separate and flagged
+  `DUPLICATE_CLAIMANT_REVIEW` on the CRM board; it cannot become a case until an analyst marks it
+  reviewed.
 
-**Apply to Supabase (free tier):** create a project, then either paste the file into the SQL
-editor, or run `supabase link --project-ref <ref>` followed by `supabase db push`.
+**All India.** The 3-Minute Check offers "All India (Pan-India Search)" for families who moved
+across states; it searches every partition. Searches run on a dedicated connection pool as named
+prepared statements with cached generic plans (`plan_cache_mode = force_generic_plan`): planning
+a query over 38 partitions costs about 5 ms, running it under 1 ms. The pool's connections also
+carry the fuzzy-match settings (trigram threshold 0.45, `gin_fuzzy_search_limit = 500`).
 
-**Verify locally without Supabase:** `PG_BIN=/usr/lib/postgresql/16/bin scripts/verify-schema.sh`,
-run as a non-root user. It starts a throwaway Postgres and stubs Supabase's `auth` schema and
-roles (`supabase/verify/supabase_stub.sql`). It then applies the migration and runs
-`supabase/verify/behaviour.sql`, which checks these 25 things:
+**Warm after restarts.** On start-up the API runs `pg_prewarm` over every partition's search
+indexes (`PREWARM_ENABLED`, on outside tests), in the background. For a warm buffer cache across
+database restarts as well, add `pg_prewarm` to `shared_preload_libraries` so its autoprewarm
+worker restores it.
 
-- actor enforcement
-- the honesty constraints
-- versioning and optimistic locking
-- anon denial
-- per-client isolation
-- that direct writes are denied
-- the RPC's ownership checks
-- audit immutability and the hash chain
-- that published rules are frozen
+**Live refresh.** Each search returns a `liveRefreshId`; `GET search/live/:id` streams
+server-sent events while `LiveMcaSyncService` (`apps/api/src/modules/search/live-mca-sync.service.ts`)
+re-reads the companies' investor-relations pages (at most once per company per
+`LIVE_SYNC_TTL_HOURS`) and bulk-loads any statement not yet imported. The browser only sees the
+id and counts. Sources are pluggable; MCA's IEPF investor search is CAPTCHA-protected with no
+public API, so it is **not** scraped. An authorised MCA or registrar feed can be added as another
+`UpstreamSource`.
 
-The same file can be pointed at a Supabase staging branch, as part of the launch gate.
+**Scale: state partitions and bulk COPY.** `unclaimed_folios` is `PARTITION BY LIST (state)`:
+36 states and union territories + `OUT_OF_INDIA` (37), plus one for `UNKNOWN`. Its primary key
+is `(id, state)`, so `recovery_cases.folio_id` is checked by the application rather than a
+foreign key. Prisma's schema cannot express partitioning: apply migrations with
+`prisma migrate deploy` only, never `prisma migrate dev`, which would try to undo it.
 
-**Swapping in Supabase:**
+Imports stream rows into an unlogged staging table with binary `COPY … FROM STDIN`. Then:
 
-1. Add `@supabase/supabase-js` and `@supabase/ssr`.
-2. Write `lib/supabase/adapter.ts`, implementing `RecoveryDataSource`. Map snake_case rows to
-   the camelCase types in `lib/types.ts`, and call the RPC for `reviewField`.
-3. Branch on `RECOVERYOS_DATA_SOURCE=supabase` in `getDataSource()`.
+- **Up to 200,000 rows: merge in place**, in one transaction: existing holders (same company,
+  folio and name) gain the new statement's per-date amounts; the rest are inserted.
+- **More: rebuild each affected state partition.** Its live rows and the staged rows (merged the
+  same way) go into an unindexed `unclaimed_folios_load_<state>` table; every index is built once
+  (`maintenance_work_mem = 2GB`, `max_parallel_maintenance_workers = 8`, four states at a time);
+  foreign keys are validated; then one short transaction runs `DETACH PARTITION` /
+  `ATTACH PARTITION` and drops the old table. Searches read the old partition until the swap. Measured on this machine (`npm run bench:partitions`, generated rows in
+  `recoveryos_bench`): see "Measured performance" below.
 
-No page or component changes.
+**Meilisearch (optional).** With `MEILI_HOST`, folios are indexed one index per state
+(`folios_maharashtra`, …, `folios_unknown`) and a search multi-queries its state and `UNKNOWN`,
+falling back to Postgres on any error.
+
+**Login Gateway.** `POST auth/otp/request` then `POST auth/otp/verify` with `name`, `email` and
+the 6-digit code. OTPs live 5 minutes, allow 5 tries, are stored as an HMAC and are rate-limited.
+The web app's `/api/v1/*` backend-for-frontend keeps the session in an httpOnly cookie
+(`fe_session`), so browser JavaScript never sees a token.
+
+**Calculator and valuation reports.** `GET market/equities?q=` searches `listed_equities`, loaded
+daily from NSE's main-board and SME (Emerge) lists, about 3,200 equities. BSE refuses automated
+requests that identify themselves honestly (its scrip master and bhavcopy files return 403), and
+the service does not pose as a browser, so BSE-only listings come from Yahoo Finance's search at
+query time. A licensed BSE or depository data feed would make the directory complete. `GET market/equities/:exchange/:symbol` returns the live price,
+bonus/split history (hand-verified for catalogue companies and the one-click examples, otherwise
+the exchange record) and dividends per share as paid. `POST valuation/report` (signed in) recomputes
+everything server-side and returns the PDF; reports are recorded in `valuation_reports`.
+
+**Custom pricing.** No percentage appears publicly. `recovery_cases.agreed_success_fee_pct` is
+empty until staff set it (`PATCH cases/:code/fee`); the Digital Mandate cannot be generated or
+signed before that, and a CHECK constraint refuses a signed mandate without a fee. The fee is
+fixed once the mandate is issued.
+
+**Data model.** There are 13 tables (migrations: init, search and integrity, enum values, real-data fields, per-event amounts). The 7 core tables are `companies`, `corporate_actions`,
+`unclaimed_folios`, `leads_and_inquiries`, `recovery_cases`, `case_documents` and `associates`.
+The 6 supporting tables are `users`, `otp_challenges`, `case_events`, `commission_ledger`,
+`ingestion_jobs` and `audit_events`. The second migration adds what Prisma cannot express:
+
+- the extensions and the trigram, Soundex and Double Metaphone indexes;
+- CHECK constraints: step 1 to 7, no step 6 without a signed mandate, no step 7 without an SRN,
+  and the folio column must hold ciphertext;
+- an append-only audit log, enforced by trigger even for the table owner.
+
+`folio_number` is AES-256-GCM ciphertext, with a masked copy and an HMAC blind index for
+de-duplication.
+
+**Market data.** `apps/api/src/market` writes `current_market_price`, `price_updated_at` and
+`price_source` on start-up and every 15 minutes: NSE's quote API first, then Yahoo Finance's
+chart API. Requests identify Finsol Enterprises honestly and never imitate a browser, so when NSE
+refuses automated clients (it answers 403 from most servers) Yahoo supplies the NSE price. A
+failed fetch keeps the last real price; no price is ever invented, and pages show "price
+pending" until the first sync. Dividends per share for the last ten years come from Yahoo
+Finance daily, scaled back from Yahoo's split adjustment. `GET /api/v1/market/prices` shows each
+company's price, source and time; `POST /api/v1/market/sync` (admin) runs a sync now.
+
+**Company catalogue.** `packages/shared/src/reference/companies.ts` is the single source for
+the 15 companies' identifiers, nodal officers (with deputies, emails, phones and addresses),
+registrars and corporate actions, each action tagged with its source. Bonus and split dates
+were checked against the exchange split history; where that history shows a combined split and
+bonus as one ratio, the announced components are kept and noted. State Bank of India has no
+CIN (it is constituted under the SBI Act, 1955), so its CIN is empty and the statute is recorded.
+
+**R.E.C.O.V.E.R.** The seven steps are Ring up, Evaluate, Check, Offer, Verify, Employ and
+Realize. They advance one at a time, by staff only, through `canAdvanceRecoverStep`, and the
+database constraints repeat the same rules. At step 5 the client reads the generated Digital
+Mandate PDF (carrying the fee staff set for the case) and signs it with Aadhaar eSign. Clients
+see these seven internal steps as Finsol's four public ones. The mandate only becomes "signed" through a verified
+provider webhook; the development provider routes its simulated signature through the same
+webhook check. When a referred case is credited, the associate's 30% share of the fee accrues
+to the commission ledger exactly once.
+
+**Document vault.** The checklist depends on the scenario: standard IEPF-5, duplicate shares,
+deceased transmission, NRI or physical-to-demat. Uploads must be PDF, JPG or PNG up to 10 MB.
+Each file is stored encrypted with its SHA-256 recorded, then reviewed by staff (verify, or send
+back with a reason). Downloads are authorised and audited.
+
+**ETL.** `POST /api/v1/admin/ingestion` accepts an IEPF-2 or IEPF-4 investor-wise statement as
+`.csv` or `.xlsx`. Headers are matched by alias, and the header row is found below any title
+block. Rows for the same (company, folio, holder) are grouped, then bulk-loaded with binary
+COPY and merged in one statement.
+Invalid rows are skipped with a reason. A background job does the parsing (BullMQ, or inline
+without Redis), then syncs Meilisearch when it is configured.
+
+**API surface** (all under `/api/v1`):
+
+- Public: `health`, `stats`, `companies`, `companies/:slug` (no contacts or identifiers),
+  `search/unclaimed`, `search/live/:id` (SSE), `market/prices`, `market/equities`,
+  `market/equities/:exchange/:symbol`, `auth/otp/request`, `auth/otp/verify`,
+  `associates/locator`, `associates/referral/:code`, `webhooks/esign/:provider`.
+- Signed in: `auth/me`, `search/claim`, `valuation/report`, `cases`, `cases/:code`,
+  `cases/:code/esign/start`, `cases/:code/mandate`, `cases/:code/documents/:docType`, `…/file`,
+  `associates/register`.
+- `ASSOCIATE_PARTNER`: `associates/me` and `associates/me/leads`.
+- Staff: `admin/companies`, `admin/companies/:slug`, `cases/:code/advance`,
+  `cases/:code/tracking`, `cases/:code/fee`, `cases/:code/release-folio`,
+  `PATCH cases/:code/documents/:docType`, `crm/board`, `crm/team`, `crm/leads/:id`,
+  `crm/leads/:id/convert`, `crm/leads/:id/release-folios`, `crm/cases/move`.
+- `LEGAL_OPS_EXEC` or `SUPER_ADMIN`: `admin/ingestion…`.
+
+---
+
+## Measured performance
+
+Measured on the development machine (24 cores, embedded PostgreSQL 18) with
+`npm run bench:partitions`, which writes generated holders only to `recoveryos_bench`
+(dropped afterwards). 50,000,000 rows; the largest partition (Maharashtra) holds 8.79M. Search
+runs as the API does: prepared statements with cached generic plans, 400 queries per set.
+
+| Measure                                                       | Result                             |
+| ------------------------------------------------------------- | ---------------------------------- |
+| Streaming 50M rows with binary COPY (generation + encryption) | 884 s, ~57,000 rows/s (Node-bound) |
+| Rebuild + swap of all 38 partitions (4 at a time)             | ~8.4 min (Maharashtra: 271 s)      |
+| Total load                                                    | ~23 min                            |
+| Re-import of a real 9,997-row Dabur statement (merge mode)    | 127 ms COPY + 628 ms merge         |
+
+| Search (p50 / p95 / p99, ms) | One state          | All India          |
+| ---------------------------- | ------------------ | ------------------ |
+| Common names (key match)     | 0.40 / 3.83 / 7.24 | 0.58 / 0.88 / 9.58 |
+| Misspelt names               | 0.37 / 0.59 / 4.41 | 0.56 / 0.77 / 1.00 |
+| No phonetic match (fuzzy)    | 0.77 / 1.37 / 2.01 | 1.16 / 1.59 / 9.49 |
+
+Through the API over HTTP, on the real data (16,539 holders): an All India 3-Minute Check takes
+about 3 ms (2.5–4.2 ms) and a single-state check about 3 ms; the first request after an API start
+takes about 8 ms. Matched rows are fetched with one prepared query selecting only the result
+columns, masked company names are cached per company, and the search pool keeps its connections
+(and prepared statements) open, with sequential scans off.
+
+The p99 values include each connection's first use of a statement, before its plan is cached.
+With an empty OS cache after a machine restart, an earlier run measured common-name p95 at 6.7 ms
+until the indexes were read in; the API's start-up `pg_prewarm` exists for this. Its effect on a
+truly cold machine was not measured here, since that needs root to drop the OS page cache. The
+generated data uses ~200 distinct name words; real data has far more, which makes the vocabulary
+lookup a little slower. Streaming is limited by row generation and AES encryption in one Node
+process.
+
+## Web app (apps/web)
+
+- Public: `/` (3-Minute Check hero, 4-step service, custom pricing, contact desks), `/search`,
+  `/calculator`, `/services`, `/services/[slug]`, `/unclaimed-shares`,
+  `/unclaimed-shares/[company-slug]` (price, bonus/split history, the 4-step service; no
+  contacts or filing steps), `/partners`, `/login` (Login Gateway), `sitemap.xml`, `robots.txt`.
+- Signed in: `/portal`, `/portal/cases/[code]` (4-step tracker; staff also see R.E.C.O.V.E.R.,
+  the fee and folio-release controls and the company file), `/partners/join`,
+  `/partners/dashboard`.
+- Staff: `/admin/crm`, `/admin/companies`, `/admin/companies/[slug]`, `/admin/ingestion`.
+
+The MVP's illustrative `/check` triage and `/cases` sample cases were removed in 0.3: they held
+fictional people and spelled out the self-filing route.
 
 ## Quality gates
 
@@ -353,10 +450,28 @@ Nothing here is done yet. **No real client documents are accepted until every it
 - [ ] Incident response plan, including CERT-In's 6-hour reporting requirement.
 - [ ] Independent security review or penetration test.
 
+### Platform (0.2)
+
+- [ ] **Data licensing.** Investor-wise IEPF data is published by companies and the IEPF Authority. Confirm with counsel that
+      indexing it, and showing teaser fields about named private individuals, is permitted. Decide on a DPDP basis, a takedown
+      route and how long records are kept.
+- [ ] **Reference data.** Verify every company's CIN, ISIN, registrar, corporate actions and nodal officer against primary
+      sources. Replace sample prices with an exchange feed.
+- [ ] **OTP.** Register a DLT sender ID and template for MSG91 or Twilio. Load-test the rate limits. Confirm that the anti-fraud
+      copy ("we never ask you to read out a code") matches every script the call team uses.
+- [ ] **eSign.** Sign a Digio or Leegality contract. Confirm their request fields and webhook signature scheme against the
+      adapters in `apps/api/src/common/providers/esign.provider.ts`. Have the Digital Mandate reviewed by counsel.
+- [ ] **Storage.** Private S3 bucket with SSE-KMS, a malware scan on upload and a retention schedule. Generate keys for
+      `FOLIO_*` and `STORAGE_ENCRYPTION_KEY` in a KMS, with a rotation procedure.
+- [ ] **Associates.** Write a partner agreement covering the 30% share, verification of professional membership, a payout
+      process and TDS.
+
 ### Product
 
 - [ ] Real registry connectors only through permitted channels. Otherwise keep "Not queried".
-- [ ] Remove fictional sample prices; wire a real valuation source.
+- [x] Live exchange prices (NSE, then Yahoo Finance) replace sample prices. Before launch, consider a licensed market-data feed and check its terms of use.
 - [ ] Screen-reader pass with NVDA, VoiceOver and TalkBack; content in at least one Indian
       language besides English.
-- [ ] Remove the demo banner only when everything above is checked.
+- [ ] Counsel review of the confidentiality model: the public pages no longer describe the free
+      self-filing route, and client folio numbers stay masked until released. Confirm this meets
+      consumer-protection and SEBI/IEPFA guidance on intermediaries before launch.

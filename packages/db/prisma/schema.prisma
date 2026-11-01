@@ -1,0 +1,608 @@
+// RecoveryOS platform schema.
+//
+// The seven core tables from the platform brief (companies, corporate_actions,
+// unclaimed_folios, leads_and_inquiries, recovery_cases, case_documents,
+// associates) plus the tables they depend on: users, otp_challenges,
+// case_events, commission_ledger, ingestion_jobs and audit_events.
+//
+// Enum names mirror packages/shared/src/enums.ts exactly.
+// Search indexes Prisma cannot express (pg_trgm GIN indexes, Soundex and
+// Double Metaphone expression indexes, CHECK constraints) live in the
+// hand-written migration under prisma/migrations, applied with
+// `prisma migrate deploy`.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  runtime             = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  INVESTOR
+  ASSOCIATE_PARTNER
+  VALUATION_ANALYST
+  LEGAL_OPS_EXEC
+  SUPER_ADMIN
+}
+
+enum IndianState {
+  ANDHRA_PRADESH
+  ARUNACHAL_PRADESH
+  ASSAM
+  BIHAR
+  CHHATTISGARH
+  GOA
+  GUJARAT
+  HARYANA
+  HIMACHAL_PRADESH
+  JHARKHAND
+  KARNATAKA
+  KERALA
+  MADHYA_PRADESH
+  MAHARASHTRA
+  MANIPUR
+  MEGHALAYA
+  MIZORAM
+  NAGALAND
+  ODISHA
+  PUNJAB
+  RAJASTHAN
+  SIKKIM
+  TAMIL_NADU
+  TELANGANA
+  TRIPURA
+  UTTAR_PRADESH
+  UTTARAKHAND
+  WEST_BENGAL
+  ANDAMAN_AND_NICOBAR_ISLANDS
+  CHANDIGARH
+  DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU
+  DELHI
+  JAMMU_AND_KASHMIR
+  LADAKH
+  LAKSHADWEEP
+  PUDUCHERRY
+  OUT_OF_INDIA
+  /// Folio statements that give no state and no PIN code.
+  UNKNOWN
+}
+
+enum RtaName {
+  KFIN
+  LINK_INTIME
+  BIGSHARE
+  ALANKIT
+  INTEGRATED
+  DATAMATICS
+  CAMEO
+  IN_HOUSE
+  OTHER
+}
+
+enum CustodyStatus {
+  IEPF_AUTHORITY
+  COMPANY_SUSPENSE
+  PHYSICAL_DORMANT
+}
+
+enum CorporateActionType {
+  BONUS
+  SPLIT
+  MERGER
+  DIVIDEND
+  CASH_ENTITLEMENT
+}
+
+enum Relationship {
+  SELF
+  SON_DAUGHTER
+  SPOUSE
+  LEGAL_HEIR
+  ADVISOR
+}
+
+enum PhysicalCertStatus {
+  AVAILABLE
+  LOST
+  PARTIAL
+}
+
+enum CrmStage {
+  NEW_SEARCH_LEAD
+  RING_UP_DONE
+  EVALUATION_IN_PROGRESS
+  FEASIBILITY_CHECKED
+  OFFER_SENT
+  CONVERTED_TO_CASE
+}
+
+enum ScenarioType {
+  STANDARD_IEPF5
+  DUPLICATE_LOC
+  DECEASED_TRANSMISSION
+  NRI_RECOVERY
+  DEMAT_DRF
+}
+
+enum EsignStatus {
+  PENDING
+  SIGNED
+}
+
+enum DocType {
+  PAN
+  AADHAAR
+  CML_COPY
+  CANCELLED_CHEQUE
+  ORIGINAL_CERT_OR_FIR
+  ISR1_ISR2_KYC
+  INDEMNITY_BOND
+  DEATH_CERTIFICATE
+  LEGAL_HEIR_OR_SUCCESSION_CERT
+  IEPF5_ACKNOWLEDGEMENT
+}
+
+enum DocStatus {
+  PENDING
+  UPLOADED
+  VERIFIED
+  REJECTED
+}
+
+enum Profession {
+  CA
+  CS
+  ADVOCATE
+  WEALTH_ADVISOR
+  EX_BANKER
+}
+
+enum TrackStatus {
+  NOT_STARTED
+  REQUESTED
+  IN_PROGRESS
+  QUERY_RAISED
+  DONE
+}
+
+enum OtpPurpose {
+  UNLOCK
+  LOGIN
+}
+
+enum IngestionForm {
+  IEPF_2
+  IEPF_4
+}
+
+enum IngestionStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum LedgerEntryType {
+  ACCRUAL
+  PAYOUT
+  ADJUSTMENT
+}
+
+model User {
+  id          String    @id @default(uuid()) @db.Uuid
+  phone       String    @unique
+  name        String
+  email       String?
+  role        Role      @default(INVESTOR)
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  associate         Associate?
+  assignedLeads     LeadInquiry[]     @relation("LeadAnalyst")
+  clientCases       RecoveryCase[]    @relation("CaseClient")
+  caseEvents        CaseEvent[]
+  ingestionJobs     IngestionJob[]
+  valuationReports  ValuationReport[]
+  reviewedDocuments CaseDocument[]    @relation("DocumentReviewer")
+
+  @@index([role])
+  @@map("users")
+}
+
+model OtpChallenge {
+  id          String     @id @default(uuid()) @db.Uuid
+  phone       String
+  purpose     OtpPurpose
+  /// HMAC-SHA256 of the code; the code itself is never stored.
+  codeHash    String     @map("code_hash")
+  attempts    Int        @default(0)
+  expiresAt   DateTime   @map("expires_at") @db.Timestamptz(6)
+  consumedAt  DateTime?  @map("consumed_at") @db.Timestamptz(6)
+  requestIp   String?    @map("request_ip")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([phone, purpose, createdAt(sort: Desc)])
+  @@map("otp_challenges")
+}
+
+model Company {
+  id                   String    @id @default(uuid()) @db.Uuid
+  /// Corporate Identity Number; null for statutory bodies (see statutory_basis).
+  cin                  String?   @unique
+  statutoryBasis       String?   @map("statutory_basis")
+  isin                 String?   @unique
+  /// Earlier ISINs (e.g. before a face-value split), still printed on old IEPF statements.
+  legacyIsins          String[]  @default([]) @map("legacy_isins")
+  name                 String
+  slug                 String    @unique
+  sector               String?
+  tickerNse            String?   @map("ticker_nse")
+  tickerBse            String?   @map("ticker_bse")
+  /// Rupees. Written only by the market sync; null until the first successful fetch.
+  currentMarketPrice   Decimal?  @map("current_market_price") @db.Decimal(14, 2)
+  priceUpdatedAt       DateTime? @map("price_updated_at") @db.Timestamptz(6)
+  /// Which feed the price came from, e.g. "NSE" or "Yahoo Finance (NSE)".
+  priceSource          String?   @map("price_source")
+  rtaName              RtaName   @default(OTHER) @map("rta_name")
+  rtaDisplayName       String?   @map("rta_display_name")
+  rtaAddress           String?   @map("rta_address")
+  rtaEmail             String?   @map("rta_email")
+  rtaPhone             String?   @map("rta_phone")
+  rtaWebsite           String?   @map("rta_website")
+  nodalOfficerName     String    @map("nodal_officer_name")
+  /// One or more addresses, separated by " / " as companies publish them.
+  nodalOfficerEmail    String?   @map("nodal_officer_email")
+  nodalOfficerPhone    String?   @map("nodal_officer_phone")
+  nodalOfficeAddress   String?   @map("nodal_office_address")
+  /// [{ name, email }]
+  deputyNodalOfficers  Json      @default("[]") @map("deputy_nodal_officers")
+  /// Investor-relations page listing IEPF / unclaimed dividend statements.
+  irPageUrl            String?   @map("ir_page_url")
+  contactsSource       String?   @map("contacts_source")
+  /// When a person last checked the registrar and nodal officer details.
+  contactsVerifiedAt   DateTime? @map("contacts_verified_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  corporateActions CorporateAction[]
+  folios           UnclaimedFolio[]
+  cases            RecoveryCase[]
+
+  @@map("companies")
+}
+
+model CorporateAction {
+  id               String              @id @default(uuid()) @db.Uuid
+  companyId        String              @map("company_id") @db.Uuid
+  actionType       CorporateActionType @map("action_type")
+  exDate           DateTime            @map("ex_date") @db.Date
+  ratioFrom        Decimal?            @map("ratio_from") @db.Decimal(10, 4)
+  ratioTo          Decimal?            @map("ratio_to") @db.Decimal(10, 4)
+  /// Rupees per share, for DIVIDEND and CASH_ENTITLEMENT.
+  dividendPerShare Decimal?            @map("dividend_per_share") @db.Decimal(12, 4)
+  notes            String?
+  /// Where the record comes from, e.g. "Company announcement" or "Yahoo Finance dividend history".
+  source           String?
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, actionType, exDate])
+  @@index([companyId, exDate])
+  @@map("corporate_actions")
+}
+
+model UnclaimedFolio {
+  id                      String         @id @default(uuid()) @db.Uuid
+  companyId               String         @map("company_id") @db.Uuid
+  investorFirstName       String         @map("investor_first_name")
+  investorMiddleName      String?        @map("investor_middle_name")
+  investorLastName        String?        @map("investor_last_name")
+  investorFullName        String         @map("investor_full_name")
+  fatherOrSpouseName      String?        @map("father_or_spouse_name")
+  addressLine             String?        @map("address_line")
+  city                    String?
+  state                   IndianState
+  pincode                 String?
+  /// AES-256-GCM ciphertext (v1:iv:tag:data, base64). Never returned by the public API.
+  folioNumber             String         @map("folio_number")
+  /// Pre-computed teaser form, e.g. RIL***21.
+  folioNumberMasked       String         @map("folio_number_masked")
+  /// HMAC-SHA256 blind index, so imports can de-duplicate without decrypting.
+  folioNumberHash         String         @map("folio_number_hash")
+  certificateNumbers      String?        @map("certificate_numbers")
+  originalShares          Int            @default(0) @map("original_shares")
+  postActionShares        Int            @default(0) @map("post_action_shares")
+  /// Rupees: the sum of amounts_by_event.
+  unclaimedDividendAmount Decimal        @default(0) @map("unclaimed_dividend_amount") @db.Decimal(14, 2)
+  /// Unclaimed amount per statement event (date or financial year) in rupees, so
+  /// statements for different years add up and re-imports do not double count.
+  amountsByEvent          Json           @default("{}") @map("amounts_by_event")
+  custodyStatus           CustodyStatus  @default(IEPF_AUTHORITY) @map("custody_status")
+  transferFinancialYear   String?        @map("transfer_financial_year")
+  /// "Date of Event" / "Proposed Date of Transfer to IEPF" on the statement.
+  eventDate               DateTime?      @map("event_date") @db.Date
+  /// The statement's "Investment Type", e.g. "Amount for unclaimed and unpaid dividend".
+  investmentType          String?        @map("investment_type")
+  sourceFilingSrn         String?        @map("source_filing_srn")
+  // Search columns, written by the API and the importer from packages/shared/names.ts.
+  fullNameNorm            String         @map("full_name_norm")
+  firstNameNorm           String         @map("first_name_norm")
+  middleNameNorm          String         @default("") @map("middle_name_norm")
+  lastNameNorm            String         @default("") @map("last_name_norm")
+  firstNameKey            String         @map("first_name_key")
+  middleNameKey           String         @default("") @map("middle_name_key")
+  lastNameKey             String         @default("") @map("last_name_key")
+  /// Generated by the database from full_name_norm (word tokens, lower case).
+  nameTokens              String[]       @default(dbgenerated()) @map("name_tokens")
+  /// Generated: sha256 of name, father/spouse, PIN, city and state. Namesakes never share one.
+  investorClusterId       String         @default(dbgenerated()) @map("investor_cluster_id")
+  ingestionJobId          String?        @map("ingestion_job_id") @db.Uuid
+  createdAt               DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  ingestionJob IngestionJob? @relation(fields: [ingestionJobId], references: [id], onDelete: SetNull)
+  cases        RecoveryCase[]
+
+  // Partitioned by LIST (state); the database primary key is (id, state).
+  // See migrations/20261101000000_finsol.
+  @@unique([companyId, folioNumberHash, investorFullName, state], map: "unclaimed_folios_company_folio_holder_state_key")
+  @@index([companyId, folioNumberHash], map: "unclaimed_folios_company_folio_idx")
+  @@index([lastNameKey, firstNameKey, postActionShares(sort: Desc)], map: "unclaimed_folios_last_first_key_idx")
+  @@index([lastNameKey])
+  @@index([firstNameKey])
+  @@index([middleNameKey])
+  @@index([companyId])
+  @@index([ingestionJobId])
+  @@map("unclaimed_folios")
+}
+
+model LeadInquiry {
+  id                   String             @id @default(uuid()) @db.Uuid
+  claimantName         String             @map("claimant_name")
+  phone                String
+  phoneOtpVerified     Boolean            @default(false) @map("phone_otp_verified")
+  email                String?
+  relationshipToHolder Relationship       @map("relationship_to_holder")
+  physicalCertStatus   PhysicalCertStatus @map("physical_cert_status")
+  matchedFolioIds      String[]           @default([]) @map("matched_folio_ids") @db.Uuid
+  /// Folio numbers an analyst has released to this client; all others stay masked.
+  releasedFolioIds     String[]           @default([]) @map("released_folio_ids") @db.Uuid
+  unlockedAt           DateTime?          @map("unlocked_at") @db.Timestamptz(6)
+  assignedAnalystId    String?            @map("assigned_analyst_id") @db.Uuid
+  crmStage             CrmStage           @default(NEW_SEARCH_LEAD) @map("crm_stage")
+  /// Search that produced the lead: {first, middle, last, state}.
+  searchContext        Json?              @map("search_context")
+  /// Estimated value of the matched holdings at unlock time, in paise.
+  estimatedValuePaise  BigInt             @default(0) @map("estimated_value_paise")
+  notes                String?
+  associateId          String?            @map("associate_id") @db.Uuid
+  convertedCaseId      String?            @unique @map("converted_case_id") @db.Uuid
+  /// "DUPLICATE_CLAIMANT_REVIEW" when another client already has a case on a claimed holding.
+  reviewAlert          String?            @map("review_alert")
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assignedAnalyst User?         @relation("LeadAnalyst", fields: [assignedAnalystId], references: [id], onDelete: SetNull)
+  associate       Associate?    @relation(fields: [associateId], references: [id], onDelete: SetNull)
+  convertedCase   RecoveryCase? @relation(fields: [convertedCaseId], references: [id], onDelete: SetNull)
+
+  @@index([crmStage, updatedAt(sort: Desc)])
+  @@index([phone])
+  @@index([assignedAnalystId])
+  @@map("leads_and_inquiries")
+}
+
+model RecoveryCase {
+  id                      String       @id @default(uuid()) @db.Uuid
+  caseCode                String       @unique @map("case_code")
+  clientUserId            String       @map("client_user_id") @db.Uuid
+  associateId             String?      @map("associate_id") @db.Uuid
+  companyId               String       @map("company_id") @db.Uuid
+  folioId                 String?      @map("folio_id") @db.Uuid
+  scenarioType            ScenarioType @default(STANDARD_IEPF5) @map("scenario_type")
+  /// 1..7: R.E.C.O.V.E.R. (CHECK constraint in the migration).
+  recoverStep             Int          @default(1) @map("recover_step")
+  /// Set by staff per case (custom pricing); a mandate cannot be issued until it is.
+  agreedSuccessFeePct     Decimal?     @map("agreed_success_fee_pct") @db.Decimal(5, 2)
+  folioReleasedAt         DateTime?    @map("folio_released_at") @db.Timestamptz(6)
+  esignStatus             EsignStatus  @default(PENDING) @map("esign_status")
+  esignMandateUrl         String?      @map("esign_mandate_url")
+  esignRequestId          String?      @unique @map("esign_request_id")
+  esignSignedAt           DateTime?    @map("esign_signed_at") @db.Timestamptz(6)
+  rtaEntitlementStatus    TrackStatus  @default(NOT_STARTED) @map("rta_entitlement_status")
+  mcaIepf5Srn             String?      @map("mca_iepf5_srn")
+  nodalVerificationStatus TrackStatus  @default(NOT_STARTED) @map("nodal_verification_status")
+  dematCreditStatus       TrackStatus  @default(NOT_STARTED) @map("demat_credit_status")
+  /// Value actually credited, in paise; fixed on the credit date.
+  creditedValuePaise      BigInt?      @map("credited_value_paise")
+  createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client     User            @relation("CaseClient", fields: [clientUserId], references: [id], onDelete: Restrict)
+  associate  Associate?      @relation(fields: [associateId], references: [id], onDelete: SetNull)
+  company    Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  /// No database foreign key: the folio table is partitioned (see UnclaimedFolio).
+  folio      UnclaimedFolio? @relation(fields: [folioId], references: [id], onDelete: SetNull)
+  documents  CaseDocument[]
+  events     CaseEvent[]
+  lead       LeadInquiry?
+  ledger     CommissionLedgerEntry[]
+
+  @@index([clientUserId])
+  @@index([recoverStep])
+  @@map("recovery_cases")
+}
+
+model CaseDocument {
+  id              String    @id @default(uuid()) @db.Uuid
+  caseId          String    @map("case_id") @db.Uuid
+  docType         DocType   @map("doc_type")
+  /// s3://bucket/key or local://key; the object is encrypted at rest.
+  s3Url           String?   @map("s3_url")
+  fileName        String?   @map("file_name")
+  mimeType        String?   @map("mime_type")
+  sizeBytes       Int?      @map("size_bytes")
+  sha256          String?
+  status          DocStatus @default(PENDING)
+  reviewerComment String?   @map("reviewer_comment")
+  reviewerId      String?   @map("reviewer_id") @db.Uuid
+  uploadedAt      DateTime? @map("uploaded_at") @db.Timestamptz(6)
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  case     RecoveryCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reviewer User?        @relation("DocumentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@unique([caseId, docType])
+  @@map("case_documents")
+}
+
+model CaseEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  caseId    String   @map("case_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  kind      String
+  message   String
+  data      Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  case  RecoveryCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([caseId, createdAt])
+  @@map("case_events")
+}
+
+model Associate {
+  id                 String      @id @default(uuid()) @db.Uuid
+  userId             String      @unique @map("user_id") @db.Uuid
+  firmName           String      @map("firm_name")
+  profession         Profession
+  state              IndianState
+  city               String
+  referralCode       String      @unique @map("referral_code")
+  revenueSharePct    Decimal     @default(30) @map("revenue_share_pct") @db.Decimal(5, 2)
+  totalReferredCases Int         @default(0) @map("total_referred_cases")
+  totalPayoutInr     Decimal     @default(0) @map("total_payout_inr") @db.Decimal(14, 2)
+  /// Shown on the public locator only after a person checks credentials.
+  isVerified         Boolean     @default(false) @map("is_verified")
+  bio                String?
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leads  LeadInquiry[]
+  cases  RecoveryCase[]
+  ledger CommissionLedgerEntry[]
+
+  @@index([state, city])
+  @@map("associates")
+}
+
+model CommissionLedgerEntry {
+  id          String          @id @default(uuid()) @db.Uuid
+  associateId String          @map("associate_id") @db.Uuid
+  caseId      String?         @map("case_id") @db.Uuid
+  entryType   LedgerEntryType @map("entry_type")
+  /// Positive for accruals, negative for payouts.
+  amountPaise BigInt          @map("amount_paise")
+  description String
+  occurredAt  DateTime        @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  associate Associate     @relation(fields: [associateId], references: [id], onDelete: Cascade)
+  case      RecoveryCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([associateId, occurredAt])
+  @@map("commission_ledger")
+}
+
+model IngestionJob {
+  id           String          @id @default(uuid()) @db.Uuid
+  formType     IngestionForm   @map("form_type")
+  fileName     String          @map("file_name")
+  storageKey   String          @map("storage_key")
+  status       IngestionStatus @default(QUEUED)
+  companyId    String?         @map("company_id") @db.Uuid
+  /// Where the file came from: an upload, a local path or a URL.
+  sourceUrl    String?         @map("source_url")
+  totalRows    Int             @default(0) @map("total_rows")
+  insertedRows Int             @default(0) @map("inserted_rows")
+  updatedRows  Int             @default(0) @map("updated_rows")
+  skippedRows  Int             @default(0) @map("skipped_rows")
+  /// First few row-level problems: [{row, message}].
+  errors       Json?
+  uploadedById String?         @map("uploaded_by_id") @db.Uuid
+  startedAt    DateTime?       @map("started_at") @db.Timestamptz(6)
+  finishedAt   DateTime?       @map("finished_at") @db.Timestamptz(6)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  uploadedBy User?            @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  folios     UnclaimedFolio[]
+
+  @@index([createdAt(sort: Desc)])
+  @@map("ingestion_jobs")
+}
+
+/// Append-only. The migration revokes UPDATE and DELETE and blocks them with a trigger.
+model AuditEvent {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorRole  Role?    @map("actor_role")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  data       Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([actorId, action, createdAt(sort: Desc)], map: "audit_events_actor_action_created_idx")
+  @@map("audit_events")
+}
+
+model ValuationReport {
+  id              String   @id @db.Uuid
+  reportCode      String   @unique @map("report_code")
+  userId          String   @map("user_id") @db.Uuid
+  phone           String
+  holdings        Json
+  totalValuePaise BigInt   @map("total_value_paise")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([phone, createdAt(sort: Desc)])
+  @@map("valuation_reports")
+}
+
+/// Equity directory for the calculator, loaded from NSE's published lists.
+model ListedEquity {
+  exchange  String
+  symbol    String
+  name      String
+  isin      String?
+  series    String?
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@id([exchange, symbol])
+  @@map("listed_equities")
+}
+
+/// Distinct normalised name words, for fuzzy matching (see migrations/20261102000200_name_words).
+model NameWord {
+  word String @id
+
+  @@map("name_words")
+}
