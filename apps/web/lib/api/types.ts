@@ -18,8 +18,14 @@ import type {
 /** Response shapes of the Finsol Enterprises API, as the web app reads them. */
 
 export interface Stats {
+  /** Holder records (statement entries): not people, not unique folios. */
   folios: number;
+  holderRecords?: number;
+  distinctFolios?: number;
+  companiesWithRecords?: number;
   companies: number;
+  companyProfiles?: number;
+  listedEquities?: number;
   states: number;
   estimatedValuePaise: number;
   activeCases: number;
@@ -59,6 +65,9 @@ export interface CompanyDetail {
   /** Last synced market price (rupees); null until the first sync. */
   currentMarketPrice: number | null;
   priceUpdatedAt: string | null;
+  priceQuoteAt?: string | null;
+  priceAttemptedAt?: string | null;
+  priceError?: string | null;
   priceSource: string | null;
   corporateActions: CompanyAction[];
   records: {
@@ -215,6 +224,8 @@ export interface CaseDetail extends CaseSummary {
     status: EsignStatus;
     signedAt: string | null;
     provider: string;
+    /** Only "aadhaar-esign" is a provider-verified Aadhaar signature. */
+    method: "aadhaar-esign" | "portal-acceptance" | "development-simulator";
     requested: boolean;
     hasMandate: boolean;
   };
@@ -373,9 +384,60 @@ export interface IngestionJob {
   insertedRows: number;
   updatedRows: number;
   skippedRows: number;
+  warningRows?: number;
+  quarantinedRows?: number;
+  parserVersion?: string | null;
+  sourceDocumentId?: string | null;
+  retryOfId?: string | null;
   errors: { row: number; message: string }[];
   uploadedBy: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+}
+
+/** GET /admin/ingestion/coverage: aggregates only. */
+export interface CoverageReport {
+  asOf: string;
+  listedEquities: number;
+  companyProfiles: number;
+  holderRecords: number;
+  recordGroups: number;
+  byValidation: { validation_status: string; review_status: string; records: number }[];
+  companies: {
+    name: string;
+    slug: string;
+    holderRecords: number;
+    distinctFolios: number;
+    recordGroups: number;
+    byCustody: Record<string, number>;
+    corporateActions: number;
+    hasIrPage: boolean;
+    price: number | null;
+    priceSource: string | null;
+    priceQuoteAt: string | null;
+    priceRetrievedAt: string | null;
+    priceAttemptedAt: string | null;
+    priceError: string | null;
+  }[];
+  sources: {
+    id: string;
+    fileName: string;
+    sourceUrl: string | null;
+    documentType: string;
+    reportingPeriod: string | null;
+    publishedAt: string | null;
+    publishedAtBasis: string;
+    retrievedAt: string | null;
+    sha256: string;
+    parserVersion: string;
+    status: string;
+    reviewStatus: string;
+    publicationStatus: string;
+    validRows: number;
+    warningRows: number;
+    quarantinedRows: number;
+  }[];
+  jobs: { status: string; count: number; latestFinishedAt: string | null }[];
+  sourceRows: { validationStatus: string; reviewStatus: string; rows: number }[];
 }

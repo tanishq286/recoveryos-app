@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { InfoIcon, SearchXIcon } from "lucide-react";
+import Link from "next/link";
+import { InfoIcon, RotateCwIcon, SearchXIcon, ServerCrashIcon } from "lucide-react";
 import {
   BRAND,
   ALL_INDIA,
   BRAND_EMAILS,
+  COVERAGE_DISCLAIMER,
   isIndianState,
   STATE_LABELS,
   type SearchResponse,
@@ -13,6 +15,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LiveRefresh } from "@/components/search/live-refresh";
+import { CoveragePanel } from "@/components/search/coverage-panel";
 import { SearchResults } from "@/components/search/search-results";
 import { UnclaimedSearchForm } from "@/components/search/unclaimed-search-form";
 import { api, ApiError } from "@/lib/api/server";
@@ -41,21 +44,39 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const asked = name.length > 0;
 
   let data: SearchResponse | null = null;
-  let error: string | null = null;
+  /** input: fix the form; limited: too many checks; unavailable: our side, retry. */
+  let error: { kind: "input" | "limited" | "unavailable"; message: string } | null = null;
+  const qs = new URLSearchParams({ state: state || "", fullName: name });
+  if (joint) qs.set("jointHolderName", joint);
   if (asked && state) {
-    const qs = new URLSearchParams({ state, fullName: name });
-    if (joint) qs.set("jointHolderName", joint);
     try {
-      data = await api<SearchResponse>(`search/unclaimed?${qs}`, { session: true });
+      data = await api<SearchResponse>(`search/unclaimed?${qs}`, {
+        session: true,
+        timeoutMs: 15_000,
+      });
     } catch (e) {
+      const status = e instanceof ApiError ? e.status : 500;
       error =
-        e instanceof ApiError && e.status < 500
-          ? e.message
-          : "The check is not available right now. Please try again in a few minutes.";
+        status === 429
+          ? { kind: "limited", message: (e as Error).message }
+          : status < 500
+            ? { kind: "input", message: (e as Error).message }
+            : {
+                kind: "unavailable",
+                message:
+                  status === 504
+                    ? "The check took too long to answer. Nothing was searched, so this is not a “no match”."
+                    : "The check is not available right now, so nothing was searched. This is not a “no match”.",
+              };
     }
   } else if (asked && !state) {
-    error = "Choose the state on the investor's last known address.";
+    error = {
+      kind: "input",
+      message: "Choose the state on the investor's last known address, or All India.",
+    };
   }
+  // The same search again, for the retry link.
+  const retryHref = `/search?${new URLSearchParams({ name, state: state || "", ...(joint ? { joint } : {}) })}`;
 
   const who = [name, joint].filter(Boolean).join(" or ");
   const where = !data
@@ -80,22 +101,46 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       />
 
       <section aria-live="polite" aria-label="Results" className="mt-12">
-        {error && (
+        {error?.kind === "unavailable" && (
+          <Alert variant="blocker" role="alert" data-testid="search-unavailable">
+            <ServerCrashIcon aria-hidden="true" />
+            <AlertTitle>Search unavailable</AlertTitle>
+            <AlertDescription>
+              <p>{error.message}</p>
+              <Button asChild variant="outline" size="sm" className="mt-3">
+                <Link href={retryHref} prefetch={false}>
+                  <RotateCwIcon aria-hidden="true" />
+                  Try again
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        {error && error.kind !== "unavailable" && (
           <Alert variant="pending" role="alert">
             <InfoIcon aria-hidden="true" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{error.message}</AlertDescription>
           </Alert>
         )}
 
         {data && data.total === 0 && (
-          <div className="panel flex flex-col items-start gap-3 p-6">
+          <div className="panel flex flex-col items-start gap-3 p-6" data-testid="search-no-match">
             <SearchXIcon className="size-6 text-fg-3" aria-hidden="true" />
             <h2 className="text-xl font-semibold text-fg">
-              Nothing found yet for {who} in {where}
+              No match for {who} in {where} in the records we hold
             </h2>
+            <p className="max-w-[60ch] font-medium text-fg">
+              This does not mean there are no unclaimed holdings.
+            </p>
             <p className="max-w-[60ch] text-fg-2">
-              Try the surname alone, or the state of an older address. Our analysts can also run a
-              deeper trace across more companies at no cost.
+              We currently hold records from{" "}
+              {data.coverage.companiesWithRecordsCount === 0
+                ? "no company statements yet"
+                : data.coverage.companiesWithRecordsCount === 1
+                  ? "one company"
+                  : `${data.coverage.companiesWithRecordsCount} companies`}
+              . Try the surname alone, another spelling, or the state of an older address, or ask
+              our analysts for a free trace that looks beyond these records.
             </p>
             {data.liveRefreshId && <LiveRefresh id={data.liveRefreshId} />}
             <Button asChild variant="outline">
@@ -112,14 +157,24 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <>
             <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
               <h2 className="text-xl font-semibold text-fg">
-                <span className="tnum">{data.total}</span> {data.total === 1 ? "record" : "records"}{" "}
-                for {who} in {where}
+                <span className="tnum">{data.total}</span>
+                {data.truncated ? "+" : ""} {data.total === 1 ? "record" : "records"} for {who} in{" "}
+                {where}
               </h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 {data.liveRefreshId && <LiveRefresh id={data.liveRefreshId} />}
                 <p className="text-sm text-fg-3 tnum">Checked in {data.tookMs} ms</p>
               </div>
             </div>
+            {data.truncated && (
+              <Alert variant="pending" className="mb-5" role="status">
+                <InfoIcon aria-hidden="true" />
+                <AlertDescription>
+                  Showing the first {data.limit} records; more matched. Add a first name or choose a
+                  state to narrow the search.
+                </AlertDescription>
+              </Alert>
+            )}
             <SearchResults results={data.results} access={data.access} referralCode={ref} />
             {data.access !== "public" && (
               <Alert variant="info" className="mt-8">
@@ -129,6 +184,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               </Alert>
             )}
           </>
+        )}
+
+        {data && <CoveragePanel coverage={data.coverage} className="mt-8" />}
+        {!data && !asked && (
+          <p className="mt-2 max-w-[70ch] text-sm text-fg-3">{COVERAGE_DISCLAIMER}</p>
         )}
       </section>
     </div>

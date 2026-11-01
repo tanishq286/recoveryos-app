@@ -3,6 +3,7 @@ import {
   BRAND,
   BRAND_EMAILS,
   rupeesInWords,
+  VALUATION_ASSUMPTIONS,
   type HoldingValuation,
   type PortfolioTotals,
 } from "@finsol/shared";
@@ -12,8 +13,10 @@ const MUTED = rgb(0.35, 0.4, 0.48);
 const ACCENT = rgb(0.02, 0.45, 0.65);
 
 /** Standard PDF fonts cannot draw the rupee sign, so amounts say "Rs." */
-const rs = (paise: number) =>
-  `Rs. ${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+const rs = (paise: number | null) =>
+  paise === null
+    ? "Not available"
+    : `Rs. ${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 export interface ValuationReportInput {
   reportCode: string;
@@ -21,13 +24,13 @@ export interface ValuationReportInput {
   preparedFor: { name: string; phoneMasked: string; email: string | null };
   rows: HoldingValuation[];
   totals: PortfolioTotals;
-  /** Per row: where the price came from and when. */
+  /** Per row: the price's status, source, quote time and fetch time. */
   priceNotes: string[];
 }
 
 export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`Official Share Valuation Report ${r.reportCode}`);
+  doc.setTitle(`Estimated Share Valuation ${r.reportCode}`);
   doc.setAuthor(BRAND.name);
   const page = doc.addPage([842, 595]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -54,7 +57,7 @@ export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer
     MUTED,
   );
   y -= 30;
-  text("Official Share Valuation Report", 40, y, 18, bold);
+  text("Estimated Share Valuation", 40, y, 18, bold);
   y -= 18;
   text(
     `Prepared for ${r.preparedFor.name} (${r.preparedFor.phoneMasked}${r.preparedFor.email ? `, ${r.preparedFor.email}` : ""})`,
@@ -74,9 +77,8 @@ export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer
     ["Shares today", 384, 70],
     ["Growth", 460, 40],
     ["Price / share", 506, 80],
-    ["Market value", 592, 80],
-    ["Dividends", 678, 70],
-    ["Total", 754, 60],
+    ["Estimated value", 592, 80],
+    ["Dividends declared*", 678, 76],
   ];
   for (const [h, x] of cols) text(h, x, y, 8, bold, MUTED);
   y -= 6;
@@ -88,18 +90,23 @@ export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer
       String(row.purchaseYear),
       row.originalShares.toLocaleString("en-IN"),
       String(row.events),
-      row.currentShares.toLocaleString("en-IN"),
+      row.currentSharesRange.min === row.currentSharesRange.max
+        ? row.currentShares.toLocaleString("en-IN")
+        : `${row.currentSharesRange.min.toLocaleString("en-IN")}-${row.currentShares.toLocaleString("en-IN")}`,
       `${row.growthMultiple.toFixed(row.growthMultiple % 1 ? 1 : 0)}x`,
       row.pricePerShare === null
         ? "n/a"
         : `Rs. ${row.pricePerShare.toLocaleString("en-IN", { minimumFractionDigits: row.pricePerShare % 1 ? 2 : 0, maximumFractionDigits: 2 })}`,
       rs(row.marketValuePaise),
       rs(row.dividendPaise),
-      rs(row.totalPaise),
     ];
     values.forEach((v, c) => text(v, cols[c]![1], y, 8.5));
     y -= 11;
     text(fit(r.priceNotes[i] ?? "", 700, 7), 48, y, 7, font, MUTED);
+    for (const a of row.assumptions) {
+      y -= 9;
+      text(fit(a, 700, 7), 48, y, 7, font, MUTED);
+    }
     y -= 15;
   });
   page.drawLine({
@@ -109,13 +116,21 @@ export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer
     color: MUTED,
   });
   y -= 10;
-  text("Total estimated family wealth", 40, y, 11, bold);
+  text(
+    r.totals.complete
+      ? "Estimated market value of these holdings"
+      : `Estimated market value (excludes ${r.totals.unvaluedLines} holding${r.totals.unvaluedLines > 1 ? "s" : ""} with no price)`,
+    40,
+    y,
+    11,
+    bold,
+  );
   text(rs(r.totals.totalPaise), 592, y, 13, bold, ACCENT);
   y -= 16;
   text(rupeesInWords(r.totals.totalPaise), 40, y, 9, bold);
   y -= 16;
   text(
-    `Shares: ${r.totals.originalShares.toLocaleString("en-IN")} bought, ${r.totals.currentShares.toLocaleString("en-IN")} today (${r.totals.growthMultiple.toFixed(1)}x). Market value ${rs(r.totals.marketValuePaise)}; dividends ${rs(r.totals.dividendPaise)}.`,
+    `Shares: ${r.totals.originalShares.toLocaleString("en-IN")} bought, ${r.totals.currentShares.toLocaleString("en-IN")} today (${r.totals.growthMultiple.toFixed(1)}x). *Dividends declared while held: ${rs(r.totals.dividendPaise)} - historical, not confirmed unpaid, not included above.`,
     40,
     y,
     8.5,
@@ -123,15 +138,14 @@ export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer
     MUTED,
   );
 
-  y -= 30;
+  y -= 26;
+  text("Assumptions", 40, y, 9, bold);
+  y -= 12;
   for (const line of [
-    "Basis: shares after every recorded bonus and split since 1 January of the purchase year, valued at the price shown;",
-    "dividends are those paid per share on each ex-date while held, counted as if never encashed.",
-    "Disclaimer: a market-price estimate by Finsol Enterprises, based on the corporate actions on record and the price shown.",
-    "It is not a registered valuer's certificate.",
-    "The actual entitlement is confirmed during verification, and value is fixed only on the day shares are credited.",
+    ...VALUATION_ASSUMPTIONS,
+    "Not a registered valuer's certificate. The entitlement is confirmed during verification.",
   ]) {
-    text(line, 40, y, 8, font, MUTED);
+    text(fit(line, 760, 8), 40, y, 8, font, MUTED);
     y -= 11;
   }
   text(
@@ -142,6 +156,6 @@ export async function buildValuationPdf(r: ValuationReportInput): Promise<Buffer
     font,
     MUTED,
   );
-  text("No Upfront Fee  ·  No Recovery, No Fee  ·  100% Confidential", 560, 30, 8, bold, ACCENT);
+  text(BRAND.promise.join("  ·  "), 560, 30, 8, bold, ACCENT);
   return Buffer.from(await doc.save());
 }

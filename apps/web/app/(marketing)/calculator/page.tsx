@@ -18,7 +18,8 @@ export default function CalculatorPage() {
       </h1>
       <p className="mt-4 max-w-[62ch] text-lg text-fg-2">
         Bonuses and splits multiply old holdings. Add each stock, the year it was bought and the
-        number of shares, and see what the family holds today at the live price.
+        number of shares, and see an estimate of what the family holds today at the latest available
+        price.
       </p>
       <p className="mt-2 text-sm font-medium text-signal">{BRAND.promise.join(" • ")}</p>
       <div className="mt-10">

@@ -10,7 +10,7 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "Unclaimed shares by company",
   description:
-    "Unclaimed shares and dividends recovered company by company by Finsol Enterprises: bonus and split history, live prices and a free 3-Minute Check.",
+    "Unclaimed shares and dividends recovered company by company by Finsol Enterprises: bonus and split history, the latest available prices and a free 3-Minute Check.",
   alternates: { canonical: "/unclaimed-shares" },
 };
 

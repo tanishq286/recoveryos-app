@@ -19,8 +19,20 @@ const convertSchema = z.object({
   scenarioType: z.enum(SCENARIO_TYPES),
   /** Custom pricing: optional here, settable on the case until the mandate is issued. */
   agreedSuccessFeePct: z.number().gt(0).max(50).nullable().optional(),
+  /** Outcome of the review when another client already has a case on this holding. */
+  competingClaimReview: z.string().trim().min(10).max(1000).optional(),
 });
-const releaseSchema = z.object({ folioIds: z.array(z.uuid()).min(1).max(10) });
+const releaseSchema = z.object({
+  folioIds: z.array(z.uuid()).min(1).max(10),
+  /** Why this claimant is entitled to see these numbers (documents checked, relationship). */
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Record why the claimant may see these folio numbers.")
+    .max(1000),
+  /** Required when another person also claims these holdings. */
+  competingClaimReview: z.string().trim().min(10).max(1000).optional(),
+});
 const moveCaseSchema = z.object({
   caseCode: z.string(),
   column: z.enum(CASE_COLUMNS.map((c) => c.id) as [string, ...string[]]),
@@ -72,7 +84,13 @@ export class CrmController {
     @Body({ schema: releaseSchema }) body: z.infer<typeof releaseSchema>,
     @CurrentUser() user: SessionClaims,
   ) {
-    return this.crm.releaseFolios(leadId, user, body.folioIds);
+    return this.crm.releaseFolios(
+      leadId,
+      user,
+      body.folioIds,
+      body.reason,
+      body.competingClaimReview,
+    );
   }
 
   /** Dragging a case card to the next column advances it one R.E.C.O.V.E.R. step. */

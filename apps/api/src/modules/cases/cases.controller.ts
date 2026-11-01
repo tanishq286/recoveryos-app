@@ -37,8 +37,18 @@ const reviewSchema = z.object({
   status: z.enum(["VERIFIED", "REJECTED"]),
   comment: z.string().trim().max(500).optional(),
 });
+const releaseSchema = z.object({
+  /** Why the client may see the folio number (identity and relationship checked). */
+  reason: z.string().trim().min(10, "Record why the client may see the folio number.").max(1000),
+  /** Required when another person also claims this holding. */
+  competingClaimReview: z.string().trim().min(10).max(1000).optional(),
+});
 const mockSignSchema = z.object({
-  aadhaarLast4: z.string().regex(/^\d{4}$/),
+  /** Only the development simulator asks for it; in-portal acceptance does not touch Aadhaar. */
+  aadhaarLast4: z
+    .string()
+    .regex(/^\d{4}$/)
+    .optional(),
   otp: z.string().regex(/^\d{6}$/),
 });
 
@@ -102,8 +112,12 @@ export class CasesController {
   @Roles("VALUATION_ANALYST", "LEGAL_OPS_EXEC")
   @Post(":code/release-folio")
   @HttpCode(200)
-  releaseFolio(@Param("code", { schema: code }) c: string, @CurrentUser() user: SessionClaims) {
-    return this.cases.releaseFolio(c, user);
+  releaseFolio(
+    @Param("code", { schema: code }) c: string,
+    @Body({ schema: releaseSchema }) body: z.infer<typeof releaseSchema>,
+    @CurrentUser() user: SessionClaims,
+  ) {
+    return this.cases.releaseFolio(c, user, body.reason, body.competingClaimReview);
   }
 
   @Post(":code/esign/start")

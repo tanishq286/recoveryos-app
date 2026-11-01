@@ -11,12 +11,7 @@ import {
   PhoneIcon,
   UserRoundIcon,
 } from "lucide-react";
-import {
-  SCENARIO_LABELS,
-  SCENARIO_TYPES,
-  TRACK_LABELS,
-  type ScenarioType,
-} from "@finsol/shared";
+import { SCENARIO_LABELS, SCENARIO_TYPES, TRACK_LABELS, type ScenarioType } from "@finsol/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,7 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { callApi } from "@/lib/api/client";
+import { callApi, ClientApiError } from "@/lib/api/client";
 import { formatDate, formatPaiseCompact } from "@/lib/format";
 import type { Board, BoardColumn, CaseCard, LeadCard, TeamMember } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -393,10 +388,31 @@ function ReleaseFolioButton({ leadId, folioId }: { leadId: string; folioId: stri
       className="link text-xs text-fg-2 disabled:opacity-60"
       disabled={busy}
       onClick={async () => {
+        // A reviewed decision: the reason goes into the audit log.
+        const reason = window.prompt(
+          "Why may this claimant see the folio number? (documents checked, relationship)",
+        );
+        if (!reason?.trim()) return;
         setBusy(true);
+        const send = (competingClaimReview?: string) =>
+          callApi(`crm/leads/${leadId}/release-folios`, {
+            body: { folioIds: [folioId], reason: reason.trim(), competingClaimReview },
+          });
         try {
-          await callApi(`crm/leads/${leadId}/release-folios`, { body: { folioIds: [folioId] } });
+          try {
+            await send();
+          } catch (e) {
+            // Someone else also claims this holding: the reviewer must record the outcome.
+            if (!(e instanceof ClientApiError && e.status === 409)) throw e;
+            const outcome = window.prompt(
+              `${e.message}\n\nIf you have reviewed both claims, record the outcome:`,
+            );
+            if (!outcome?.trim()) return;
+            await send(outcome.trim());
+          }
           router.refresh();
+        } catch (e) {
+          window.alert((e as Error).message);
         } finally {
           setBusy(false);
         }

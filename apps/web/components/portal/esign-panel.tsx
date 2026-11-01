@@ -22,18 +22,16 @@ import type { CaseDetail } from "@/lib/api/types";
 type Phase = "review" | "aadhaar" | "redirecting";
 
 /**
- * The Digital Mandate and the Aadhaar eSign. The client reads the PDF
- * in the dialog, confirms, and signs: on the provider's page in production,
- * or through a simulated Aadhaar OTP step in development. The mandate only
- * counts as signed once the provider's webhook verifies.
+ * The Digital Mandate. With an eSign provider the client signs with Aadhaar
+ * on the provider's page; without one, production offers an online
+ * acceptance confirmed by a mobile code (never labelled an Aadhaar eSign) and
+ * development offers a simulator. Only a verified webhook marks it accepted.
  */
 export function EsignPanel({ detail }: { detail: CaseDetail }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [phase, setPhase] = React.useState<Phase>("review");
   const [mode, setMode] = React.useState<"redirect" | "simulated" | "internal">("simulated");
-  /** Shown only while SMS is not live (internal mode). */
-  const [testCode, setTestCode] = React.useState<string | null>(null);
   const [read, setRead] = React.useState(false);
   const [aadhaar, setAadhaar] = React.useState("");
   const [otp, setOtp] = React.useState("");
@@ -42,6 +40,13 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
   const [pdfVersion, setPdfVersion] = React.useState(0);
 
   const signed = detail.esign.status === "SIGNED";
+  const method = detail.esign.method;
+  const methodName =
+    method === "aadhaar-esign"
+      ? "Aadhaar eSign"
+      : method === "portal-acceptance"
+        ? "online acceptance"
+        : "development simulator";
   const quoted = detail.money.feePct !== null;
   const canSign = detail.viewerRole === "client" && detail.recoverStep === 5 && !signed && quoted;
   const pdfUrl = `/api/v1/cases/${detail.caseCode}/mandate?v=${pdfVersion}`;
@@ -53,7 +58,6 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
       const res = await callApi<{
         signUrl: string | null;
         mode: "redirect" | "simulated" | "internal";
-        testCode?: string;
       }>(`cases/${detail.caseCode}/esign/start`, { method: "POST" });
       setPdfVersion((v) => v + 1);
       if (res.mode === "redirect" && res.signUrl) {
@@ -62,7 +66,6 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
         return;
       }
       setMode(res.mode);
-      setTestCode(res.testCode ?? null);
       setPhase("aadhaar");
     } catch (e) {
       setError((e as Error).message);
@@ -77,7 +80,7 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
     setError(null);
     try {
       await callApi(`cases/${detail.caseCode}/esign/mock-complete`, {
-        body: { aadhaarLast4: aadhaar, otp },
+        body: mode === "internal" ? { otp } : { aadhaarLast4: aadhaar, otp },
       });
       setOpen(false);
       router.refresh();
@@ -94,11 +97,11 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
         <div>
           <h2 id="esign-heading" className="flex items-center gap-2 text-lg font-semibold text-fg">
             <FileSignatureIcon className="size-5 text-signal" aria-hidden="true" />
-            Mandate and Aadhaar eSign
+            {method === "aadhaar-esign" ? "Mandate and Aadhaar eSign" : "Digital Mandate"}
           </h2>
           <p className="mt-1 text-sm text-fg-2">
             {signed
-              ? `Signed ${detail.esign.signedAt ? formatDateTime(detail.esign.signedAt) : ""}.`
+              ? `${method === "aadhaar-esign" ? "Signed with Aadhaar eSign" : method === "portal-acceptance" ? "Accepted online with a mobile code (not an Aadhaar eSign)" : "Marked accepted by the development simulator (not a signature)"} ${detail.esign.signedAt ? formatDateTime(detail.esign.signedAt) : ""}.`
               : detail.recoverStep < 5
                 ? "Opens at step 5, once you have agreed the offer."
                 : detail.money.feePct === null
@@ -110,7 +113,13 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
           tone={signed ? "success" : detail.recoverStep === 5 ? "active" : "neutral"}
           live={!signed && detail.recoverStep === 5}
         >
-          {signed ? "Signed" : detail.recoverStep === 5 ? "Your turn" : "Not yet"}
+          {signed
+            ? method === "aadhaar-esign"
+              ? "Signed"
+              : "Accepted"
+            : detail.recoverStep === 5
+              ? "Your turn"
+              : "Not yet"}
         </StatusBadge>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -171,7 +180,9 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
                   onChange={(e) => setRead(e.target.checked)}
                   className="mt-1 size-5 shrink-0 accent-(--color-signal)"
                 />
-                I have read the Digital Mandate and want to sign it with my Aadhaar.
+                {method === "aadhaar-esign"
+                  ? "I have read the Digital Mandate and want to sign it with my Aadhaar."
+                  : "I have read the Digital Mandate and want to accept it."}
               </label>
               <Button className="mt-4" size="lg" disabled={!read || busy} onClick={start}>
                 {busy ? (
@@ -179,7 +190,9 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
                 ) : (
                   <ShieldCheckIcon aria-hidden="true" />
                 )}
-                Sign with Aadhaar eSign
+                {method === "aadhaar-esign"
+                  ? "Sign with Aadhaar eSign"
+                  : `Continue to ${methodName}`}
               </Button>
             </>
           )}
@@ -196,15 +209,9 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
               {mode === "internal" ? (
                 <Alert variant="pending" data-testid="esign-internal">
                   <AlertDescription>
-                    Aadhaar eSign is being connected. Until then you accept this mandate
-                    electronically here, confirmed by a one-time code to your mobile.
-                    {testCode && (
-                      <>
-                        {" "}
-                        SMS is not live yet, so your code is{" "}
-                        <strong className="tnum font-mono tracking-[0.2em]">{testCode}</strong>.
-                      </>
-                    )}
+                    Aadhaar eSign is not connected yet. You can accept this mandate electronically
+                    here, confirmed by the code we sent to your mobile. This is an online
+                    acceptance, not an Aadhaar eSign.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -216,23 +223,25 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
                 </Alert>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="e-aadhaar" className="mb-1.5 block text-sm text-fg-2">
-                    Last 4 digits of Aadhaar
-                  </label>
-                  <Input
-                    id="e-aadhaar"
-                    required
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={aadhaar}
-                    onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ""))}
-                    className="tnum font-mono"
-                  />
-                </div>
+                {mode !== "internal" && (
+                  <div>
+                    <label htmlFor="e-aadhaar" className="mb-1.5 block text-sm text-fg-2">
+                      Any 4 digits (simulator)
+                    </label>
+                    <Input
+                      id="e-aadhaar"
+                      required
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={aadhaar}
+                      onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ""))}
+                      className="tnum font-mono"
+                    />
+                  </div>
+                )}
                 <div>
                   <label htmlFor="e-otp" className="mb-1.5 block text-sm text-fg-2">
-                    {mode === "internal" ? "Code sent to your mobile" : "Aadhaar OTP"}
+                    {mode === "internal" ? "Code sent to your mobile" : "Any 6 digits (simulator)"}
                   </label>
                   <Input
                     id="e-otp"
@@ -249,10 +258,10 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
               <Button
                 type="submit"
                 size="lg"
-                disabled={busy || aadhaar.length !== 4 || otp.length !== 6}
+                disabled={busy || (mode !== "internal" && aadhaar.length !== 4) || otp.length !== 6}
               >
                 {busy && <LoaderCircleIcon className="animate-spin" aria-hidden="true" />}
-                Sign the mandate
+                {mode === "internal" ? "Accept the mandate" : "Mark accepted (simulator)"}
               </Button>
             </form>
           )}

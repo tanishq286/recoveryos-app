@@ -11,6 +11,7 @@ import {
   Res,
 } from "@nestjs/common";
 import {
+  describeQuote,
   maskPhone,
   MIN_PURCHASE_YEAR,
   portfolioTotals,
@@ -95,14 +96,21 @@ export class ValuationController {
           },
           d.actions,
           d.dividends,
+          d.actionsKnown,
         ),
       );
+      // The same description the calculator shows for this price.
+      const q = describeQuote({
+        price: manual ?? d.price,
+        quoteAt: d.priceQuoteAt,
+        retrievedAt: d.priceRetrievedAt,
+        attemptedAt: d.priceAttemptedAt,
+        error: d.priceError,
+        manual: manual !== null,
+        source: d.priceSource,
+      });
       notes.push(
-        manual !== null
-          ? "Price entered by the client."
-          : d.price === null
-            ? "No market price available."
-            : `Price: ${d.priceSource ?? "market data"}, ${d.priceUpdatedAt?.replace("T", " ").slice(0, 16) ?? "time unknown"} UTC. ${d.actionsBasis === "verified" ? "Bonus/split history verified against company filings." : "Bonus/split history from the exchange record."}`,
+        `${q.label}: ${q.detail} ${d.actionsBasis === "verified" ? "Bonus/split history checked against company filings." : d.actionsKnown ? "Bonus/split history from the exchange record." : ""}`.trim(),
       );
     }
     const totals = portfolioTotals(rows);

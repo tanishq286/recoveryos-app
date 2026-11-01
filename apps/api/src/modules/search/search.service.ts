@@ -6,12 +6,14 @@ import {
   holdingValuePaise,
   maskCompanyName,
   maskPincode,
+  expandSingleWord,
   resolveSearch,
   STAFF_ROLES,
   VALUATION_BASIS,
   type ClaimRequestBody,
   type ClaimResponse,
   type ResultAccess,
+  type SearchCoverage,
   type SearchInput,
   type SearchResponse,
   type SearchResultItem,
@@ -23,6 +25,7 @@ import { PrismaService } from "../../common/prisma.service.js";
 import type { SessionClaims } from "../../common/auth/tokens.service.js";
 import { JobQueueService } from "../../common/queue/job-queue.service.js";
 import { num } from "../../common/serialize.js";
+import { competingClaims, isContested, lockFolios } from "../../common/claims.js";
 import { LiveMcaSyncService } from "./live-mca-sync.service.js";
 import { SEARCH_ENGINE, SEARCH_POOL } from "./search.tokens.js";
 import type { SearchEngine, SearchHit } from "./search-engine.js";
@@ -44,7 +47,10 @@ interface ResultRow {
   folio_number: string;
   folio_number_masked: string;
   post_action_shares: number;
+  original_shares: number;
   dividend_rupees: number;
+  source_published_at: Date | null;
+  source_retrieved_at: Date | null;
   event_date: string | null;
   investment_type: string | null;
   transfer_financial_year: string | null;
@@ -57,20 +63,27 @@ interface ResultRow {
 const RESULT_COLUMNS = `
   f.id, f.state::text AS state, f.investor_full_name, f.father_or_spouse_name, f.city, f.pincode,
   f.investor_cluster_id, f.custody_status::text AS custody_status, f.folio_number,
-  f.folio_number_masked, f.post_action_shares, f.unclaimed_dividend_amount::float8 AS dividend_rupees,
+  f.folio_number_masked, f.post_action_shares, f.original_shares,
+  f.unclaimed_dividend_amount::float8 AS dividend_rupees,
   to_char(f.event_date, 'YYYY-MM-DD') AS event_date, f.investment_type, f.transfer_financial_year,
   c.name AS company_name, c.slug AS company_slug,
-  c.current_market_price::float8 AS price_rupees, c.price_updated_at
-FROM unclaimed_folios f JOIN companies c ON c.id = f.company_id`;
+  c.current_market_price::float8 AS price_rupees, c.price_updated_at,
+  d.published_at AS source_published_at, d.retrieved_at AS source_retrieved_at
+FROM unclaimed_folios f JOIN companies c ON c.id = f.company_id
+LEFT JOIN source_documents d ON d.id = f.source_document_id`;
+/** Quarantined and withdrawn records are never returned: they wait for, or failed, review. */
+const PUBLISHED = `f.review_status = 'PUBLISHED'`;
 /** Pruned to the matched states at run time; Meilisearch hits carry no state. */
 export const RESULTS_BY_STATE = {
-  name: "search_results_by_state",
-  text: `SELECT ${RESULT_COLUMNS} WHERE f.state = ANY($2::"IndianState"[]) AND f.id = ANY($1::uuid[])`,
+  name: "search_results_by_state_v2",
+  text: `SELECT ${RESULT_COLUMNS} WHERE f.state = ANY($2::"IndianState"[]) AND f.id = ANY($1::uuid[]) AND ${PUBLISHED}`,
 };
 export const RESULTS_BY_ID = {
-  name: "search_results_by_id",
-  text: `SELECT ${RESULT_COLUMNS} WHERE f.id = ANY($1::uuid[])`,
+  name: "search_results_by_id_v2",
+  text: `SELECT ${RESULT_COLUMNS} WHERE f.id = ANY($1::uuid[]) AND ${PUBLISHED}`,
 };
+
+const COVERAGE_TTL_MS = 10 * 60_000;
 
 /** Masked company names, computed once per company rather than once per row. */
 const maskedNames = new Map<string, string>();
@@ -105,16 +118,62 @@ export class SearchService {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
+  private coverageCache: { at: number; value: SearchCoverage } | null = null;
+
+  /** What the search covers, cached briefly per instance. Aggregates only. */
+  async coverage(): Promise<SearchCoverage> {
+    if (this.coverageCache && Date.now() - this.coverageCache.at < COVERAGE_TTL_MS)
+      return this.coverageCache.value;
+    const db = this.prisma.client;
+    const [perCompany, profiles, equities, sources, years] = await Promise.all([
+      db.$queryRaw<{ name: string; records: bigint }[]>`
+        SELECT c.name, count(*) AS records FROM unclaimed_folios f
+          JOIN companies c ON c.id = f.company_id
+         WHERE f.review_status = 'PUBLISHED'
+         GROUP BY c.name ORDER BY count(*) DESC`,
+      db.company.count(),
+      db.listedEquity.count(),
+      db.sourceDocument.aggregate({
+        where: { status: "IMPORTED" },
+        _max: { publishedAt: true, retrievedAt: true },
+      }),
+      db.$queryRaw<{ oldest: number | null; newest: number | null }[]>`
+        SELECT min(extract(year FROM event_date))::int AS oldest,
+               max(extract(year FROM event_date))::int AS newest
+          FROM unclaimed_folios WHERE review_status = 'PUBLISHED'`,
+    ]);
+    const companiesWithRecords = perCompany.map((c) => ({
+      name: c.name,
+      records: Number(c.records),
+    }));
+    const value: SearchCoverage = {
+      holderRecords: companiesWithRecords.reduce((a, c) => a + c.records, 0),
+      companiesWithRecords,
+      companiesWithRecordsCount: companiesWithRecords.length,
+      companyProfiles: profiles,
+      listedEquities: equities,
+      latestSourcePublishedAt: sources._max.publishedAt?.toISOString() ?? null,
+      latestSourceRetrievedAt: sources._max.retrievedAt?.toISOString() ?? null,
+      oldestRecordYear: years[0]?.oldest ?? null,
+      newestRecordYear: years[0]?.newest ?? null,
+    };
+    this.coverageCache = { at: Date.now(), value };
+    return value;
+  }
+
   private item(
     f: ResultRow,
     hit: SearchHit,
     access: ResultAccess,
     released: Set<string>,
     matchedHolder: "primary" | "joint",
+    mode: SearchResponse["mode"],
   ): SearchResultItem {
     const open = access !== "public";
     const folioReleased = access === "staff" || released.has(f.id);
     const dividendPaise = Math.round(f.dividend_rupees * 100);
+    // A statement that lists only an amount states no share count: unknown, not zero.
+    const sharesStated = f.original_shares > 0;
     return {
       id: f.id,
       access,
@@ -132,10 +191,13 @@ export class SearchService {
         ? decryptField(f.folio_number, this.prisma.fieldKeys)
         : f.folio_number_masked,
       folioReleased,
-      postActionShares: open ? f.post_action_shares : null,
-      estimatedTotalValuePaise: open
-        ? holdingValuePaise(f.post_action_shares, f.price_rupees ?? 0) + dividendPaise
-        : null,
+      postActionShares: open && sharesStated ? f.post_action_shares : null,
+      sharesStated,
+      recordKind: sharesStated ? "SHARES" : "UNCLAIMED_AMOUNT",
+      estimatedTotalValuePaise:
+        open && sharesStated && f.price_rupees !== null
+          ? holdingValuePaise(f.post_action_shares, f.price_rupees) + dividendPaise
+          : null,
       sharePricePaise: open && f.price_rupees !== null ? Math.round(f.price_rupees * 100) : null,
       priceUpdatedAt: open && f.price_updated_at ? f.price_updated_at.toISOString() : null,
       unclaimedDividendPaise: open ? dividendPaise : null,
@@ -145,6 +207,14 @@ export class SearchService {
       matchedHolder,
       matchScore: hit.score,
       matchedBy: hit.matchedBy,
+      matchClass: hit.matchedBy !== "exact" ? "variant" : mode === "FULL" ? "exact" : "partial",
+      source:
+        f.source_published_at || f.source_retrieved_at
+          ? {
+              publishedAt: f.source_published_at?.toISOString() ?? null,
+              retrievedAt: f.source_retrieved_at?.toISOString() ?? null,
+            }
+          : null,
     };
   }
 
@@ -206,9 +276,23 @@ export class SearchService {
         );
     }
 
-    const [primaryHits, jointHits] = await Promise.all([
-      this.engine.search(q, RESULT_LIMIT),
-      joint ? this.engine.search(joint, RESULT_LIMIT) : Promise.resolve([]),
+    // One more than the limit, to know whether the list was cut short. A single
+    // typed word is searched as surname, first and middle name.
+    const searchAll = async (r: typeof q) => {
+      const lists = await Promise.all(
+        expandSingleWord(r).map((x) => this.engine.search(x, RESULT_LIMIT + 1)),
+      );
+      const best = new Map<string, SearchHit>();
+      for (const h of lists.flat()) {
+        const seen = best.get(h.id);
+        if (!seen || h.score > seen.score) best.set(h.id, h);
+      }
+      return [...best.values()].sort((a, b) => b.score - a.score);
+    };
+    const [primaryHits, jointHits, coverage] = await Promise.all([
+      searchAll(q),
+      joint ? searchAll(joint) : Promise.resolve([]),
+      this.coverage(),
     ]);
     const hits = new Map<string, { hit: SearchHit; holder: "primary" | "joint" }>();
     for (const h of primaryHits) hits.set(h.id, { hit: h, holder: "primary" });
@@ -228,10 +312,15 @@ export class SearchService {
       : [];
     const byId = new Map(folios.map((f) => [f.id, f]));
     const released = access === "member" ? await this.releasedFor(user!.sub) : new Set<string>();
-    const results = [...hits.values()].flatMap(({ hit, holder }) => {
+    const all = [...hits.values()].flatMap(({ hit, holder }) => {
       const f = byId.get(hit.id);
-      return f ? [this.item(f, hit, access, released, holder)] : [];
+      return f ? [this.item(f, hit, access, released, holder, q.mode)] : [];
     });
+    const truncated =
+      all.length > RESULT_LIMIT ||
+      primaryHits.length > RESULT_LIMIT ||
+      jointHits.length > RESULT_LIMIT;
+    const results = all.slice(0, RESULT_LIMIT);
     if (access === "member")
       await this.audit.record({
         actorId: user!.sub,
@@ -254,6 +343,10 @@ export class SearchService {
       access,
       total: results.length,
       results,
+      limit: RESULT_LIMIT,
+      truncated,
+      // Company names stay masked for the public, so the coverage gives only a count.
+      coverage: access === "public" ? { ...coverage, companiesWithRecords: [] } : coverage,
       valuationBasis: VALUATION_BASIS,
       engine: this.engine.name,
       tookMs: Math.round(performance.now() - started),
@@ -287,67 +380,72 @@ export class SearchService {
       : null;
     const estimate = folios.reduce((s, f) => s + estimateValuePaise(f), 0);
     const now = new Date();
-    // Never mix claimants: a holding another client already has a case on, or
-    // that another person has asked for, is flagged for an analyst to review.
-    const [contestedCases, contestedLeads] = await Promise.all([
-      db.recoveryCase.findMany({
-        where: { folioId: { in: folioIds }, clientUserId: { not: user.id } },
-        select: { caseCode: true, folioId: true },
-      }),
-      db.leadInquiry.findMany({
+    const analyst = await this.pickAnalyst();
+    // One transaction, with the records locked: two people claiming the same
+    // record at once both end up in review instead of both slipping through.
+    const { lead, contest, reviewAlert } = await db.$transaction(async (tx) => {
+      await lockFolios(tx, folioIds);
+      const contest = await competingClaims(tx, folioIds, user.phone);
+      const reviewAlert = isContested(contest) ? ("DUPLICATE_CLAIMANT_REVIEW" as const) : null;
+      const existing = await tx.leadInquiry.findFirst({
         where: {
-          phone: { not: user.phone },
-          matchedFolioIds: { hasSome: folioIds },
+          phone: user.phone,
           crmStage: { not: "CONVERTED_TO_CASE" },
+          createdAt: { gte: new Date(Date.now() - 30 * 86_400_000) },
         },
-        select: { id: true },
-      }),
-    ]);
-    const reviewAlert =
-      contestedCases.length || contestedLeads.length ? "DUPLICATE_CLAIMANT_REVIEW" : null;
-    const existing = await db.leadInquiry.findFirst({
-      where: {
-        phone: user.phone,
-        crmStage: { not: "CONVERTED_TO_CASE" },
-        createdAt: { gte: new Date(Date.now() - 30 * 86_400_000) },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    const lead = existing
-      ? await db.leadInquiry.update({
-          where: { id: existing.id },
-          data: {
-            claimantName: user.name,
-            email: user.email ?? existing.email,
-            relationshipToHolder: body.relationshipToHolder,
-            physicalCertStatus: body.physicalCertStatus,
-            phoneOtpVerified: true,
-            matchedFolioIds: [...new Set([...existing.matchedFolioIds, ...folioIds])],
-            unlockedAt: now,
-            estimatedValuePaise: BigInt(Math.max(Number(existing.estimatedValuePaise), estimate)),
-            associateId: existing.associateId ?? associate?.id ?? null,
-            reviewAlert: reviewAlert ?? existing.reviewAlert,
-          },
-        })
-      : await db.leadInquiry.create({
-          data: {
-            claimantName: user.name,
-            phone: user.phone,
-            phoneOtpVerified: true,
-            email: user.email,
-            relationshipToHolder: body.relationshipToHolder,
-            physicalCertStatus: body.physicalCertStatus,
-            matchedFolioIds: folioIds,
-            unlockedAt: now,
-            assignedAnalystId: await this.pickAnalyst(),
-            estimatedValuePaise: BigInt(estimate),
-            associateId: associate?.id ?? null,
-            reviewAlert,
-            searchContext: {
-              folios: folios.map((f) => ({ last: f.lastNameNorm, state: f.state })),
+        orderBy: { createdAt: "desc" },
+      });
+      const lead = existing
+        ? await tx.leadInquiry.update({
+            where: { id: existing.id },
+            data: {
+              claimantName: user.name,
+              email: user.email ?? existing.email,
+              relationshipToHolder: body.relationshipToHolder,
+              physicalCertStatus: body.physicalCertStatus,
+              phoneOtpVerified: true,
+              matchedFolioIds: [...new Set([...existing.matchedFolioIds, ...folioIds])],
+              unlockedAt: now,
+              estimatedValuePaise: BigInt(Math.max(Number(existing.estimatedValuePaise), estimate)),
+              associateId: existing.associateId ?? associate?.id ?? null,
+              reviewAlert: reviewAlert ?? existing.reviewAlert,
             },
+          })
+        : await tx.leadInquiry.create({
+            data: {
+              claimantName: user.name,
+              phone: user.phone,
+              phoneOtpVerified: true,
+              email: user.email,
+              relationshipToHolder: body.relationshipToHolder,
+              physicalCertStatus: body.physicalCertStatus,
+              matchedFolioIds: folioIds,
+              unlockedAt: now,
+              assignedAnalystId: analyst,
+              estimatedValuePaise: BigInt(estimate),
+              associateId: associate?.id ?? null,
+              reviewAlert,
+              searchContext: {
+                folios: folios.map((f) => ({ last: f.lastNameNorm, state: f.state })),
+              },
+            },
+          });
+      if (reviewAlert) {
+        // The earlier claimants' requests enter review too; nobody is told who else asked.
+        await tx.leadInquiry.updateMany({
+          where: {
+            OR: [
+              { id: { in: contest.leads.map((l) => l.id) } },
+              { convertedCaseId: { in: contest.cases.map((c) => c.id) } },
+            ],
           },
+          data: { reviewAlert },
         });
+      }
+      return { lead, contest, reviewAlert };
+    });
+    const contestedCases = contest.cases;
+    const contestedLeads = contest.leads;
     await this.audit.record({
       actorId: user.id,
       actorRole: user.role,

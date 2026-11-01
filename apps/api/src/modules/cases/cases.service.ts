@@ -9,6 +9,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { decryptField, type Prisma } from "@finsol/db";
@@ -37,6 +38,7 @@ import {
 
 import { ENV, type Env } from "../../config/env.js";
 import { AuditService } from "../../common/audit.service.js";
+import { competingClaims, isContested, lockFolios } from "../../common/claims.js";
 import { PrismaService } from "../../common/prisma.service.js";
 import type { SessionClaims } from "../../common/auth/tokens.service.js";
 import { DOCUMENT_STORAGE, type DocumentStorage } from "../../common/providers/storage.provider.js";
@@ -89,6 +91,15 @@ export class CasesService {
    */
   private get internalEsign(): boolean {
     return this.esign instanceof MockEsignProvider && this.env.NODE_ENV === "production";
+  }
+
+  /** How a signed mandate is described: only a provider webhook is an Aadhaar eSign. */
+  private signatureLabel(): string {
+    if (this.internalEsign)
+      return "Mandate accepted electronically in the portal, confirmed with a code sent to the client's mobile. This is not an Aadhaar eSign.";
+    if (this.esign instanceof MockEsignProvider)
+      return "Mandate marked accepted by the development simulator. This is not a signature.";
+    return `Mandate signed with Aadhaar eSign via ${this.esign.name}.`;
   }
 
   /* ── Access ─────────────────────────────────────────────────────────── */
@@ -333,6 +344,12 @@ export class CasesService {
         status: c.esignStatus,
         signedAt: isoTime(c.esignSignedAt),
         provider: this.esign.name,
+        /** Only "aadhaar-esign" is a provider-verified Aadhaar signature. */
+        method: this.internalEsign
+          ? ("portal-acceptance" as const)
+          : this.esign instanceof MockEsignProvider
+            ? ("development-simulator" as const)
+            : ("aadhaar-esign" as const),
         requested: !!c.esignRequestId,
         hasMandate: !!c.esignMandateUrl,
       },
@@ -474,24 +491,45 @@ export class CasesService {
     return this.get(code, user);
   }
 
-  /** Shows the client their folio number. Until then it stays masked for them. */
-  async releaseFolio(code: string, user: SessionClaims) {
+  /**
+   * Shows the client their folio number; until then it stays masked for them.
+   * A reviewed decision, never automatic: the client's PAN must be verified,
+   * no other person's claim on the holding may be open, and the reviewer
+   * records why. Signing the mandate does not release it.
+   */
+  async releaseFolio(
+    code: string,
+    user: SessionClaims,
+    reason: string,
+    /** Required when someone else also claims this holding: how the review was resolved. */
+    competingClaimReview?: string,
+  ) {
     const c = await this.access(code, user, "staff-write");
     if (!c.folioId) throw new BadRequestException("Link a holding to this case first.");
-    if (!c.folioReleasedAt) {
-      await this.prisma.client.recoveryCase.update({
+    if (c.folioReleasedAt) return this.get(code, user);
+    if (!c.documents.some((d) => d.docType === "PAN" && d.status === "VERIFIED"))
+      throw new ConflictException("Verify the client's PAN before releasing the folio number.");
+    await this.prisma.client.$transaction(async (tx) => {
+      await lockFolios(tx, [c.folioId!]);
+      const contest = await competingClaims(tx, [c.folioId!], c.client.phone);
+      if (c.lead?.reviewAlert || (isContested(contest) && !competingClaimReview?.trim()))
+        throw new ConflictException(
+          "Another person has a case or request on this holding. Resolve the review and record its outcome before releasing the folio number.",
+        );
+      await tx.recoveryCase.update({
         where: { id: c.id },
         data: { folioReleasedAt: new Date() },
       });
-      await this.event(c.id, user.sub, "release", "Your folio number is now visible to you.");
-      await this.audit.record({
-        actorId: user.sub,
-        actorRole: user.role,
-        action: "case.folio.release",
-        entityType: "case",
-        entityId: c.id,
-      });
-    }
+    });
+    await this.event(c.id, user.sub, "release", "Your folio number is now visible to you.");
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "case.folio.release",
+      entityType: "case",
+      entityId: c.id,
+      data: { reason, competingClaimReview: competingClaimReview ?? null },
+    });
     return this.get(code, user);
   }
 
@@ -540,6 +578,11 @@ export class CasesService {
       throw new ConflictException(
         "Your analyst is preparing your custom quote. The mandate opens for signing once it is ready.",
       );
+    // In-portal acceptance is confirmed by a mobile code; without SMS it cannot be offered.
+    if (this.internalEsign && !this.otp.status().available)
+      throw new ServiceUnavailableException(
+        "Accepting the mandate online is paused until mobile codes can be delivered. Your analyst will arrange another way to sign.",
+      );
     const pdf = await buildMandatePdf({
       caseCode: c.caseCode,
       clientName: c.client.name,
@@ -565,10 +608,9 @@ export class CasesService {
       where: { id: c.id },
       data: { esignRequestId: req.requestId, esignMandateUrl: url },
     });
-    let testCode: string | undefined;
     if (this.internalEsign) {
       try {
-        testCode = (await this.otp.request(c.client.phone, "UNLOCK", null)).testCode;
+        await this.otp.request(c.client.phone, "UNLOCK", null);
       } catch (e) {
         // A code sent in the last 30 seconds is still valid; anything else is a real failure.
         if (!(e instanceof HttpException && e.getStatus() === HttpStatus.TOO_MANY_REQUESTS))
@@ -580,26 +622,33 @@ export class CasesService {
       user.sub,
       "esign",
       this.internalEsign
-        ? "Digital Mandate generated for electronic acceptance in the portal."
-        : "Digital Mandate generated and sent for Aadhaar eSign.",
+        ? "Digital Mandate generated for electronic acceptance in the portal (mobile code, not Aadhaar eSign)."
+        : this.esign instanceof MockEsignProvider
+          ? "Digital Mandate generated for the development simulator (not a signature)."
+          : "Digital Mandate generated and sent for Aadhaar eSign.",
     );
     return {
       requestId: req.requestId,
       signUrl: req.signUrl,
       provider: this.esign.name,
       mode: req.signUrl ? "redirect" : this.internalEsign ? "internal" : "simulated",
-      ...(testCode ? { testCode } : {}),
     };
   }
 
   /** Development only: completes the simulated Aadhaar OTP step through the real webhook path. */
-  async completeMockEsign(code: string, user: SessionClaims, aadhaarLast4: string, otp: string) {
+  async completeMockEsign(
+    code: string,
+    user: SessionClaims,
+    aadhaarLast4: string | undefined,
+    otp: string,
+  ) {
     if (!(this.esign instanceof MockEsignProvider))
       throw new BadRequestException("Simulated signing is off; sign on the provider's page.");
     const c = await this.access(code, user, "client-write");
     if (!c.esignRequestId) throw new ConflictException("Start the eSign first.");
-    if (!/^\d{4}$/.test(aadhaarLast4) || !/^\d{6}$/.test(otp))
-      throw new BadRequestException("Enter the last 4 digits of Aadhaar and the 6-digit code.");
+    if (!/^\d{6}$/.test(otp)) throw new BadRequestException("Enter the 6-digit code.");
+    if (!this.internalEsign && !/^\d{4}$/.test(aadhaarLast4 ?? ""))
+      throw new BadRequestException("Enter any 4 digits for the development simulator.");
     if (this.internalEsign) await this.otp.verify(c.client.phone, "UNLOCK", otp);
     const hook = this.esign.buildWebhook(c.esignRequestId);
     await this.handleWebhook(this.esign.name, Buffer.from(hook.body), {
@@ -655,26 +704,30 @@ export class CasesService {
         "application/pdf",
       );
     }
-    await db.recoveryCase.update({
-      where: { id: c.id },
-      data: {
-        esignStatus: "SIGNED",
-        esignSignedAt: signedAt,
-        esignMandateUrl: mandateUrl,
-        // Signing the Digital Mandate releases the folio number to the client.
-        folioReleasedAt: c.folioReleasedAt ?? signedAt,
-      },
+    // Conditional: a replayed or concurrent webhook cannot sign twice. Signing does
+    // not release the folio; release is a separate, reviewed staff decision.
+    const updated = await db.recoveryCase.updateMany({
+      where: { id: c.id, esignStatus: "PENDING", esignRequestId: result.requestId },
+      data: { esignStatus: "SIGNED", esignSignedAt: signedAt, esignMandateUrl: mandateUrl },
     });
-    await this.event(c.id, c.clientUserId, "esign", "Mandate signed with Aadhaar eSign.");
-    if (!c.folioReleasedAt && c.folioId)
-      await this.event(c.id, null, "release", "Your folio number is now visible to you.");
+    if (updated.count !== 1) return { ok: true, duplicate: true };
+    await this.event(c.id, c.clientUserId, "esign", this.signatureLabel());
     await this.audit.record({
       actorId: c.clientUserId,
       actorRole: "INVESTOR",
       action: "case.esign.signed",
       entityType: "case",
       entityId: c.id,
-      data: { provider, requestId: result.requestId },
+      data: {
+        provider,
+        requestId: result.requestId,
+        method: this.internalEsign
+          ? "portal-acceptance-mobile-code"
+          : this.esign instanceof MockEsignProvider
+            ? "development-simulator"
+            : "aadhaar-esign",
+        bodySha256: createHash("sha256").update(rawBody).digest("hex"),
+      },
     });
     return { ok: true };
   }

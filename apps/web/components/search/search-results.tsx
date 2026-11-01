@@ -40,6 +40,19 @@ const MATCH_LABEL = {
   "sound-alike": "Similar sound",
 } as const;
 
+const CLASS_ORDER = ["exact", "partial", "variant"] as const;
+const CLASS_HEADING: Record<(typeof CLASS_ORDER)[number], { title: string; body: string }> = {
+  exact: { title: "Exact matches", body: "Every name part you typed matches." },
+  partial: {
+    title: "Partial matches",
+    body: "The one name you typed matches; other names on the record were not checked.",
+  },
+  variant: {
+    title: "Spelling or sound-alike variants",
+    body: "Close to what you typed, not the same. Statements often misspell names.",
+  },
+};
+
 function Fact({
   label,
   children,
@@ -99,8 +112,12 @@ export function SearchResults({
   }, [referralCode]);
 
   const isPublic = access === "public";
-  // Namesakes: rows with the same name but a different holder ID are different people.
+  // Record groups only group statement lines; they do not establish identity.
   const clusterOf = new Map(results.map((r) => [r.id, r.investorClusterId]));
+  const grouped = CLASS_ORDER.map((c) => ({
+    cls: c,
+    items: results.filter((r) => r.matchClass === c),
+  })).filter((g) => g.items.length > 0);
   const selectedPeople = new Set(selected.map((id) => clusterOf.get(id)));
   const toggle = (id: string) =>
     setSelected((s) =>
@@ -118,7 +135,8 @@ export function SearchResults({
         <div className="panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <p className="text-base text-fg-2">
             <LockIcon className="mr-1.5 inline size-4 text-signal" aria-hidden="true" />
-            Company names, share counts and values open after a free sign-in.
+            Company names, share counts and values are restricted: they open after a free sign-in.
+            Folio numbers stay hidden until our team has verified the claim.
           </p>
           <Button onClick={() => setGatewayOpen(true)}>
             <KeyRoundIcon aria-hidden="true" />
@@ -126,130 +144,168 @@ export function SearchResults({
           </Button>
         </div>
       )}
-      <ul className="grid gap-3">
-        {results.map((r) => {
-          const isSelected = selected.includes(r.id);
-          return (
-            <li key={r.id}>
-              <article
-                aria-labelledby={`r-${r.id}`}
-                className={cn(
-                  "panel relative grid gap-4 p-4 transition-[border-color,box-shadow] duration-150 sm:p-5",
-                  isSelected && "border-signal shadow-[inset_0_0_0_1px_var(--color-signal)]",
-                )}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3
-                      id={`r-${r.id}`}
-                      className="flex items-center gap-2 text-lg font-semibold text-fg"
-                    >
-                      <UserRoundIcon className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
-                      {r.investorFullName}
-                    </h3>
-                    <p className="mt-1 text-sm text-fg-2">
-                      {r.fatherOrSpouseName ? (
-                        <>Father or spouse: {r.fatherOrSpouseName} · </>
-                      ) : null}
-                      {[r.city, folioStateLabel(r.state)].filter(Boolean).join(", ")}
-                      {r.pincodeMasked ? ` · PIN ${r.pincodeMasked}` : ""}
-                    </p>
-                    <p className="mt-0.5 text-xs text-fg-3">
-                      Holder ID{" "}
-                      <span className="font-mono tnum">
-                        {r.investorClusterId.slice(0, 8).toUpperCase()}
-                      </span>
-                      <span className="sr-only">
-                        . Same name with a different holder ID is a different person.
-                      </span>
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <StatusBadge tone={CUSTODY_TONE[r.custodyStatus]} live={false}>
-                      {CUSTODY_LABELS[r.custodyStatus]}
-                    </StatusBadge>
-                    <StatusBadge tone="neutral" live={false}>
-                      {r.matchedHolder === "joint"
-                        ? "Joint holder match"
-                        : MATCH_LABEL[r.matchedBy]}
-                    </StatusBadge>
-                  </div>
-                </div>
+      {grouped.map((g) => (
+        <section key={g.cls} aria-labelledby={`match-${g.cls}`} className="mb-6">
+          <h3 id={`match-${g.cls}`} className="text-base font-semibold text-fg">
+            {CLASS_HEADING[g.cls].title} <span className="text-fg-3 tnum">({g.items.length})</span>
+          </h3>
+          <p className="mb-3 text-sm text-fg-3">{CLASS_HEADING[g.cls].body}</p>
+          <ul className="grid gap-3">
+            {g.items.map((r) => {
+              const isSelected = selected.includes(r.id);
+              return (
+                <li key={r.id}>
+                  <article
+                    aria-labelledby={`r-${r.id}`}
+                    className={cn(
+                      "panel relative grid gap-4 p-4 transition-[border-color,box-shadow] duration-150 sm:p-5",
+                      isSelected && "border-signal shadow-[inset_0_0_0_1px_var(--color-signal)]",
+                    )}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3
+                          id={`r-${r.id}`}
+                          className="flex items-center gap-2 text-lg font-semibold text-fg"
+                        >
+                          <UserRoundIcon className="size-4 shrink-0 text-fg-3" aria-hidden="true" />
+                          {r.investorFullName}
+                        </h3>
+                        <p className="mt-1 text-sm text-fg-2">
+                          {r.fatherOrSpouseName ? (
+                            <>Father or spouse: {r.fatherOrSpouseName} · </>
+                          ) : null}
+                          {[r.city, folioStateLabel(r.state)].filter(Boolean).join(", ")}
+                          {r.pincodeMasked ? ` · PIN ${r.pincodeMasked}` : ""}
+                        </p>
+                        <p className="mt-0.5 text-xs text-fg-3">
+                          Record group ID{" "}
+                          <span className="font-mono tnum">
+                            {r.investorClusterId.slice(0, 8).toUpperCase()}
+                          </span>
+                          . Different groups may still relate to the same person; identity is
+                          verified separately.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <StatusBadge tone={CUSTODY_TONE[r.custodyStatus]} live={false}>
+                          {CUSTODY_LABELS[r.custodyStatus]}
+                        </StatusBadge>
+                        <StatusBadge tone="neutral" live={false}>
+                          {r.matchedHolder === "joint"
+                            ? "Joint holder match"
+                            : MATCH_LABEL[r.matchedBy]}
+                        </StatusBadge>
+                      </div>
+                    </div>
 
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-                  <Fact label="Company">
-                    {r.companySlug ? (
-                      <Link href={`/unclaimed-shares/${r.companySlug}`} className="link">
-                        {r.companyName}
-                      </Link>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5">
-                        <LockIcon className="size-3.5 shrink-0 text-fg-3" aria-hidden="true" />
-                        <span aria-label="Company name hidden until you sign in">
-                          {r.companyName}
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+                      <Fact label="Company">
+                        {r.companySlug ? (
+                          <Link href={`/unclaimed-shares/${r.companySlug}`} className="link">
+                            {r.companyName}
+                          </Link>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <LockIcon className="size-3.5 shrink-0 text-fg-3" aria-hidden="true" />
+                            <span aria-label="Company name hidden until you sign in">
+                              {r.companyName}
+                            </span>
+                          </span>
+                        )}
+                      </Fact>
+                      <Fact label="Folio" mono>
+                        <span
+                          title={
+                            r.folioReleased
+                              ? undefined
+                              : "Shown once your analyst confirms the claim"
+                          }
+                        >
+                          {r.folioNumber}
                         </span>
-                      </span>
-                    )}
-                  </Fact>
-                  <Fact label="Folio" mono>
-                    <span
-                      title={
-                        r.folioReleased ? undefined : "Shown once your analyst confirms the claim"
-                      }
-                    >
-                      {r.folioNumber}
-                    </span>
-                  </Fact>
-                  <Fact label="Shares today">
-                    {r.postActionShares === null ? (
-                      signIn
-                    ) : (
-                      <span className="tnum">{formatCount(r.postActionShares)}</span>
-                    )}
-                  </Fact>
-                  <Fact label="Estimated value">
-                    {r.estimatedTotalValuePaise === null ? (
-                      signIn
-                    ) : (
-                      <span className="tnum font-semibold">
-                        {formatPaiseCompact(r.estimatedTotalValuePaise)}
-                      </span>
-                    )}
-                  </Fact>
-                </dl>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--glass-border) pt-4">
-                  <p className="text-sm text-fg-3">
-                    {r.transferFinancialYear ? `Recorded for FY ${r.transferFinancialYear}. ` : ""}
-                    {isPublic
-                      ? "Sign in to see the company, shares and value."
-                      : r.folioReleased
-                        ? "Folio released by your analyst."
-                        : "Your analyst confirms the folio during verification."}
-                  </p>
-                  {!isPublic && access !== "staff" && (
-                    <Button
-                      type="button"
-                      variant={isSelected ? "secondary" : "outline"}
-                      size="sm"
-                      aria-pressed={isSelected}
-                      onClick={() => toggle(r.id)}
-                      disabled={!isSelected && selected.length >= MAX_SELECT}
-                    >
-                      {isSelected ? (
-                        <CheckIcon aria-hidden="true" />
+                      </Fact>
+                      {r.recordKind === "UNCLAIMED_AMOUNT" ? (
+                        <>
+                          <Fact label="Record type">Unclaimed dividend listing</Fact>
+                          <Fact label="Amount listed">
+                            {r.unclaimedDividendPaise === null ? (
+                              signIn
+                            ) : (
+                              <span className="tnum font-semibold">
+                                {formatPaiseCompact(r.unclaimedDividendPaise)}
+                              </span>
+                            )}
+                          </Fact>
+                        </>
                       ) : (
-                        <HandCoinsIcon aria-hidden="true" />
+                        <>
+                          <Fact label="Shares today">
+                            {isPublic ? (
+                              signIn
+                            ) : r.postActionShares === null ? (
+                              "Unknown"
+                            ) : (
+                              <span className="tnum">{formatCount(r.postActionShares)}</span>
+                            )}
+                          </Fact>
+                          <Fact label="Estimated value">
+                            {isPublic ? (
+                              signIn
+                            ) : r.estimatedTotalValuePaise === null ? (
+                              "Not available"
+                            ) : (
+                              <span className="tnum font-semibold">
+                                {formatPaiseCompact(r.estimatedTotalValuePaise)}
+                              </span>
+                            )}
+                          </Fact>
+                        </>
                       )}
-                      {isSelected ? "Selected" : "This is my family's"}
-                    </Button>
-                  )}
-                </div>
-              </article>
-            </li>
-          );
-        })}
-      </ul>
+                    </dl>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--glass-border) pt-4">
+                      <p className="text-sm text-fg-3">
+                        {r.recordKind === "UNCLAIMED_AMOUNT"
+                          ? "This statement lists an unclaimed dividend amount and no share count. "
+                          : ""}
+                        {r.transferFinancialYear
+                          ? `Recorded for FY ${r.transferFinancialYear}. `
+                          : ""}
+                        {r.source?.retrievedAt
+                          ? `Source retrieved ${new Date(r.source.retrievedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. `
+                          : ""}
+                        {isPublic
+                          ? "Sign in to see the company, shares and value."
+                          : r.folioReleased
+                            ? "Folio released by your analyst."
+                            : "Your analyst confirms the folio during verification."}
+                      </p>
+                      {!isPublic && access !== "staff" && (
+                        <Button
+                          type="button"
+                          variant={isSelected ? "secondary" : "outline"}
+                          size="sm"
+                          aria-pressed={isSelected}
+                          onClick={() => toggle(r.id)}
+                          disabled={!isSelected && selected.length >= MAX_SELECT}
+                        >
+                          {isSelected ? (
+                            <CheckIcon aria-hidden="true" />
+                          ) : (
+                            <HandCoinsIcon aria-hidden="true" />
+                          )}
+                          {isSelected ? "Selected" : "This is my family's"}
+                        </Button>
+                      )}
+                    </div>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
 
       {access === "member" && (
         <div className="sticky bottom-4 z-10 mt-6">
@@ -262,8 +318,9 @@ export function SearchResults({
               </p>
               {selectedPeople.size > 1 && (
                 <p className="mt-1 text-sm text-pending">
-                  These belong to {selectedPeople.size} different people (different holder IDs:
-                  father or spouse, city or PIN differ). Select only your own family member.
+                  These are {selectedPeople.size} different record groups (father or spouse, city or
+                  PIN differ). They may or may not be the same person; select only records you
+                  believe belong to your family, and our team verifies identity.
                 </p>
               )}
             </div>

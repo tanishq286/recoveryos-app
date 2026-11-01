@@ -16,9 +16,21 @@ export interface RawTable {
   firstDataRow: number;
   /** Sheet name, or "page 1-n" for PDFs. */
   sheet: string;
+  /** Extraction notes per row (same order as rows), e.g. "WRAPPED_NAME". */
+  rowNotes?: string[][];
+  /** Where each row came from, e.g. "page 12, line 31". */
+  rowRefs?: string[];
 }
 
 export type StatementFormat = "xlsx" | "xls" | "csv" | "pdf";
+
+/**
+ * Bumped whenever extraction changes, and stored with every source document
+ * and source row, so re-processing can tell which reader produced a value.
+ * 2026.11.2: PDF text runs that span two cells are split, and column
+ * boundaries come from the empty gutters between columns, not header centres.
+ */
+export const PARSER_VERSION = "statement-reader/2026.11.2";
 
 export function formatOf(fileName: string, contentType?: string | null): StatementFormat | null {
   const ext = /\.([a-z0-9]+)(?:$|\?)/i.exec(fileName)?.[1]?.toLowerCase();
@@ -88,7 +100,7 @@ function readWorkbook(buffer: Buffer, format: "xlsx" | "xls" | "csv"): RawTable 
   throw new Error("No header row with a folio number or DP ID-client ID column was found.");
 }
 
-interface PdfItem {
+export interface PdfItem {
   str: string;
   x: number;
   y: number;
@@ -107,7 +119,122 @@ interface Column {
   items: PdfItem[];
 }
 
-const center = (i: PdfItem) => i.x + i.w / 2;
+/** Approximate advance widths (Helvetica, per em) to place words inside a merged run. */
+function glyphWeight(ch: string): number {
+  if (/\s/.test(ch)) return 0.278;
+  if (/[0-9]/.test(ch)) return 0.556;
+  if (/[.,:;'|!]/.test(ch)) return 0.278;
+  if (/[-‐‑‒–—()/\\[\]]/.test(ch)) return 0.333;
+  if (/[A-Z]/.test(ch)) return /[MW]/.test(ch) ? 0.833 : /[IJ]/.test(ch) ? 0.3 : 0.667;
+  if (/[a-z]/.test(ch)) return /[mw]/.test(ch) ? 0.778 : /[ijlft]/.test(ch) ? 0.278 : 0.53;
+  return 0.556;
+}
+
+/**
+ * pdf.js merges text that shares a baseline into one run, even across table
+ * cells ("1234.50 02" is an amount followed by the next cell's day). Each
+ * word becomes its own item, positioned by its share of the run's width.
+ */
+export function splitRun(it: PdfItem): PdfItem[] {
+  // A digit directly followed by a capitalised word ("…-9Amount") is two cells with no space.
+  // The inserted break is a zero-width separator, so it takes no share of the run's width.
+  const text = it.str.replace(/(?<=\d)(?=[A-Z][a-z])/g, "\u0000");
+  if (!/[\s\u0000]/.test(text)) return [it];
+  const chars = [...text];
+  const weights = chars.map((ch) => (ch === "\u0000" ? 0 : glyphWeight(ch)));
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  const out: PdfItem[] = [];
+  let pos = 0;
+  let i = 0;
+  while (i < chars.length) {
+    if (/[\s\u0000]/.test(chars[i]!)) {
+      pos += weights[i]!;
+      i++;
+      continue;
+    }
+    const start = pos;
+    let word = "";
+    while (i < chars.length && !/[\s\u0000]/.test(chars[i]!)) {
+      word += chars[i];
+      pos += weights[i]!;
+      i++;
+    }
+    out.push({
+      str: word,
+      x: it.x + (it.w * start) / total,
+      y: it.y,
+      w: (it.w * (pos - start)) / total,
+    });
+  }
+  return out;
+}
+
+/**
+ * Where column i-1 ends and column i begins, searched between the two header
+ * spans. Headers are centred while data is set against a cell's left edge,
+ * so header centres alone put the first words of a wide column into its left
+ * neighbour. Instead:
+ * 1. The anchor is where the most cells start (words after a gap wider than
+ *    a word space): a column's left edge. Ties go to the leftmost.
+ * 2. The boundary is the middle of the least-straddled stretch within a few
+ *    points to the left of the anchor.
+ * With no word starting between the headers (an empty column), the boundary
+ * is the middle of the longest least-straddled stretch.
+ */
+export function gutterBetween(
+  left: number,
+  right: number,
+  words: PdfItem[],
+  /** Words that follow a gap wider than a word space on their line (possible cell starts). */
+  cellStarts: ReadonlySet<PdfItem> = new Set(words),
+): number {
+  if (!(right > left + 0.5)) return (left + right) / 2;
+  const step = 0.25;
+  const covering = words.filter((w) => w.x < right && w.x + w.w > left);
+  const xs: number[] = [];
+  for (let x = left; x <= right + 1e-9; x += step) xs.push(x);
+  const counts = xs.map((x) => covering.filter((w) => w.x < x && w.x + w.w > x).length);
+  const min = Math.min(...counts);
+  const zoneAround = (i: number): [number, number] => {
+    let a = i;
+    let b = i;
+    while (a > 0 && counts[a - 1] === min) a--;
+    while (b + 1 < counts.length && counts[b + 1] === min) b++;
+    return [a, b];
+  };
+
+  const starts = new Map<number, number>();
+  for (const w of covering)
+    if (cellStarts.has(w) && w.x > left + 0.75 && w.x <= right + 0.5) {
+      const bin = Math.round(w.x);
+      starts.set(bin, (starts.get(bin) ?? 0) + 1);
+    }
+  const peak = [...starts.entries()].sort((p, q) => q[1] - p[1] || p[0] - q[0])[0];
+  if (peak) {
+    // The least-straddled stretch in the few points just left of the anchor.
+    const hi = Math.min(xs.length - 1, Math.max(0, Math.floor((peak[0] - 0.75 - left) / step)));
+    const lo = Math.max(0, hi - Math.round(6 / step));
+    let localMin = Number.POSITIVE_INFINITY;
+    for (let i = lo; i <= hi; i++) localMin = Math.min(localMin, counts[i]!);
+    let b = hi;
+    while (b > lo && counts[b] !== localMin) b--;
+    let a = b;
+    while (a > lo && counts[a - 1] === localMin) a--;
+    return (xs[a]! + xs[b]!) / 2;
+  }
+  let best: [number, number] = [0, 0];
+  for (let i = 0; i < counts.length;) {
+    if (counts[i] !== min) {
+      i++;
+      continue;
+    }
+    const [a, b] = zoneAround(i);
+    if (b - a > best[1] - best[0]) best = [a, b];
+    i = b + 1;
+  }
+  return (xs[best[0]]! + xs[best[1]]!) / 2;
+}
+
 const hasDataDigits = (l: PdfLine) =>
   l.items.some((i) => /\d{4,}/.test(i.str) || /^[\d.,/-]+$/.test(i.str));
 const HEADER_WORDS =
@@ -123,8 +250,9 @@ const looksLikeHeader = (l: PdfLine) =>
  * 2. The header is the line naming the folio column plus the lines within a
  *    line-height of it; its words are grouped into columns where they overlap
  *    horizontally, and each column's words are read top to bottom.
- * 3. Data text goes to the column whose span contains its centre, or the
- *    nearest column centre (headers are often centred over left-set data).
+ * 3. Runs that pdf.js merged across cells are split into words, and each
+ *    word goes to the column whose left boundary (the emptiest gutter between
+ *    two header spans) it starts after.
  * 4. A record starts on each line with text in the name column; lines with
  *    none (wrapped addresses, IDs) join the nearest record line.
  */
@@ -203,19 +331,34 @@ async function readPdf(buffer: Buffer): Promise<RawTable> {
       // Words broken mid-way ("Investm ent", "transferr ed") are rejoined.
       .replace(/([a-z])- ?([a-z])/g, "$1$2"),
   );
-  const columnOf = (it: PdfItem) => {
-    const c = center(it);
-    const inside = columns.findIndex((col) => c >= col.left - 2 && c <= col.right + 2);
-    if (inside >= 0) return inside;
-    let best = 0;
-    columns.forEach((col, i) => {
-      if (
-        Math.abs((col.left + col.right) / 2 - c) <
-        Math.abs((columns[best]!.left + columns[best]!.right) / 2 - c)
-      )
-        best = i;
+  // Data words, split out of merged runs, decide where each column starts.
+  const dataLines = lines
+    .slice(headerIdx + 1)
+    .filter((l) => !headerLines.has(l) && !isHeaderRow(l.items.map((i) => i.str)));
+  for (const l of dataLines) l.items = l.items.flatMap(splitRun).sort((a, b) => a.x - b.x);
+  const words = dataLines.flatMap((l) => l.items);
+  // A word space is about half a character; a cell starts after a wider gap.
+  const charWidths = words
+    .filter((w) => w.str.length > 1)
+    .map((w) => w.w / w.str.length)
+    .sort((a, b) => a - b);
+  const medianChar = charWidths[Math.floor(charWidths.length / 2)] ?? 2.5;
+  const cellStarts = new Set<PdfItem>();
+  for (const l of dataLines)
+    l.items.forEach((w, i) => {
+      const prev = l.items[i - 1];
+      if (!prev || w.x - (prev.x + prev.w) > medianChar * 0.6) cellStarts.add(w);
     });
-    return best;
+  const bounds = columns.map((col, i) =>
+    i === 0
+      ? Number.NEGATIVE_INFINITY
+      : gutterBetween(columns[i - 1]!.right, col.left, words, cellStarts),
+  );
+  const columnOf = (it: PdfItem) => {
+    // A word belongs to the column whose left boundary it starts after.
+    const start = it.x + 0.5;
+    for (let i = bounds.length - 1; i >= 0; i--) if (start >= bounds[i]!) return i;
+    return 0;
   };
 
   // The record key: the leftmost name column (or the folio column).
@@ -227,10 +370,7 @@ async function readPdf(buffer: Buffer): Promise<RawTable> {
   })();
 
   // 3–4. Data lines into records.
-  const data = lines
-    .slice(headerIdx + 1)
-    .filter((l) => !headerLines.has(l) && !isHeaderRow(l.items.map((i) => i.str)));
-  const assigned = data.map((l) => ({ line: l, cells: new Map<number, PdfItem[]>() }));
+  const assigned = dataLines.map((l) => ({ line: l, cells: new Map<number, PdfItem[]>() }));
   for (const a of assigned) {
     for (const it of a.line.items) {
       const c = columnOf(it);
@@ -239,11 +379,40 @@ async function readPdf(buffer: Buffer): Promise<RawTable> {
   }
   // A record starts with a name, or with its own folio (holders listed with a surname only).
   const folioCol = headers.findIndex((h) => /folio/i.test(h));
-  const starts = assigned.filter(
-    (a) =>
-      a.cells.has(keyCol) ||
-      (folioCol >= 0 && (a.cells.get(folioCol) ?? []).some((i) => /\d/.test(i.str))),
-  );
+  // A holder's first line carries its folio, amount or share count (a demat ID may
+  // be centred lower in the cell, so it does not count).
+  const idCols = headers
+    .map((h, i) => (/folio|amount|shares/i.test(h) ? i : -1))
+    .filter((i) => i >= 0);
+  const hasId = (a: (typeof assigned)[number]) =>
+    idCols.some((c) => (a.cells.get(c) ?? []).some((i) => /\d/.test(i.str)));
+  const startSet = new Set<(typeof assigned)[number]>();
+  const wrappedName = new Set<(typeof assigned)[number]>();
+  let prevStart: (typeof assigned)[number] | null = null;
+  for (const a of assigned) {
+    const folioStart = folioCol >= 0 && (a.cells.get(folioCol) ?? []).some((i) => /\d/.test(i.str));
+    let start = a.cells.has(keyCol) || folioStart;
+    // A name fragment with no identifier just under a holder's first line is
+    // that holder's name wrapping inside its cell, not another holder.
+    if (
+      start &&
+      !folioStart &&
+      !hasId(a) &&
+      prevStart &&
+      prevStart.line.page === a.line.page &&
+      hasId(prevStart) &&
+      prevStart.line.y - a.line.y > 0 &&
+      prevStart.line.y - a.line.y <= 7
+    ) {
+      start = false;
+      wrappedName.add(a);
+    }
+    if (start) {
+      startSet.add(a);
+      prevStart = a;
+    }
+  }
+  const starts = assigned.filter((a) => startSet.has(a));
   const members = new Map(starts.map((s) => [s, [s]]));
   // A continuation line belongs to the record that started above it, except a
   // line sitting just over the next record's first line (a top-wrapped cell).
@@ -256,9 +425,22 @@ async function readPdf(buffer: Buffer): Promise<RawTable> {
     const above = samePage
       .filter((s) => s.line.y > a.line.y)
       .sort((x, y) => x.line.y - y.line.y)[0];
-    const target = below && a.line.y - below.line.y <= 4 ? below : (above ?? below);
+    // A line whose cells the record above already has, and the record below
+    // lacks, is the top line of the record below (amounts set above the name).
+    const fills = [...a.cells.keys()].filter((c) => c !== keyCol);
+    const topOfBelow =
+      !!below &&
+      !!above &&
+      a.line.y - below.line.y <= 13 &&
+      fills.length > 0 &&
+      fills.every((c) => above.cells.has(c) && !below.cells.has(c));
+    const target = below && (a.line.y - below.line.y <= 4 || topOfBelow) ? below : (above ?? below);
     if (target && Math.abs(target.line.y - a.line.y) <= 80) members.get(target)!.push(a);
   }
+  const notes = starts.map((s) =>
+    members.get(s)!.some((m) => wrappedName.has(m)) ? ["WRAPPED_NAME"] : [],
+  );
+  const refs = starts.map((s) => `page ${s.line.page}, y ${Math.round(s.line.y)}`);
   const rows: unknown[][] = starts.map((s) => {
     const parts = members.get(s)!.sort((x, y) => y.line.y - x.line.y);
     return columns.map((_, c) =>
@@ -272,16 +454,30 @@ async function readPdf(buffer: Buffer): Promise<RawTable> {
   });
   // Fragments (wrapped text that formed its own line group) join the record above.
   const merged: string[][] = [];
-  for (const r of rows as string[][]) {
+  const mergedNotes: string[][] = [];
+  const mergedRefs: string[] = [];
+  (rows as string[][]).forEach((r, k) => {
     const fragment = folioCol >= 0 && !r[folioCol] && !r.some((c) => /\d{3,}/.test(c));
     if (fragment && merged.length) {
       const prev = merged[merged.length - 1]!;
       r.forEach((c, i) => {
         if (c) prev[i] = prev[i] ? `${prev[i]} ${c}` : c;
       });
-    } else merged.push(r);
-  }
-  return { headers, rows: merged, firstDataRow: 1, sheet: `pages 1-${pages}` };
+      mergedNotes[mergedNotes.length - 1]!.push("MERGED_FRAGMENT", ...notes[k]!);
+    } else {
+      merged.push(r);
+      mergedNotes.push([...notes[k]!]);
+      mergedRefs.push(refs[k]!);
+    }
+  });
+  return {
+    headers,
+    rows: merged,
+    firstDataRow: 1,
+    sheet: `pages 1-${pages}`,
+    rowNotes: mergedNotes,
+    rowRefs: mergedRefs,
+  };
 }
 
 export async function readStatement(

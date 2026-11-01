@@ -5,7 +5,7 @@ export const BRAND = {
   domain: "finsolenterprises.com",
   siteUrl: "https://finsolenterprises.com",
   tagline: "Turnkey recovery of unclaimed shares and dividends",
-  promise: ["No Upfront Fee", "No Recovery, No Fee", "100% Confidential"],
+  promise: ["No Upfront Fee", "No Recovery, No Fee", "Confidential Handling"],
 } as const;
 
 /** Official desks, each on the company domain. */

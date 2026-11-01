@@ -127,12 +127,12 @@ to start with development secrets or adapters.
 | `DATABASE_URL`                                         | local embedded Postgres                    | Any PostgreSQL 15+ with `pg_trgm` and `fuzzystrmatch` (Supabase works)                             |
 | `JWT_SECRET`, `OTP_SECRET`                             | dev values                                 | 32+ chars each; sessions and OTP hashes                                                            |
 | `FOLIO_ENCRYPTION_KEY`, `FOLIO_HASH_KEY`               | derived dev keys                           | 32 bytes base64: AES-256-GCM for folio numbers, HMAC blind index                                   |
-| `OTP_PROVIDER`                                         | `console`                                  | `msg91` (`MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_*`)                           |
+| `OTP_PROVIDER`                                         | `console` (dev/test); `disabled` (prod)    | `msg91` (`MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_*`). Without one, production pauses OTP sign-in; codes are never shown or logged |
 | `ESIGN_PROVIDER`                                       | `mock`                                     | `digio` (`DIGIO_CLIENT_ID/SECRET`) or `leegality` (`LEEGALITY_AUTH_TOKEN`); `ESIGN_WEBHOOK_SECRET` |
 | `STORAGE_PROVIDER`                                     | `local` (AES-256-GCM files in `.uploads/`) | `s3` with `S3_BUCKET`, `S3_REGION`, `S3_KMS_KEY_ID` (SSE-KMS)                                      |
 | `REDIS_URL`                                            | unset: jobs run inline                     | BullMQ queue; run `npm run dev:worker`                                                             |
 | `MEILI_HOST`, `MEILI_API_KEY`                          | unset: Postgres search                     | Meilisearch, with automatic fallback to Postgres on any error                                      |
-| `MARKET_SYNC_ENABLED`, `MARKET_SYNC_INTERVAL_MINUTES`  | on (off under test), 15                    | Live prices from NSE, falling back to Yahoo Finance (.NS, then .BO); daily dividend history        |
+| `MARKET_SYNC_ENABLED`, `MARKET_SYNC_INTERVAL_MINUTES`  | on (off under test), 15                    | Latest available prices (quote time and fetch time stored separately) from NSE, falling back to Yahoo Finance (.NS, then .BO); daily dividend history |
 | `SEED_ADMIN_PHONE`, `SEED_ADMIN_NAME`                  | unset                                      | First administrator created by `npm run db:seed`                                                   |
 | `VALUATION_REPORTS_PER_DAY`, `MEMBER_SEARCHES_PER_DAY` | 2, 60                                      | Per-mobile report limit; member checks per day                                                     |
 | `LIVE_SYNC_ENABLED`, `LIVE_SYNC_TTL_HOURS`             | on (off under test), 24                    | Live refresh of company-published statements behind each search                                    |
@@ -182,10 +182,13 @@ state, so nothing is ever grouped or unlocked by name:
 
 - `unclaimed_folios.investor_cluster_id` is a stored SHA-256 of the holder's name, father or
   spouse, PIN, city and state (`investor_cluster_id()` in `migrations/20261103000000_isolation`).
-  Search results carry it as a "Holder ID" with the father/spouse, city and masked PIN
-  (`400***`). The web app warns when a selection spans more than one Holder ID.
-- A member sees a folio number only when it was released to _their_ verified mobile (an analyst
-  release on their lead, or their own signed mandate), never because they share a name.
+  Search results carry it as a "Record group ID" with the father/spouse, city and masked PIN
+  (`400***`). It groups statement lines; it is not identity. Different groups may still be the
+  same person, and identity is verified separately by people.
+- A member sees a folio number only when staff released it to _them_, with a recorded reason
+  (and, on a case, a verified PAN), never because they share a name, hold a verified mobile or
+  signed the mandate. While another person's claim on the same record is open, nothing is
+  released until a reviewer records the outcome. See `docs/AUDIT-2026-11.md`.
 - Clients' case, document and lead reads run as the `finsol_app_client` role with `app.user_id`
   set for the transaction, so Postgres row-level security on `recovery_cases`, `case_documents`,
   `leads_and_inquiries` and `valuation_reports` returns only their own rows, whatever the query
@@ -245,7 +248,7 @@ The web app's `/api/v1/*` backend-for-frontend keeps the session in an httpOnly 
 daily from NSE's main-board and SME (Emerge) lists, about 3,200 equities. BSE refuses automated
 requests that identify themselves honestly (its scrip master and bhavcopy files return 403), and
 the service does not pose as a browser, so BSE-only listings come from Yahoo Finance's search at
-query time. A licensed BSE or depository data feed would make the directory complete. `GET market/equities/:exchange/:symbol` returns the live price,
+query time. A licensed BSE or depository data feed would make the directory complete. `GET market/equities/:exchange/:symbol` returns the latest available price (with its quote and fetch times),
 bonus/split history (hand-verified for catalogue companies and the one-click examples, otherwise
 the exchange record) and dividends per share as paid. `POST valuation/report` (signed in) recomputes
 everything server-side and returns the PDF; reports are recorded in `valuation_reports`.

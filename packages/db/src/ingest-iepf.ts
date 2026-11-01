@@ -1,5 +1,11 @@
+import { createHash } from "node:crypto";
+
 import {
   computeEntitlement,
+  normalizeRelative,
+  parseAmount,
+  statusOf,
+  type IssueCode,
   parseIndianState,
   splitName,
   stateFromPincode,
@@ -9,13 +15,14 @@ import {
   type IngestionForm,
 } from "@finsol/shared";
 
-import { blindIndex, type FieldKeys } from "./crypto.js";
+import { blindIndex, encryptField, type FieldKeys } from "./crypto.js";
 import { folioColumns, folioSearchColumns } from "./columns.js";
 import { bulkUpsertFolios, type StagedFolio } from "./bulk-copy.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
-import { readStatement, type RawTable } from "./statement-reader.js";
+import { PARSER_VERSION, readStatement, type RawTable } from "./statement-reader.js";
 
 export {
+  PARSER_VERSION,
   readStatement,
   formatOf,
   type RawTable,
@@ -211,6 +218,8 @@ export interface ParsedRow {
   middle: string;
   last: string;
   fatherOrSpouse: string | null;
+  /** Father/spouse text exactly as the statement printed it. */
+  fatherOrSpouseRaw: string | null;
   address: string | null;
   city: string | null;
   state: FolioState;
@@ -226,6 +235,8 @@ export interface ParsedRow {
   isin: string | null;
   srn: string | null;
   investmentType: string | null;
+  /** Validation findings; see ISSUE_SEVERITY in @finsol/shared. */
+  issues: IssueCode[];
 }
 
 function text(v: unknown): string {
@@ -234,16 +245,10 @@ function text(v: unknown): string {
   return String(v).replace(/\s+/g, " ").trim();
 }
 
+/** One number from a cell; NaN when it is unreadable or holds more than one number. */
 function number(v: unknown): number {
-  if (typeof v === "number") return v;
-  const raw = text(v).replace(/rs\.?|inr|₹/gi, "");
-  if (!raw.replace(/[\s,-]/g, "")) return 0;
-  const plain = Number(raw.replace(/[,\s]/g, ""));
-  if (Number.isFinite(plain)) return plain;
-  // PDF cells can carry stray words from neighbours ("un 750.00 02"): take the one decimal amount.
-  const decimals = raw.match(/\d[\d,]*\.\d{1,2}\b/g);
-  if (decimals?.length === 1) return Number(decimals[0]!.replace(/,/g, ""));
-  return Number.NaN;
+  const r = parseAmount(v);
+  return r.value === null ? Number.NaN : r.value;
 }
 
 const MONTHS: Record<string, number> = {
@@ -267,6 +272,9 @@ export function parseDate(v: unknown): Date | null {
   if (typeof v === "number" && v > 20000 && v < 80000)
     return new Date(Date.UTC(1899, 11, 30) + v * 86_400_000); // Excel serial
   const s = text(v)
+    // A header remnant such as "(DD-MON-YYYY)" printed above the first record.
+    .replace(/\(\s*dd\s*[-‐]\s*mon\s*[-‐]\s*yyyy\s*\)/gi, "")
+    .trim()
     .replace(/[‐‑‒–—−]/g, "-")
     .replace(/\s*-\s*/g, "-")
     .replace(/\s*\/\s*/g, "/");
@@ -290,13 +298,15 @@ export function financialYear(d: Date): string {
 }
 
 export type RowResult =
-  { ok: true; value: ParsedRow } | { ok: false; row: number; message: string };
+  { ok: true; value: ParsedRow } | { ok: false; row: number; message: string; issues: IssueCode[] };
 
 export function parseRow(
   cells: unknown[],
   map: Partial<Record<Field, number>>,
   rowNumber: number,
   form: IngestionForm,
+  /** Extraction notes from the reader, e.g. WRAPPED_NAME. */
+  notes: readonly string[] = [],
 ): RowResult | null {
   const raw = (f: Field) => (map[f] === undefined ? undefined : cells[map[f]!]);
   const get = (f: Field) => text(raw(f));
@@ -320,11 +330,17 @@ export function parseRow(
     middle = mRest.join(" ");
   }
   if (!first && last) [first, last] = [last, ""];
-  if (!first) return { ok: false, row: rowNumber, message: "No investor name." };
+  const fail = (message: string, issues: IssueCode[] = ["UNREADABLE"]): RowResult => ({
+    ok: false,
+    row: rowNumber,
+    message,
+    issues,
+  });
+  if (!first) return fail("No investor name.");
 
   const folio = (get("folio") || get("dematId")).replace(/\s+/g, "");
   if (!folio || folio === "-" || /^n\/?a$/i.test(folio))
-    return { ok: false, row: rowNumber, message: "No folio number or demat account." };
+    return fail("No folio number or demat account.");
 
   const country = get("country");
   const pinDigits = get("pincode").replace(/\D/g, "");
@@ -343,10 +359,14 @@ export function parseRow(
       : foreign || writtenState === "OUT_OF_INDIA"
         ? "OUT_OF_INDIA"
         : (stateFromPincode(pinDigits) ?? (blankState ? STATE_NOT_STATED : null));
-  if (!state) return { ok: false, row: rowNumber, message: `Unknown state "${stateText}".` };
+  if (!state) return fail(`Unknown state "${stateText}".`);
 
-  let shares = map.shares === undefined ? 0 : number(raw("shares"));
-  let amount = map.amount === undefined ? 0 : number(raw("amount"));
+  const issues: IssueCode[] = [];
+  const amountCell = map.amount === undefined ? null : parseAmount(raw("amount"));
+  const sharesCell = map.shares === undefined ? null : parseAmount(raw("shares"));
+  if (amountCell?.ambiguous || sharesCell?.ambiguous) issues.push("AMOUNT_AMBIGUOUS");
+  let shares = sharesCell ? (sharesCell.value ?? Number.NaN) : 0;
+  let amount = amountCell ? (amountCell.value ?? Number.NaN) : 0;
   // IEPF-2 statements list the shares behind unclaimed dividends as their own
   // rows, with the share count in the amount column.
   if (
@@ -356,24 +376,33 @@ export function parseRow(
     shares = amount;
     amount = 0;
   }
-  if (Number.isNaN(shares) || shares < 0)
-    return { ok: false, row: rowNumber, message: "Share count is not a number." };
-  if (Number.isNaN(amount) || amount < 0)
-    return { ok: false, row: rowNumber, message: "Amount is not a number." };
-  if (form === "IEPF_4" && shares <= 0)
-    return { ok: false, row: rowNumber, message: "IEPF-4 rows need a share count." };
-  if (form === "IEPF_2" && amount <= 0 && shares <= 0)
-    return { ok: false, row: rowNumber, message: "IEPF-2 rows need an amount." };
+  if (Number.isNaN(shares) || shares < 0) return fail("Share count is not a number.");
+  if (amountCell?.ambiguous || sharesCell?.ambiguous)
+    return fail("The amount or share cell holds more than one number.", ["AMOUNT_AMBIGUOUS"]);
+  if (Number.isNaN(amount) || amount < 0) return fail("Amount is not a number.");
+  if (form === "IEPF_4" && shares <= 0) return fail("IEPF-4 rows need a share count.");
+  if (form === "IEPF_2" && amount <= 0 && shares <= 0) return fail("IEPF-2 rows need an amount.");
 
-  const father =
-    get("fatherFull") ||
-    [get("fatherFirst"), get("fatherMiddle"), get("fatherLast")].filter(Boolean).join(" ");
+  const relativeParts = get("fatherFull")
+    ? [get("fatherFull")]
+    : [get("fatherFirst"), get("fatherMiddle"), get("fatherLast")];
+  const fatherRaw = relativeParts.filter(Boolean).join(" | ") || null;
+  const relative = normalizeRelative(relativeParts);
+  issues.push(...relative.issues);
+  if (notes.includes("WRAPPED_NAME")) issues.push("WRAPPED_NAME");
+  if (notes.includes("MERGED_FRAGMENT")) issues.push("MERGED_FRAGMENT");
+  if (/\d/.test([first, middle, last].join(""))) issues.push("NAME_SUSPECT");
+  if (!get("address")) issues.push("ADDRESS_MISSING");
+  if (pinDigits.length !== 6) issues.push("PIN_MISSING");
+  if (state === STATE_NOT_STATED) issues.push("STATE_NOT_STATED");
+  else if (!writtenState && !foreign && stateFromPincode(pinDigits)) issues.push("STATE_FROM_PIN");
   let eventDate = parseDate(raw("eventDate"));
   // A PDF date that lost its day to the amount cell ("750.00 02" | "-DEC-2017").
   if (!eventDate && map.amount !== undefined) {
     const day = /\b(\d{1,2})\s*$/.exec(text(raw("amount")).replace(/\d[\d,]*\.\d{1,2}/g, ""))?.[1];
     if (day) eventDate = parseDate(`${day}${text(raw("eventDate"))}`);
   }
+  if (!eventDate) issues.push("EVENT_DATE_MISSING");
   const pin = pinDigits;
   const fy = get("financialYear");
   return {
@@ -383,7 +412,8 @@ export function parseRow(
       first,
       middle,
       last,
-      fatherOrSpouse: father && !/^(na|n\/a|-)$/i.test(father) ? father : null,
+      fatherOrSpouse: relative.value,
+      fatherOrSpouseRaw: fatherRaw,
       address: get("address") || null,
       city: get("city") || null,
       state,
@@ -403,6 +433,7 @@ export function parseRow(
       isin: get("isin").toUpperCase() || null,
       srn: get("srn") || null,
       investmentType: get("investmentType") || null,
+      issues: [...new Set(issues)],
     },
   };
 }
@@ -428,6 +459,15 @@ export const TEMPLATE_HEADERS = [
   "Proposed Date of Transfer to IEPF",
 ];
 
+export interface SourceInfo {
+  url?: string | null;
+  retrievedAt: Date;
+  publishedAt?: Date | null;
+  publishedAtBasis?: "HTTP_LAST_MODIFIED" | "STATED_IN_DOCUMENT" | "UNKNOWN";
+  reportingPeriod?: string | null;
+  documentType?: "IEPF_2_STATEMENT" | "IEPF_4_STATEMENT" | "AUTHORISED_UPLOAD" | "LICENSED_FEED";
+}
+
 export interface IngestOptions {
   /** The statement's company. Rows may instead name it by CIN or company name. */
   companyId?: string | null;
@@ -437,8 +477,12 @@ export interface IngestOptions {
   jobId?: string | null;
   /** Connection for the bulk COPY; defaults to DATABASE_URL. */
   databaseUrl?: string;
-  /** Parse and report without writing. */
+  /** Parse, validate and report without writing anything. */
   dryRun?: boolean;
+  /** With dryRun: also return the holder records that would be written (in memory only). */
+  plan?: boolean;
+  /** Where the file came from. When given, a source document and its rows are recorded. */
+  source?: SourceInfo;
   /** Called with progress counts every batch. */
   onProgress?: (done: number, total: number) => void;
 }
@@ -446,25 +490,48 @@ export interface IngestOptions {
 export interface IngestResult {
   form: IngestionForm;
   sheet: string;
+  parserVersion: string;
+  sha256: string;
+  sourceDocumentId: string | null;
   totalRows: number;
   insertedRows: number;
   updatedRows: number;
+  /** Rows not merged into holder records (quarantined, kept in source_rows when recorded). */
   skippedRows: number;
+  /** Holder records written but held back from search until reviewed. */
+  quarantinedRecords: number;
+  validRows: number;
+  warningRows: number;
+  quarantinedRows: number;
+  /** Count of each issue code across rows. */
+  issueCounts: Partial<Record<IssueCode, number>>;
   /** Time spent streaming rows in (binary COPY) and merging them, when written. */
   timings?: { copyMs: number; mergeMs: number };
   errors: { row: number; message: string }[];
   unmappedHeaders: string[];
-  /** First few parsed rows (dry runs only), for checking a new layout. */
-  preview: Omit<ParsedRow, "folio">[];
+  /** First few parsed rows (dry runs only, folio and address withheld), for checking a layout. */
+  preview: Omit<ParsedRow, "folio" | "address" | "fatherOrSpouseRaw">[];
+  /** With dryRun + plan: the records that would be written. Holds personal data; never print it. */
+  planned?: StagedFolio[];
 }
 
 const MAX_ERRORS_KEPT = 50;
 
+const SEVERITY_RANK = { VALID: 0, WARNING: 1, QUARANTINED: 2 } as const;
+
 /**
- * Parses a statement and upserts its holders. Rows for the same company,
- * folio and holder are grouped (IEPF-2 lists one row per unpaid dividend).
- * Post-action shares apply every bonus and split dated after the row's event
- * date, since the IEPF keeps receiving them. Safe to re-run: rows upsert.
+ * Parses a statement, validates every row, and upserts its holders.
+ * - Rows for the same company, folio and holder are grouped (IEPF-2 lists
+ *   one row per unpaid dividend).
+ * - With `source`, the file is recorded in source_documents (by checksum and
+ *   parser version) and every row in source_rows: its raw cells encrypted
+ *   and immutable, its row reference, issues and validation status. Re-running
+ *   the same file with the same reader changes nothing new (idempotent).
+ * - Quarantined rows never disappear: they stay in source_rows (and the
+ *   import report), and any holder record they would create is written with
+ *   review_status QUARANTINED, out of search until staff review it.
+ * - Post-action shares apply every bonus and split dated after the row's
+ *   event date, since the IEPF keeps receiving them.
  */
 export async function ingestStatement(
   db: PrismaClient,
@@ -472,6 +539,7 @@ export async function ingestStatement(
   file: { buffer: Buffer; fileName: string; contentType?: string | null },
   opts: IngestOptions = {},
 ): Promise<IngestResult> {
+  const sha256 = createHash("sha256").update(file.buffer).digest("hex");
   const table: RawTable = await readStatement(file.buffer, file.fileName, file.contentType);
   const { map, unmapped } = mapHeaders(table.headers);
   if (map.first === undefined && map.fullName === undefined && map.last === undefined) {
@@ -516,21 +584,39 @@ export async function ingestStatement(
   const keep = (e: { row: number; message: string }) => {
     if (errors.length < MAX_ERRORS_KEPT) errors.push(e);
   };
-  const groups = new Map<
-    string,
-    { companyId: string; row: ParsedRow; amounts: Record<string, number>; shares: number }
-  >();
+  interface Group {
+    companyId: string;
+    row: ParsedRow;
+    amounts: Record<string, number>;
+    shares: number;
+    issues: Set<IssueCode>;
+    rowIndexes: number[];
+  }
+  const groups = new Map<string, Group>();
+  /** Per table row: what happened to it, for source_rows. */
+  const outcomes: {
+    index: number;
+    issues: IssueCode[];
+    status: "VALID" | "WARNING" | "QUARANTINED";
+    groupKey: string | null;
+  }[] = [];
+  const issueCounts: Partial<Record<IssueCode, number>> = {};
+  const count = (issues: readonly IssueCode[]) => {
+    for (const i of issues) issueCounts[i] = (issueCounts[i] ?? 0) + 1;
+  };
   const eventKey = (r: ParsedRow) =>
     r.eventDate ? r.eventDate.toISOString().slice(0, 10) : (r.transferFinancialYear ?? "undated");
   let total = 0;
   let skipped = 0;
   table.rows.forEach((cells, i) => {
-    const res = parseRow(cells, map, table.firstDataRow + i, form);
+    const res = parseRow(cells, map, table.firstDataRow + i, form, table.rowNotes?.[i] ?? []);
     if (!res) return;
     total++;
     if (!res.ok) {
       skipped++;
+      count(res.issues);
       keep({ row: res.row, message: res.message });
+      outcomes.push({ index: i, issues: res.issues, status: "QUARANTINED", groupKey: null });
       return;
     }
     const r = res.value;
@@ -542,50 +628,145 @@ export async function ingestStatement(
       null;
     if (!companyId) {
       skipped++;
+      count(["UNREADABLE"]);
       keep({
         row: r.row,
         message: `Unknown company ${r.cin ?? r.isin ?? r.companyName ?? ""}`.trim(),
       });
+      outcomes.push({ index: i, issues: ["UNREADABLE"], status: "QUARANTINED", groupKey: null });
       return;
     }
+    count(r.issues);
     const key = `${companyId}|${blindIndex(r.folio, keys)}|${[r.first, r.middle, r.last].join(" ").toUpperCase()}`;
+    outcomes.push({ index: i, issues: r.issues, status: statusOf(r.issues), groupKey: key });
     const g = groups.get(key);
     if (g) {
       if (r.amountRupees)
         g.amounts[eventKey(r)] =
           Math.round(((g.amounts[eventKey(r)] ?? 0) + r.amountRupees) * 100) / 100;
       g.shares = Math.max(g.shares, r.shares);
+      for (const issue of r.issues) g.issues.add(issue);
+      g.rowIndexes.push(i);
       if (r.eventDate && (!g.row.eventDate || r.eventDate > g.row.eventDate)) {
         g.row.eventDate = r.eventDate;
         g.row.transferFinancialYear = r.transferFinancialYear;
       }
+      // Two lines of one holder that disagree on the relative: keep the clean one, flag it.
+      if (g.row.fatherOrSpouse !== r.fatherOrSpouse && !r.issues.includes("RELATIVE_SUSPECT"))
+        if (g.issues.has("RELATIVE_SUSPECT") || !g.row.fatherOrSpouse) {
+          g.row.fatherOrSpouse = r.fatherOrSpouse;
+          g.row.fatherOrSpouseRaw = r.fatherOrSpouseRaw;
+        }
     } else
       groups.set(key, {
         companyId,
         row: r,
         amounts: r.amountRupees ? { [eventKey(r)]: r.amountRupees } : {},
         shares: r.shares,
+        issues: new Set(r.issues),
+        rowIndexes: [i],
       });
   });
 
+  const tally = { VALID: 0, WARNING: 0, QUARANTINED: 0 };
+  for (const o of outcomes) tally[o.status]++;
+  const list = [...groups.values()];
   const result: IngestResult = {
     form,
     sheet: table.sheet,
+    parserVersion: PARSER_VERSION,
+    sha256,
+    sourceDocumentId: null,
     totalRows: total,
     insertedRows: 0,
     updatedRows: 0,
     skippedRows: skipped,
+    quarantinedRecords: list.filter((g) => statusOf([...g.issues]) === "QUARANTINED").length,
+    validRows: tally.VALID,
+    warningRows: tally.WARNING,
+    quarantinedRows: tally.QUARANTINED,
+    issueCounts,
     errors,
     unmappedHeaders: unmapped,
     preview: [],
   };
-  const list = [...groups.values()];
-  if (opts.dryRun) {
+  if (opts.dryRun && !opts.plan) {
     result.preview = list.slice(0, 5).map(({ row }) => {
-      const { folio: _folio, ...rest } = row;
+      const { folio: _folio, address: _address, fatherOrSpouseRaw: _raw, ...rest } = row;
       return rest;
     });
     return result;
+  }
+
+  // Provenance: the document (once per checksum and reader) and every row.
+  let sourceDocumentId: string | null = null;
+  const rowIds = new Map<number, string>();
+  if (opts.source && !opts.dryRun) {
+    const companyIds = new Set(list.map((g) => g.companyId));
+    const doc = await db.sourceDocument.upsert({
+      where: { sha256_parserVersion: { sha256, parserVersion: PARSER_VERSION } },
+      update: {
+        status: "PARSED",
+        rowCount: total,
+        validRows: tally.VALID,
+        warningRows: tally.WARNING,
+        quarantinedRows: tally.QUARANTINED,
+        ingestionJobId: opts.jobId ?? undefined,
+      },
+      create: {
+        companyId: opts.companyId ?? (companyIds.size === 1 ? [...companyIds][0]! : null),
+        sourceUrl: opts.source.url ?? null,
+        fileName: file.fileName,
+        documentType:
+          opts.source.documentType ?? (form === "IEPF_4" ? "IEPF_4_STATEMENT" : "IEPF_2_STATEMENT"),
+        reportingPeriod: opts.source.reportingPeriod ?? null,
+        publishedAt: opts.source.publishedAt ?? null,
+        publishedAtBasis: opts.source.publishedAtBasis ?? "UNKNOWN",
+        retrievedAt: opts.source.retrievedAt,
+        sha256,
+        bytes: file.buffer.length,
+        contentType: file.contentType ?? null,
+        parserVersion: PARSER_VERSION,
+        status: "PARSED",
+        quantityBasis: form === "IEPF_4" ? "SHARES_AS_STATED_ON_EVENT_DATE" : "AMOUNT_ONLY",
+        rowCount: total,
+        validRows: tally.VALID,
+        warningRows: tally.WARNING,
+        quarantinedRows: tally.QUARANTINED,
+        ingestionJobId: opts.jobId ?? null,
+      },
+    });
+    sourceDocumentId = doc.id;
+    result.sourceDocumentId = doc.id;
+    const existing = await db.sourceRow.findMany({
+      where: { sourceDocumentId: doc.id },
+      select: { id: true, rowIndex: true },
+    });
+    for (const e of existing) rowIds.set(e.rowIndex, e.id);
+    const fresh = outcomes.filter((o) => !rowIds.has(o.index));
+    for (let k = 0; k < fresh.length; k += 1000) {
+      const batch = fresh.slice(k, k + 1000).map((o) => {
+        const id = crypto.randomUUID();
+        rowIds.set(o.index, id);
+        const cells = Object.fromEntries(
+          table.headers.map((h, c) => [h || `column ${c + 1}`, table.rows[o.index]![c] ?? null]),
+        );
+        const json = JSON.stringify(cells);
+        return {
+          id,
+          sourceDocumentId: doc.id,
+          rowIndex: o.index,
+          rowRef: table.rowRefs?.[o.index] ?? `${table.sheet}, row ${table.firstDataRow + o.index}`,
+          rawCellsEnc: encryptField(json, keys),
+          rawHash: blindIndex(json, keys),
+          extractionNotes: table.rowNotes?.[o.index] ?? [],
+          validationStatus: o.status,
+          issues: o.issues,
+          reviewStatus: o.status === "QUARANTINED" ? "PENDING_REVIEW" : "NOT_REQUIRED",
+        };
+      });
+      await db.sourceRow.createMany({ data: batch, skipDuplicates: true });
+    }
   }
 
   // Post-action shares: the IEPF keeps receiving bonuses and splits after the transfer.
@@ -599,6 +780,8 @@ export async function ingestStatement(
         : g.shares;
     // Actions dated on the transfer day itself are already reflected in the statement's count.
     const post = after ? Math.max(g.shares, computed) : computed;
+    const issues = [...g.issues];
+    const status = statusOf(issues);
     staged.push({
       companyId: g.companyId,
       investorFirstName: r.first,
@@ -606,6 +789,7 @@ export async function ingestStatement(
       investorLastName: r.last || null,
       investorFullName: [r.first, r.middle, r.last].filter(Boolean).join(" "),
       fatherOrSpouseName: r.fatherOrSpouse,
+      fatherOrSpouseRaw: r.fatherOrSpouseRaw,
       addressLine: r.address,
       city: r.city,
       state: r.state,
@@ -626,13 +810,38 @@ export async function ingestStatement(
       investmentType: r.investmentType,
       sourceFilingSrn: r.srn,
       ingestionJobId: opts.jobId ?? null,
+      validationStatus: status,
+      validationIssues: issues,
+      reviewStatus: status === "QUARANTINED" ? "QUARANTINED" : "PUBLISHED",
+      sourceDocumentId,
+      sourceRowIds: g.rowIndexes.map((i) => rowIds.get(i)).filter((x): x is string => !!x),
+      quantityBasis: g.shares > 0 ? "SHARES_AS_STATED_ON_EVENT_DATE" : "AMOUNT_ONLY",
+      quantityEffectiveDate: g.shares > 0 ? r.eventDate : null,
       ...folioSearchColumns({ first: r.first, middle: r.middle, last: r.last }),
     });
+  }
+  if (opts.dryRun) {
+    result.planned = staged;
+    return result;
   }
   const bulk = await bulkUpsertFolios(staged, { form, databaseUrl: opts.databaseUrl });
   result.insertedRows = bulk.inserted;
   result.updatedRows = bulk.updated;
   result.timings = { copyMs: bulk.copyMs, mergeMs: bulk.mergeMs };
+  if (sourceDocumentId) {
+    await db.sourceDocument.update({
+      where: { id: sourceDocumentId },
+      data: { status: "IMPORTED", statusDetail: null },
+    });
+    // Link each source row to the holder record it fed (folio ids exist only after the merge).
+    await db.$executeRaw`
+      UPDATE source_rows r SET folio_id = f.id, folio_state = f.state
+      FROM unclaimed_folios f
+      WHERE r.source_document_id = ${sourceDocumentId}::uuid
+        AND r.folio_id IS NULL
+        AND r.id = ANY (f.source_row_ids)
+        AND f.source_document_id = ${sourceDocumentId}::uuid`;
+  }
   opts.onProgress?.(list.length, list.length);
   return result;
 }

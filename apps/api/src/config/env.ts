@@ -21,10 +21,12 @@ const schema = z
     SESSION_TTL_HOURS: z.coerce.number().default(24 * 7),
 
     /**
-     * Unset: MSG91 when its keys are present, otherwise "internal" (the code is
-     * shown on screen to non-staff numbers and written to the server log).
+     * Unset: MSG91 or Twilio when their keys are present; otherwise "console" in
+     * development and test, and "disabled" in production (sign-in by mobile code
+     * is paused with an honest message; codes are never shown or logged).
+     * "internal" is accepted from older deployments and means "disabled".
      */
-    OTP_PROVIDER: z.enum(["console", "internal", "msg91", "twilio"]).optional(),
+    OTP_PROVIDER: z.enum(["console", "disabled", "internal", "msg91", "twilio"]).optional(),
     MSG91_AUTH_KEY: z.string().optional(),
     MSG91_TEMPLATE_ID: z.string().optional(),
     TWILIO_ACCOUNT_SID: z.string().optional(),
@@ -101,6 +103,13 @@ const schema = z
         path: ["JWT_SECRET"],
         message: "JWT_SECRET is required in production",
       });
+    // The console sender prints usable codes to the log.
+    if (env.NODE_ENV === "production" && env.OTP_PROVIDER === "console")
+      ctx.addIssue({
+        code: "custom",
+        path: ["OTP_PROVIDER"],
+        message: "The console OTP provider is for development and tests only",
+      });
   });
 
 export type Env = Omit<
@@ -111,7 +120,7 @@ export type Env = Omit<
   OTP_SECRET: string;
   ESIGN_WEBHOOK_SECRET: string;
   STORAGE_ENCRYPTION_KEY: string | undefined;
-  OTP_PROVIDER: "console" | "internal" | "msg91" | "twilio";
+  OTP_PROVIDER: "console" | "disabled" | "msg91" | "twilio";
   ESIGN_PROVIDER: "mock" | "digio" | "leegality";
   STORAGE_PROVIDER: "local" | "s3" | "db";
   SERVERLESS: boolean;
@@ -135,9 +144,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   // so one secret never doubles as another.
   const secret = (value: string | undefined, label: string) =>
     value ?? (prod ? derive(env.JWT_SECRET!, label) : DEV_SECRET(label));
+  const configured = env.OTP_PROVIDER === "internal" ? "disabled" : (env.OTP_PROVIDER ?? undefined);
   const otpProvider =
-    env.OTP_PROVIDER ??
-    (env.MSG91_AUTH_KEY && env.MSG91_TEMPLATE_ID ? "msg91" : prod ? "internal" : "console");
+    configured ??
+    (env.MSG91_AUTH_KEY && env.MSG91_TEMPLATE_ID
+      ? "msg91"
+      : env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM
+        ? "twilio"
+        : prod
+          ? "disabled"
+          : "console");
   const esignProvider =
     env.ESIGN_PROVIDER ??
     (env.DIGIO_CLIENT_ID && env.DIGIO_CLIENT_SECRET
