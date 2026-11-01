@@ -2,6 +2,8 @@
 .env*
 !.env.example
 .uploads
+.data
+.data/**
 data/pan-india-drop/*
 !data/pan-india-drop/README.md
 **/node_modules
