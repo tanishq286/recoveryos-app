@@ -91,6 +91,7 @@ function value(
   );
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const growth = (x: number) => `${x >= 10 ? Math.round(x) : x.toFixed(x % 1 ? 1 : 0)}x`;
 
 /**
@@ -476,8 +477,10 @@ export function Calculator() {
         {detail && (
           <p className="text-sm text-fg-2">
             Recorded Corporate Actions (Splits &amp; Bonuses):{" "}
-            <span className="font-semibold text-fg tnum">{preview?.events ?? 0} events</span> since{" "}
-            {year}
+            <span className="font-semibold text-fg tnum">
+              {plural(preview?.events ?? 0, "event")}
+            </span>{" "}
+            since {year}
             <span className="text-fg-3">
               {" "}
               ·{" "}
@@ -559,7 +562,7 @@ export function Calculator() {
                     <p className="mt-1 text-sm text-fg-2 tnum">
                       {formatCount(r.valuation.originalShares)} in {r.valuation.purchaseYear} →{" "}
                       {formatCount(r.valuation.currentShares)} shares (
-                      {growth(r.valuation.growthMultiple)}, {r.valuation.events} events) ·{" "}
+                      {growth(r.valuation.growthMultiple)}, {plural(r.valuation.events, "event")}) ·{" "}
                       {r.valuation.pricePerShare === null
                         ? "no price"
                         : `${formatPaise(Math.round(r.valuation.pricePerShare * 100), { exact: true })}/share${r.valuation.priceIsManual ? " (yours)" : ""}`}

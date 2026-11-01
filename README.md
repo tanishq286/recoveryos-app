@@ -288,17 +288,19 @@ Measured on the development machine (24 cores, embedded PostgreSQL 18) with
 `npm run bench:partitions`, which writes generated holders only to `recoveryos_bench`
 (dropped afterwards). 50,000,000 rows; the largest partition (Maharashtra) holds 8.79M.
 
-| Measure                                                       | Result                                   |
-| ------------------------------------------------------------- | ---------------------------------------- |
-| Streaming 50M rows with binary COPY (generation + encryption) | 814 s, ~61,000 rows/s (Node-bound)       |
-| Rebuild + swap, Maharashtra partition (8.79M rows)            | 177 s                                    |
-| Rebuild + swap, all 38 partitions (4 at a time)               | ~6 min (earlier run, previous index set) |
-| Search, common names (key match)                              | p50 0.60 ms, p95 3.25 ms, p99 8.1 ms     |
-| Search, misspelt names                                        | p50 0.51 ms, p95 0.75 ms, p99 3.0 ms     |
-| Search, names with no phonetic match (fuzzy phase)            | p50 2.80 ms, p95 3.44 ms, p99 4.5 ms     |
-| Re-import of a real 9,997-row Dabur statement (merge mode)    | 127 ms COPY + 628 ms merge               |
+| Measure                                                       | Result                                |
+| ------------------------------------------------------------- | ------------------------------------- |
+| Streaming 50M rows with binary COPY (generation + encryption) | 814 s, ~61,000 rows/s (Node-bound)    |
+| Rebuild + swap, Maharashtra partition (8.79M rows)            | 177 s                                 |
+| Rebuild + swap, all 38 partitions (4 at a time)               | ~6.5 min                              |
+| Search, common names (key match), warm cache                  | p50 0.65 ms, p95 1.01 ms, p99 1.22 ms |
+| Search, misspelt names, warm cache                            | p50 0.58 ms, p95 0.91 ms, p99 1.25 ms |
+| Search, no phonetic match (fuzzy phase), warm cache           | p50 3.01 ms, p95 3.83 ms, p99 4.68 ms |
+| Re-import of a real 9,997-row Dabur statement (merge mode)    | 127 ms COPY + 628 ms merge            |
 
-The generated data uses ~200 distinct name words, so the `name_words` vocabulary is tiny; real
+With a cold cache (first queries after a database restart) common-name searches measured p50
+0.63 ms but p95 6.7 ms and p99 14.4 ms while index pages were read from disk; give the database
+enough memory to keep the search indexes cached. The generated data uses ~200 distinct name words, so the `name_words` vocabulary is tiny; real
 data will have hundreds of thousands of words, which makes the vocabulary trigram lookup a few
 milliseconds slower. Total 50M load time is about 20 minutes here, not 7–9: streaming is
 limited by row generation and AES encryption in one Node process.
