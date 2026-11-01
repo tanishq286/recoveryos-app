@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { Role } from "@recoveryos/shared";
 
-import { API_URL, SESSION_COOKIE, UNLOCK_COOKIE } from "@/lib/api/config";
+import { API_URL, SESSION_COOKIE } from "@/lib/api/config";
 
 export class ApiError extends Error {
   constructor(
@@ -25,8 +25,6 @@ function messageOf(body: unknown, status: number): string {
 interface ApiOptions {
   /** Send the visitor's session (private data). Forces a fresh, uncached request. */
   session?: boolean;
-  /** Send the visitor's unlock token (search results). */
-  unlock?: boolean;
   /** Cache public data for this many seconds. */
   revalidate?: number;
   method?: string;
@@ -36,16 +34,12 @@ interface ApiOptions {
 /** Server-side call to the API. Throws ApiError with the API's own message. */
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = { accept: "application/json" };
-  if (opts.session || opts.unlock) {
-    const jar = await cookies();
-    const session = jar.get(SESSION_COOKIE)?.value;
-    const unlock = jar.get(UNLOCK_COOKIE)?.value;
-    if (opts.session && session) headers.authorization = `Bearer ${session}`;
-    if (opts.unlock && unlock) headers["x-unlock-token"] = unlock;
-    if (opts.unlock && session) headers.authorization = `Bearer ${session}`;
+  if (opts.session) {
+    const session = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (session) headers.authorization = `Bearer ${session}`;
   }
   if (opts.body !== undefined) headers["content-type"] = "application/json";
-  const personal = opts.session || opts.unlock;
+  const personal = opts.session;
   const res = await fetch(`${API_URL}/${path.replace(/^\//, "")}`, {
     method: opts.method ?? "GET",
     headers,

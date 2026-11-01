@@ -4,7 +4,8 @@
  * automated clients (HTTP 401/403), in which case the next provider answers.
  */
 export const MARKET_USER_AGENT =
-  process.env.MARKET_USER_AGENT ?? "RecoveryOS-PriceSync/0.2 (+https://recoveryos.in/bot)";
+  process.env.MARKET_USER_AGENT ??
+  "FinsolEnterprises-PriceSync/0.3 (+https://finsolenterprises.com/bot)";
 
 export interface Quote {
   /** Rupees. */
@@ -63,7 +64,13 @@ export class NseQuoteProvider implements QuoteProvider {
 interface YahooChart {
   chart?: {
     result?: {
-      meta?: { regularMarketPrice?: number; regularMarketTime?: number; exchangeName?: string };
+      meta?: {
+        regularMarketPrice?: number;
+        regularMarketTime?: number;
+        exchangeName?: string;
+        longName?: string;
+        shortName?: string;
+      };
       events?: {
         dividends?: Record<string, { amount: number; date: number }>;
         splits?: Record<string, { date: number; numerator: number; denominator: number }>;
@@ -129,5 +136,37 @@ export class YahooChartProvider implements QuoteProvider {
         return { exDate, amount: Math.round(d.amount * later * 10_000) / 10_000 };
       })
       .sort((a, b) => a.exDate.localeCompare(b.exDate));
+  }
+
+  /**
+   * Full monthly history for one Yahoo symbol: price, name, split events
+   * (which include bonuses, recorded as splits) and dividends as Yahoo
+   * reports them (adjusted for later splits).
+   */
+  async history(symbol: string): Promise<{
+    name: string | null;
+    price: number | null;
+    tradedAt: Date | null;
+    splits: { exDate: string; numerator: number; denominator: number }[];
+    dividends: { exDate: string; adjustedAmount: number }[];
+  } | null> {
+    const result = (await this.chart(symbol, "interval=1mo&range=max&events=div,split"))?.chart
+      ?.result?.[0];
+    if (!result) return null;
+    const day = (t: number) => new Date((t + 5.5 * 3600) * 1000).toISOString().slice(0, 10);
+    const meta = result.meta;
+    return {
+      name: meta?.longName ?? meta?.shortName ?? null,
+      price:
+        meta?.regularMarketPrice && meta.regularMarketPrice > 0 ? meta.regularMarketPrice : null,
+      tradedAt: meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000) : null,
+      splits: Object.values(result.events?.splits ?? {})
+        .map((x) => ({ exDate: day(x.date), numerator: x.numerator, denominator: x.denominator }))
+        .sort((a, b) => a.exDate.localeCompare(b.exDate)),
+      dividends: Object.values(result.events?.dividends ?? {})
+        .filter((d) => d.amount > 0)
+        .map((d) => ({ exDate: day(d.date), adjustedAmount: d.amount }))
+        .sort((a, b) => a.exDate.localeCompare(b.exDate)),
+    };
   }
 }

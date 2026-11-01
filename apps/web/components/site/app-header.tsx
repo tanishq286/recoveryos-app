@@ -1,5 +1,4 @@
 import { Wordmark } from "@/components/brand/wordmark";
-import { CommandTrigger } from "@/components/command/command-trigger";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { NavLinks, type NavItem } from "@/components/site/nav-links";
 import { AccountLink } from "@/components/auth/account-link";
@@ -7,9 +6,8 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { getViewer, isStaffRole } from "@/lib/api/server";
 
 const PUBLIC_NAV: NavItem[] = [
-  { href: "/search", label: "Search" },
-  { href: "/check", label: "Guided check" },
-  { href: "/cases", label: "Sample cases" },
+  { href: "/search", label: "3-Minute Check" },
+  { href: "/calculator", label: "Calculator" },
 ];
 
 export async function AppHeader() {
@@ -20,6 +18,7 @@ export async function AppHeader() {
       ? [
           { href: "/admin/crm", label: "CRM board" },
           { href: "/portal", label: "Cases" },
+          { href: "/admin/companies", label: "Company files" },
           ...(viewer.role === "VALUATION_ANALYST"
             ? []
             : [{ href: "/admin/ingestion", label: "Imports" }]),
@@ -33,8 +32,8 @@ export async function AppHeader() {
           ]
         : [
             { href: "/portal", label: "My cases" },
-            { href: "/search", label: "Search" },
-            { href: "/check", label: "Guided check" },
+            { href: "/search", label: "3-Minute Check" },
+            { href: "/calculator", label: "Calculator" },
           ];
   return (
     <header
@@ -48,7 +47,6 @@ export async function AppHeader() {
           <NavLinks items={nav} label="App" />
         </div>
         <div className="order-2 flex items-center gap-2 sm:order-3">
-          <CommandTrigger />
           <ThemeToggle />
           {viewer ? <SignOutButton /> : <AccountLink />}
         </div>

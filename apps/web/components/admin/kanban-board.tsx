@@ -289,8 +289,18 @@ function LeadCardView({
       {card.holdings.length > 0 && (
         <ul className="mt-2 grid gap-1 border-t border-(--glass-border) pt-2 text-sm">
           {card.holdings.slice(0, 3).map((h) => (
-            <li key={h.folioId} className="text-fg-2">
-              <span className="text-fg">{h.holder}</span> · {h.company}
+            <li
+              key={h.folioId}
+              className="flex flex-wrap items-center justify-between gap-1 text-fg-2"
+            >
+              <span>
+                <span className="text-fg">{h.holder}</span> · {h.company}
+              </span>
+              {h.folioReleased ? (
+                <span className="text-xs text-confirmed">folio released</span>
+              ) : (
+                <ReleaseFolioButton leadId={card.id} folioId={h.folioId} />
+              )}
             </li>
           ))}
           {card.holdings.length > 3 && (
@@ -328,9 +338,33 @@ function LeadCardView({
       </label>
       <MoveMenu card={card} columns={columns} from={from} onMove={onMove} />
       {card.unlockedAt && (
-        <p className="mt-2 text-xs text-fg-3">Unlocked {formatDate(card.unlockedAt)}</p>
+        <p className="mt-2 text-xs text-fg-3">Claim requested {formatDate(card.unlockedAt)}</p>
       )}
     </>
+  );
+}
+
+/** Shows the claimant one holding's folio number; until then it stays masked for them. */
+function ReleaseFolioButton({ leadId, folioId }: { leadId: string; folioId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <button
+      type="button"
+      className="link text-xs text-fg-2 disabled:opacity-60"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await callApi(`crm/leads/${leadId}/release-folios`, { body: { folioIds: [folioId] } });
+          router.refresh();
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Releasing…" : "Release folio"}
+    </button>
   );
 }
 
@@ -371,6 +405,16 @@ function CaseCardView({
       </div>
       <dl className="mt-2 grid gap-0.5 text-xs text-fg-3">
         <div className="flex justify-between gap-2">
+          <dt>Fee</dt>
+          <dd className="text-fg-2 tnum">
+            {card.feePct === null ? (
+              <span className="text-pending">quote pending</span>
+            ) : (
+              `${card.feePct}%`
+            )}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
           <dt>SRN</dt>
           <dd className="font-mono text-fg-2">{card.mcaIepf5Srn ?? "not filed"}</dd>
         </div>
@@ -399,7 +443,7 @@ function ConvertDialog({
 }) {
   const [folioId, setFolioId] = React.useState("");
   const [scenario, setScenario] = React.useState<ScenarioType>("STANDARD_IEPF5");
-  const [fee, setFee] = React.useState("10");
+  const [fee, setFee] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [created, setCreated] = React.useState<string | null>(null);
@@ -419,7 +463,11 @@ function ConvertDialog({
     setError(null);
     try {
       const res = await callApi<{ caseCode: string }>(`crm/leads/${lead.id}/convert`, {
-        body: { folioId, scenarioType: scenario, agreedSuccessFeePct: Number(fee) },
+        body: {
+          folioId,
+          scenarioType: scenario,
+          agreedSuccessFeePct: fee ? Number(fee) : null,
+        },
       });
       setCreated(res.caseCode);
       onDone();
@@ -458,8 +506,8 @@ function ConvertDialog({
             {!lead?.phoneVerified && (
               <Alert variant="pending">
                 <AlertDescription>
-                  This lead&apos;s phone is not verified yet. Ask them to unlock from the search
-                  page first.
+                  This lead&apos;s phone is not verified yet. Ask them to sign in through the Login
+                  Gateway first.
                 </AlertDescription>
               </Alert>
             )}
@@ -499,11 +547,12 @@ function ConvertDialog({
               </div>
               <div>
                 <label htmlFor="c-fee" className="mb-1.5 block text-sm text-fg-2">
-                  Fee %
+                  Custom fee %
                 </label>
                 <Input
                   id="c-fee"
                   inputMode="decimal"
+                  placeholder="Later"
                   value={fee}
                   onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ""))}
                   className="tnum"

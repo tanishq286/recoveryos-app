@@ -7,7 +7,7 @@ import { ENV, type Env } from "../../config/env.js";
 import { PrismaService } from "../../common/prisma.service.js";
 import { OTP_SENDER, type OtpSender } from "../../common/providers/otp.provider.js";
 
-export type OtpPurpose = "UNLOCK" | "LOGIN";
+export type OtpPurpose = "LOGIN";
 
 const TTL_MS = 5 * 60_000;
 const RESEND_AFTER_MS = 30_000;

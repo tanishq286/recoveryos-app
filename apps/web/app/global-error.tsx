@@ -15,7 +15,8 @@ export default function GlobalError({
         <main className="mx-auto max-w-2xl px-4 py-20" role="alert">
           <h1 className="text-3xl leading-tight">Something went wrong</h1>
           <p className="mt-4 text-lg text-fg-2">
-            RecoveryOS couldn&apos;t load. Nothing on any case has changed. Please try again.
+            Finsol Enterprises couldn&apos;t load. Nothing on any case has changed. Please try
+            again.
           </p>
           {error.digest && (
             <p className="mt-3 text-sm text-fg-3">

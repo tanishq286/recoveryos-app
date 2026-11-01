@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
 
 export type Theme = "dark" | "light";
 
-const KEY = "recoveryos:theme";
-const EVENT = "recoveryos:theme-change";
+const KEY = "finsol:theme";
+const EVENT = "finsol:theme-change";
 const CHROME: Record<Theme, string> = { dark: "#05080E", light: "#F3F6FA" };
 
 export function readTheme(): Theme {

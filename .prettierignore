@@ -5,3 +5,4 @@ apps/web/supabase
 dist
 .data
 packages/db/prisma/migrations
+.impeccable/

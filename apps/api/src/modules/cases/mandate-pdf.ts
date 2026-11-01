@@ -1,7 +1,9 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import {
+  BRAND,
+  BRAND_EMAILS,
+  CLIENT_DOC_LABELS,
   documentChecklist,
-  DOC_TYPE_LABELS,
   SCENARIO_LABELS,
   SCENARIO_TIMELINE_MONTHS,
   type ScenarioType,
@@ -50,21 +52,22 @@ function paragraph(
 }
 
 /**
- * The Scope of Work the client signs at step 5. Plain language, the fee in
- * one place, and the limits stated as clearly as the promises.
+ * The Digital Mandate the client signs at step 5. Plain language, the fee
+ * staff set for this case in one place, and the limits stated as clearly as
+ * the promises. Filing mechanics stay with Finsol and are not spelled out.
  * (Standard PDF fonts cannot draw the rupee sign, so amounts say "Rs.")
  */
 export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`Scope of Work ${m.caseCode}`);
-  doc.setAuthor("RecoveryOS");
+  doc.setTitle(`Digital Mandate ${m.caseCode}`);
+  doc.setAuthor(BRAND.name);
   const page = doc.addPage([595, 842]);
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const W = 595 - 112;
   let y = 780;
 
-  page.drawText("RecoveryOS", { x: 56, y, size: 11, font: bold, color: rgb(0.02, 0.45, 0.65) });
+  page.drawText(BRAND.name, { x: 56, y, size: 11, font: bold, color: rgb(0.02, 0.45, 0.65) });
   page.drawText(`Case ${m.caseCode}  ·  Issued ${m.issuedOn}`, {
     x: 330,
     y,
@@ -73,7 +76,7 @@ export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
     color: MUTED,
   });
   y -= 36;
-  page.drawText("Scope of Work and Recovery Mandate", {
+  page.drawText("Digital Mandate and Scope of Work", {
     x: 56,
     y,
     size: 18,
@@ -92,7 +95,7 @@ export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
     ],
     [
       "Fee",
-      `${m.feePct}% of the value actually credited to you, plus GST. Nothing upfront. Nothing if nothing is credited.`,
+      `${m.feePct}% of the value actually credited to you, plus GST, as agreed for this case. Nothing upfront. Nothing if nothing is credited.`,
     ],
   ];
   for (const [k, v] of rows) {
@@ -104,10 +107,10 @@ export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
   page.drawText("What we will do", { x: 56, y, size: 12, font: bold, color: INK });
   y -= 18;
   for (const s of [
-    "Request the registrar's entitlement letter confirming what moved and when.",
-    "Prepare the claim (Form IEPF-5 or the registrar route), the indemnity bond and supporting forms from your checked documents.",
-    "Show you every page before it is signed or sent, and file only what you approve.",
-    "Track the company's nodal verification and the IEPF Authority's decision, with a named owner and a next date.",
+    "Confirm exactly what you hold today, after every bonus and split.",
+    "Prepare all paperwork and carry out every filing and legal step on your behalf.",
+    "Show you every document before you sign it, and act only on what you approve.",
+    "Follow up with the company and the authorities until shares are credited, with a named owner and a next date.",
   ])
     y = paragraph(page, `•  ${s}`, 64, y, regular, 10, W - 8) - 2;
 
@@ -115,7 +118,7 @@ export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
   page.drawText("What we will not do", { x: 56, y, size: 12, font: bold, color: INK });
   y -= 18;
   for (const s of [
-    "Guarantee recovery: the company verifies the claim and the IEPF Authority decides.",
+    "Guarantee recovery: approval rests with the company and the authorities.",
     "Hold your shares or money: shares go to your own demat account and money to your own bank account.",
     "Ask for any OTP, password or PIN by phone, WhatsApp or email.",
   ])
@@ -127,7 +130,7 @@ export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
   y = paragraph(
     page,
     documentChecklist({ scenario: m.scenario })
-      .map((d) => DOC_TYPE_LABELS[d.docType])
+      .map((d) => CLIENT_DOC_LABELS[d.docType])
       .join("; ") + ".",
     64,
     y,
@@ -148,6 +151,16 @@ export async function buildMandatePdf(m: MandateInput): Promise<Buffer> {
     MUTED,
   );
 
+  page.drawText(
+    `Claims & Case Desk: ${BRAND_EMAILS.claims}  ·  Client Support: ${BRAND_EMAILS.support}`,
+    {
+      x: 56,
+      y: 48,
+      size: 8,
+      font: regular,
+      color: MUTED,
+    },
+  );
   page.drawRectangle({
     x: 56,
     y: 70,

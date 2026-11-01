@@ -1,13 +1,9 @@
 import Link from "next/link";
-import { ArrowUpRightIcon } from "lucide-react";
+import { MailIcon } from "lucide-react";
+import { BRAND, BRAND_DESKS } from "@recoveryos/shared";
 
 import { Wordmark } from "@/components/brand/wordmark";
-import { OFFICIAL_LINKS } from "@/lib/sources";
 import { cn } from "@/lib/utils";
-
-function shortName(label: string) {
-  return label.split(": ")[0];
-}
 
 /** `wide` matches the app shell's container (84rem); the default matches marketing pages. */
 export function SiteFooter({ wide = false }: { wide?: boolean }) {
@@ -15,36 +11,33 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
   return (
     <footer className="mt-auto border-t border-(--glass-border) bg-ink-950/60">
       <div
-        className={cn("mx-auto grid gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]", width)}
+        className={cn(
+          "mx-auto grid gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.3fr_1.2fr_1fr]",
+          width,
+        )}
       >
         <div className="space-y-4">
           <Wordmark />
+          <p className="text-sm font-medium text-signal">{BRAND.promise.join(" • ")}</p>
           <p className="max-w-sm text-sm text-fg-3">
-            An independent service. Not affiliated with the IEPF Authority, the Ministry of
-            Corporate Affairs, SEBI, RBI or EPFO. We do not give legal, tax or investment advice.
+            An independent recovery firm, not a government body. We do not give legal, tax or
+            investment advice.
           </p>
         </div>
         <div>
           <h2 className="text-sm font-medium tracking-normal text-fg [font-stretch:100%]">
-            Free official routes
+            Write to us
           </h2>
           <ul className="mt-4 space-y-2.5">
-            {[
-              OFFICIAL_LINKS.iepfSearch,
-              OFFICIAL_LINKS.mcaIepf5,
-              OFFICIAL_LINKS.udgam,
-              OFFICIAL_LINKS.epfo,
-            ].map((l) => (
-              <li key={l.href}>
+            {BRAND_DESKS.map((d) => (
+              <li key={d.key} className="text-sm">
+                <span className="block text-fg-3">{d.label}</span>
                 <a
-                  href={l.href}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                  className="inline-flex items-center gap-1 text-sm text-fg-2 transition-colors duration-150 hover:text-fg"
+                  href={`mailto:${d.email}`}
+                  className="link inline-flex items-center gap-1.5 break-all text-fg-2"
                 >
-                  {shortName(l.label)}
-                  <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-                  <span className="sr-only"> (opens in a new tab)</span>
+                  <MailIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                  {d.email}
                 </a>
               </li>
             ))}
@@ -55,9 +48,9 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
             If something feels wrong
           </h2>
           <p className="mt-4 text-sm text-fg-2">
-            Report fraud at{" "}
+            We never ask for a fee upfront or for any code over the phone. Report fraud at{" "}
             <a
-              href={OFFICIAL_LINKS.cybercrime.href}
+              href="https://cybercrime.gov.in"
               rel="noopener noreferrer"
               target="_blank"
               className="link"
@@ -68,11 +61,12 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
           </p>
           <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm">
             {[
-              ["/search", "Search by name"],
+              ["/search", "3-Minute Check"],
               ["/services", "Services"],
               ["/calculator", "Calculator"],
-              ["/unclaimed-shares", "Company guides"],
+              ["/unclaimed-shares", "Companies"],
               ["/partners", "Partners"],
+              ["/login", "Client login"],
             ].map(([href, label]) => (
               <li key={href}>
                 <Link href={href} className="link text-fg-2">
@@ -80,23 +74,12 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
                 </Link>
               </li>
             ))}
-            <li>
-              <Link href="/check" className="link text-fg-2">
-                Guided check
-              </Link>
-            </li>
-            <li>
-              <Link href="/cases" className="link text-fg-2">
-                Sample cases
-              </Link>
-            </li>
           </ul>
         </div>
       </div>
       <div className="border-t border-(--glass-border)">
         <p className={cn("mx-auto px-4 py-5 text-sm text-fg-3 sm:px-6", width)}>
-          Investor records come from companies&apos; IEPF-2 and IEPF-4 statements. The sample case
-          under Sample cases is illustrative.
+          © {new Date().getFullYear()} {BRAND.name} · {BRAND.domain}
         </p>
       </div>
     </footer>

@@ -16,8 +16,10 @@ const updateSchema = z.object({
 const convertSchema = z.object({
   folioId: z.uuid(),
   scenarioType: z.enum(SCENARIO_TYPES),
-  agreedSuccessFeePct: z.number().min(0).max(30).default(10),
+  /** Custom pricing: optional here, settable on the case until the mandate is issued. */
+  agreedSuccessFeePct: z.number().gt(0).max(50).nullable().optional(),
 });
+const releaseSchema = z.object({ folioIds: z.array(z.uuid()).min(1).max(10) });
 const moveCaseSchema = z.object({
   caseCode: z.string(),
   column: z.enum(CASE_COLUMNS.map((c) => c.id) as [string, ...string[]]),
@@ -60,6 +62,16 @@ export class CrmController {
     @CurrentUser() user: SessionClaims,
   ) {
     return this.crm.convert(leadId, user, body);
+  }
+
+  /** Shows the claimant the folio numbers of these holdings. */
+  @Post("leads/:id/release-folios")
+  releaseFolios(
+    @Param("id", { schema: id }) leadId: string,
+    @Body({ schema: releaseSchema }) body: z.infer<typeof releaseSchema>,
+    @CurrentUser() user: SessionClaims,
+  ) {
+    return this.crm.releaseFolios(leadId, user, body.folioIds);
   }
 
   /** Dragging a case card to the next column advances it one R.E.C.O.V.E.R. step. */

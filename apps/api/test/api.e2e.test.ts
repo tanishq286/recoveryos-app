@@ -29,7 +29,7 @@ async function login(phone: string, name?: string): Promise<string> {
   const code = otp.lastCode(phone)!;
   const res = await request(http)
     .post("/api/v1/auth/otp/verify")
-    .send({ phone, code, name })
+    .send({ phone, code, name: name ?? "Test User", email: "test.user@example.in" })
     .expect(200);
   return res.body.token as string;
 }
@@ -72,13 +72,13 @@ describe("health", () => {
   });
 });
 
-describe("GET /search/unclaimed", () => {
-  it("finds spelling variants of a surname within the state, masked", async () => {
+describe("GET /search/unclaimed: the 3-Minute Check", () => {
+  it("finds spelling variants within the state and masks company, shares and value for the public", async () => {
     const res = await request(http)
       .get("/api/v1/search/unclaimed")
       .query({ lastName: "Agarwal", state: "DELHI" })
       .expect(200);
-    expect(res.body.mode).toBe("LAST");
+    expect(res.body).toMatchObject({ mode: "LAST", access: "public", liveRefreshId: null });
     const names = res.body.results.map((r: { investorFullName: string }) => r.investorFullName);
     expect(names).toEqual(
       expect.arrayContaining(["Ramesh Kumar Agarwal", "Ramesh K Agrawal", "Kamla Devi Aggarwal"]),
@@ -87,41 +87,49 @@ describe("GET /search/unclaimed", () => {
       (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
     );
     expect(ril).toMatchObject({
-      unlocked: false,
+      access: "public",
       companyName: "R******e Industries Limited",
+      companySlug: null,
       folioNumber: "RIL***21",
+      folioReleased: false,
+      postActionShares: null,
+      estimatedTotalValuePaise: null,
+      sharePricePaise: null,
       fatherOrSpouseName: "Om Prakash Agarwal",
       city: "New Delhi",
     });
-    expect(ril.postActionShares).toBe(1600);
-    expect(ril.estimatedTotalValuePaise).toBeGreaterThan(1600 * 1000 * 100);
     expect(JSON.stringify(res.body)).not.toContain("RIL0012345621");
     expect(JSON.stringify(res.body)).not.toContain("Reliance");
   });
 
-  it("supports all four search modes", async () => {
-    const full = await request(http)
+  it("takes the investor's name as one field, with an optional joint holder", async () => {
+    const res = await request(http)
       .get("/api/v1/search/unclaimed")
-      .query({ firstName: "Ramesh", middleName: "Kumar", lastName: "Agarwal", state: "DELHI" })
+      .query({
+        fullName: "Ramesh Kumar Agarwal",
+        jointHolderName: "Kamla Devi Aggarwal",
+        state: "DELHI",
+      })
       .expect(200);
-    expect(full.body.mode).toBe("FULL");
-    expect(full.body.results[0].investorFullName).toBe("Ramesh Kumar Agarwal");
-    const first = await request(http)
-      .get("/api/v1/search/unclaimed")
-      .query({ firstName: "Venkatesh", state: "TELANGANA" })
-      .expect(200);
-    expect(first.body.mode).toBe("FIRST");
+    expect(res.body.mode).toBe("FULL");
+    expect(res.body.results[0]).toMatchObject({
+      investorFullName: "Ramesh Kumar Agarwal",
+      matchedHolder: "primary",
+    });
     expect(
-      first.body.results.map((r: { investorFullName: string }) => r.investorFullName),
-    ).toContain("Venkatesh Rao");
-    const middle = await request(http)
+      res.body.results.find(
+        (r: { investorFullName: string }) => r.investorFullName === "Kamla Devi Aggarwal",
+      ),
+    ).toMatchObject({ matchedHolder: "joint" });
+    const joint = await request(http)
       .get("/api/v1/search/unclaimed")
-      .query({ middleName: "Devi", state: "DELHI" })
+      .query({ fullName: "Venkatesh Rao", jointHolderName: "Ramesh Kumar Agarwal", state: "DELHI" })
       .expect(200);
-    expect(middle.body.mode).toBe("MIDDLE");
     expect(
-      middle.body.results.map((r: { investorFullName: string }) => r.investorFullName),
-    ).toContain("Kamla Devi Aggarwal");
+      joint.body.results.find(
+        (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
+      ),
+    ).toMatchObject({ matchedHolder: "joint" });
     const phonetic = await request(http)
       .get("/api/v1/search/unclaimed")
       .query({ fullName: "Debasish Chaudhary", state: "WEST_BENGAL" })
@@ -155,6 +163,26 @@ describe("GET /search/unclaimed", () => {
     await request(http).get("/api/v1/search/unclaimed").query({ state: "DELHI" }).expect(400);
   });
 
+  it("shows signed-in members company, shares and value, but never the folio number", async () => {
+    const res = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Ramesh Kumar Agarwal", state: "DELHI" })
+      .set(auth("venkatesh"))
+      .expect(200);
+    expect(res.body.access).toBe("member");
+    const ril = res.body.results[0];
+    expect(ril).toMatchObject({
+      access: "member",
+      companyName: "Reliance Industries Limited",
+      companySlug: "reliance-industries-limited",
+      folioNumber: "RIL***21",
+      folioReleased: false,
+      postActionShares: 1600,
+    });
+    expect(ril.estimatedTotalValuePaise).toBeGreaterThan(1600 * 1000 * 100);
+    expect(JSON.stringify(res.body)).not.toContain("RIL0012345621");
+  });
+
   it("shows staff everything unmasked", async () => {
     const res = await request(http)
       .get("/api/v1/search/unclaimed")
@@ -165,18 +193,18 @@ describe("GET /search/unclaimed", () => {
       (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
     );
     expect(ril).toMatchObject({
-      unlocked: true,
+      access: "staff",
       companyName: "Reliance Industries Limited",
       folioNumber: "RIL0012345621",
-      rtaName: "KFIN",
+      folioReleased: true,
     });
   });
 });
 
-describe("POST /search/unlock", () => {
+describe("Login Gateway, claims and analyst folio release", () => {
   const phone = "9876500001";
+  let token: string;
   let folioId: string;
-  let otherId: string;
 
   beforeAll(async () => {
     const res = await request(http)
@@ -185,62 +213,67 @@ describe("POST /search/unlock", () => {
     folioId = res.body.results.find(
       (r: { investorFullName: string }) => r.investorFullName === "Ramesh Kumar Agarwal",
     ).id;
-    otherId = res.body.results.find(
-      (r: { investorFullName: string }) => r.investorFullName === "Ramesh K Agrawal",
-    ).id;
   });
 
-  const body = (code: string) => ({
-    name: "Asha Agarwal",
-    phone,
-    otpCode: code,
-    relationshipToHolder: "SON_DAUGHTER",
-    physicalCertStatus: "LOST",
-    folioIds: [folioId],
-    referralCode: "rahul-del",
-    consent: true,
-  });
-
-  it("rejects a wrong code and creates no lead", async () => {
+  it("asks for full name, mobile OTP and email", async () => {
     await request(http)
       .post("/api/v1/auth/otp/request")
-      .send({ phone, purpose: "UNLOCK" })
+      .send({ phone, purpose: "LOGIN" })
       .expect(200);
-    const real = otp.lastCode("+919876500001")!;
-    const wrong = real === "000000" ? "111111" : "000000";
-    await request(http).post("/api/v1/search/unlock").send(body(wrong)).expect(400);
+    const code = otp.lastCode("+919876500001")!;
+    const wrong = code === "000000" ? "111111" : "000000";
+    await request(http)
+      .post("/api/v1/auth/otp/verify")
+      .send({ phone, code, name: "Asha Agarwal" })
+      .expect(400); // no email
+    await request(http)
+      .post("/api/v1/auth/otp/verify")
+      .send({ phone, code: wrong, name: "Asha Agarwal", email: "asha@example.in" })
+      .expect(400);
+    const ok = await request(http)
+      .post("/api/v1/auth/otp/verify")
+      .send({ phone, code, name: "Asha Agarwal", email: "asha@example.in" })
+      .expect(200);
+    expect(ok.body.user).toMatchObject({ name: "Asha Agarwal", email: "asha@example.in" });
+    token = ok.body.token;
   });
 
-  it("verifies the code, records the lead and unmasks only the chosen rows", async () => {
-    const code = otp.lastCode("+919876500001")!;
-    const res = await request(http).post("/api/v1/search/unlock").send(body(code)).expect(200);
-    expect(res.body.results[0]).toMatchObject({
-      unlocked: true,
-      companyName: "Reliance Industries Limited",
-      folioNumber: "RIL0012345621",
-      rtaLabel: "KFin Technologies Limited",
-    });
-    const token = res.body.unlockToken as string;
+  it("needs a session to claim", async () => {
+    await request(http)
+      .post("/api/v1/search/claim")
+      .send({
+        folioIds: [folioId],
+        relationshipToHolder: "SON_DAUGHTER",
+        physicalCertStatus: "LOST",
+        consent: true,
+      })
+      .expect(401);
+  });
 
-    const again = await request(http).post("/api/v1/search/unlock").send(body(code));
-    expect(again.status).toBe(400); // a code works once
-
-    const search = await request(http)
-      .get("/api/v1/search/unclaimed")
-      .query({ lastName: "Agarwal", state: "DELHI" })
-      .set("x-unlock-token", token)
+  it("records the claim as a lead, then shows the folio only once the analyst releases it", async () => {
+    const asha = { authorization: `Bearer ${token}` };
+    await request(http)
+      .post("/api/v1/search/claim")
+      .set(asha)
+      .send({
+        folioIds: [folioId],
+        relationshipToHolder: "SON_DAUGHTER",
+        physicalCertStatus: "LOST",
+        consent: false,
+      })
+      .expect(400);
+    const res = await request(http)
+      .post("/api/v1/search/claim")
+      .set(asha)
+      .send({
+        folioIds: [folioId],
+        relationshipToHolder: "SON_DAUGHTER",
+        physicalCertStatus: "LOST",
+        referralCode: "rahul-del",
+        consent: true,
+      })
       .expect(200);
-    const unlocked = search.body.results.find((r: { id: string }) => r.id === folioId);
-    const other = search.body.results.find((r: { id: string }) => r.id === otherId);
-    expect(unlocked.unlocked).toBe(true);
-    expect(other.unlocked).toBe(false);
-
-    const forged = await request(http)
-      .get("/api/v1/search/unclaimed")
-      .query({ lastName: "Agarwal", state: "DELHI" })
-      .set("x-unlock-token", token.slice(0, -4) + "AAAA")
-      .expect(200);
-    expect(forged.body.results.every((r: { unlocked: boolean }) => !r.unlocked)).toBe(true);
+    expect(res.body.folioCount).toBe(1);
 
     const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
     await db.connect();
@@ -251,20 +284,99 @@ describe("POST /search/unlock", () => {
     await db.end();
     expect(lead.rows[0]).toMatchObject({
       phone: "+919876500001",
+      claimant_name: "Asha Agarwal",
+      email: "asha@example.in",
       phone_otp_verified: true,
       crm_stage: "NEW_SEARCH_LEAD",
-      relationship_to_holder: "SON_DAUGHTER",
       referral_code: "RAHUL-DEL",
     });
     expect(lead.rows[0].assigned_analyst_id).toBeTruthy();
-    expect(lead.rows[0].matched_folio_ids).toContain(folioId);
+
+    const before = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Ramesh Kumar Agarwal", state: "DELHI" })
+      .set(asha)
+      .expect(200);
+    expect(before.body.results[0]).toMatchObject({ folioNumber: "RIL***21", folioReleased: false });
+
+    await request(http)
+      .post(`/api/v1/crm/leads/${res.body.leadId}/release-folios`)
+      .set(asha)
+      .send({ folioIds: [folioId] })
+      .expect(403);
+    await request(http)
+      .post(`/api/v1/crm/leads/${res.body.leadId}/release-folios`)
+      .set(auth("analyst"))
+      .send({ folioIds: [folioId] })
+      .expect(201);
+    const after = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Ramesh Kumar Agarwal", state: "DELHI" })
+      .set(asha)
+      .expect(200);
+    expect(after.body.results[0]).toMatchObject({
+      folioNumber: "RIL0012345621",
+      folioReleased: true,
+    });
+  });
+});
+
+describe("calculator: equities and valuation reports", () => {
+  it("finds equities and returns verified bonus and split history", async () => {
+    const list = await request(http)
+      .get("/api/v1/market/equities")
+      .query({ q: "torrent" })
+      .expect(200);
+    expect(list.body.results[0]).toMatchObject({ symbol: "TORNTPHARM", exchange: "NSE" });
+    const torrent = await request(http).get("/api/v1/market/equities/NSE/TORNTPHARM").expect(200);
+    expect(torrent.body).toMatchObject({ actionsBasis: "verified" });
+    expect(torrent.body.actions).toHaveLength(4);
+    const ril = await request(http).get("/api/v1/market/equities/NSE/RELIANCE").expect(200);
+    expect(ril.body.price).toBeGreaterThan(0);
+    expect(ril.body.priceSource).toBe("Test fixture");
   });
 
-  it("rejects an unlock without consent", async () => {
+  it("issues an FE-VAL report PDF, at most twice a day per mobile", async () => {
+    const holdings = [
+      { symbol: "RELIANCE", exchange: "NSE", purchaseYear: 1999, originalShares: 100 },
+      { symbol: "ITC", exchange: "NSE", purchaseYear: 2000, originalShares: 100, manualPrice: 400 },
+    ];
+    await request(http).post("/api/v1/valuation/report").send({ holdings }).expect(401);
+    for (let i = 0; i < 2; i++) {
+      const res = await request(http)
+        .post("/api/v1/valuation/report")
+        .set(auth("anil"))
+        .send({ holdings })
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on("data", (c: Buffer) => chunks.push(c));
+          r.on("end", () => cb(null, Buffer.concat(chunks)));
+        })
+        .expect(200);
+      expect(res.headers["content-type"]).toContain("application/pdf");
+      expect(res.headers["x-report-code"]).toMatch(/^FE-VAL-\d{8}-[0-9A-F]{6}$/);
+      expect((res.body as Buffer).subarray(0, 5).toString()).toBe("%PDF-");
+    }
     await request(http)
-      .post("/api/v1/search/unlock")
-      .send({ ...body("123456"), consent: false })
-      .expect(400);
+      .post("/api/v1/valuation/report")
+      .set(auth("anil"))
+      .send({ holdings })
+      .expect(429);
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const rows = await db.query(
+      "SELECT holdings FROM valuation_reports WHERE phone = '+919000000013' ORDER BY created_at",
+    );
+    await db.end();
+    expect(rows.rows).toHaveLength(2);
+    const [ril, itc] = rows.rows[0].holdings;
+    expect(ril).toMatchObject({ currentShares: 800, events: 3, priceIsManual: false });
+    expect(itc).toMatchObject({
+      currentShares: 4500,
+      priceIsManual: true,
+      marketValuePaise: 4500 * 40000,
+    });
   });
 });
 
@@ -301,17 +413,35 @@ describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
     expect(c.body).toMatchObject({
       recoverStep: 3,
       viewerRole: "client",
-      holding: { folioNumber: "RIL0012345621" },
+      // Masked until the analyst releases it.
+      holding: { folioNumber: "RIL***21", folioReleased: false },
+      company: { name: "Reliance Industries Limited", internal: null },
+      tracking: { claimFiled: false, holdingConfirmation: "REQUESTED" },
+      internal: null,
+      money: { feePct: null, realization: null },
+      serviceStep: 2,
+      steps: [],
     });
-    expect(c.body.steps.map((s: { state: string }) => s.state)).toEqual([
-      "done",
+    expect(c.body.serviceSteps.map((s: { state: string }) => s.state)).toEqual([
       "done",
       "current",
       "upcoming",
       "upcoming",
-      "upcoming",
-      "upcoming",
     ]);
+    const text = JSON.stringify(c.body);
+    for (const hidden of ["IEPF-5", "ISR-1", "nodal", "Nodal", "KFin", "RIL0012345621"])
+      expect(text).not.toContain(hidden);
+    const staffView = await request(http)
+      .get("/api/v1/cases/RC-2026-1001")
+      .set(auth("analyst"))
+      .expect(200);
+    expect(staffView.body.steps).toHaveLength(7);
+    expect(staffView.body.company.internal.rtaLabel).toBe("KFin Technologies Limited");
+    const credited = await request(http)
+      .get("/api/v1/cases/RC-2026-1004")
+      .set(auth("sunita"))
+      .expect(200);
+    expect(credited.body.holding.folioReleased).toBe(true);
     expect(c.body.vault.map((v: { docType: string }) => v.docType)).toContain("DEATH_CERTIFICATE");
   });
 
@@ -348,6 +478,21 @@ describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
       .set(auth("analyst"))
       .send({ toStep: 6 })
       .expect(409); // unsigned
+    await request(http)
+      .post("/api/v1/cases/RC-2026-1001/esign/start")
+      .set(auth("sunita"))
+      .expect(409); // no custom quote yet
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/fee")
+      .set(auth("sunita"))
+      .send({ feePct: 1 })
+      .expect(403);
+    const quoted = await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/fee")
+      .set(auth("analyst"))
+      .send({ feePct: 10 })
+      .expect(200);
+    expect(quoted.body.money.feePct).toBe(10);
 
     const start = await request(http)
       .post("/api/v1/cases/RC-2026-1001/esign/start")
@@ -367,6 +512,25 @@ describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
       .send({ aadhaarLast4: "1234", otp: "456789" })
       .expect(200);
     expect(signed.body.esign.status).toBe("SIGNED");
+    await request(http)
+      .patch("/api/v1/cases/RC-2026-1001/fee")
+      .set(auth("analyst"))
+      .send({ feePct: 12 })
+      .expect(409); // fixed once the mandate is issued
+    // Signing the mandate released the folio to the client.
+    const clientView = await request(http)
+      .get("/api/v1/cases/RC-2026-1001")
+      .set(auth("sunita"))
+      .expect(200);
+    expect(clientView.body.holding).toMatchObject({
+      folioNumber: "RIL0012345621",
+      folioReleased: true,
+    });
+    const released = await request(http)
+      .post("/api/v1/cases/RC-2026-1001/release-folio")
+      .set(auth("analyst"))
+      .expect(200);
+    expect(released.body.folioReleasedAt).toBeTruthy();
 
     await request(http)
       .post("/api/v1/cases/RC-2026-1001/advance")
@@ -395,7 +559,8 @@ describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
       .expect(200);
     expect(done.body).toMatchObject({
       recoverStep: 7,
-      tracking: { mcaIepf5Srn: "T11223344", nodalVerificationStatus: "IN_PROGRESS" },
+      tracking: { claimFiled: true, companyVerification: "IN_PROGRESS" },
+      internal: { mcaIepf5Srn: "T11223344", nodalVerificationStatus: "IN_PROGRESS" },
     });
   });
 
@@ -503,9 +668,9 @@ describe("CRM board", () => {
       .send({
         folioId: offer.holdings[0].folioId,
         scenarioType: "STANDARD_IEPF5",
-        agreedSuccessFeePct: 10,
       })
       .expect(201);
+    expect(created.body.agreedSuccessFeePct).toBeNull();
     expect(created.body.caseCode).toMatch(/^RC-\d{4}-\d{4}$/);
     expect(created.body.recoverStep).toBe(5);
     await request(http)
@@ -613,6 +778,7 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
     const found = await request(http)
       .get("/api/v1/search/unclaimed")
       .query({ lastName: "Bhargav", state: "RAJASTHAN" })
+      .set(auth("analyst"))
       .expect(200);
     expect(found.body.results[0]).toMatchObject({
       investorFullName: "Hemlata Bhargava",
@@ -834,6 +1000,77 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
   });
 });
 
+describe("bulk loader: partition rebuild", () => {
+  it("rebuilds a state partition off-line, swaps it in, and merges a repeat load", async () => {
+    const { bulkUpsertFolios, folioColumns, folioSearchColumns, keysFromEnv } =
+      await import("@recoveryos/db");
+    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await db.connect();
+    const company = await db.query("SELECT id FROM companies WHERE slug = 'itc-limited'");
+    const before = await db.query(
+      "SELECT count(*)::int AS n FROM unclaimed_folios WHERE state = 'GOA'",
+    );
+    const keys = keysFromEnv();
+    const row = (first: string, last: string, folio: string, amount: number) => ({
+      companyId: company.rows[0].id,
+      investorFirstName: first,
+      investorMiddleName: null,
+      investorLastName: last,
+      investorFullName: `${first} ${last}`,
+      fatherOrSpouseName: null,
+      addressLine: null,
+      city: "Panaji",
+      state: "GOA",
+      pincode: null,
+      ...folioColumns(folio, keys),
+      certificateNumbers: null,
+      originalShares: 0,
+      postActionShares: 0,
+      amountsByEvent: { "2020-08-01": amount },
+      custodyStatus: "PHYSICAL_DORMANT",
+      eventDate: new Date("2020-08-01"),
+      transferFinancialYear: "2020-21",
+      investmentType: null,
+      sourceFilingSrn: null,
+      ingestionJobId: null,
+      ...folioSearchColumns({ first, last }),
+    });
+    const first = await bulkUpsertFolios(
+      [row("Fernando", "Menezes", "ITC0000001", 120), row("Lourdes", "Pereira", "ITC0000002", 80)],
+      { form: "IEPF_2", databaseUrl: process.env.DATABASE_URL, rebuildAbove: 0 },
+    );
+    expect(first).toMatchObject({ mode: "rebuild", inserted: 2, updated: 0, partitions: 1 });
+    const again = await bulkUpsertFolios(
+      [{ ...row("Fernando", "Menezes", "ITC0000001", 0), amountsByEvent: { "2021-08-01": 30 } }],
+      { form: "IEPF_2", databaseUrl: process.env.DATABASE_URL, rebuildAbove: 0 },
+    );
+    expect(again).toMatchObject({ mode: "rebuild", inserted: 0, updated: 1 });
+    const after = await db.query(
+      "SELECT count(*)::int AS n, sum(unclaimed_dividend_amount)::text AS total FROM unclaimed_folios WHERE state = 'GOA' AND city = 'Panaji'",
+    );
+    const parts = await db.query(
+      "SELECT count(*)::int AS n FROM pg_inherits WHERE inhparent = 'unclaimed_folios'::regclass",
+    );
+    const goa = await db.query(
+      "SELECT count(*)::int AS n FROM unclaimed_folios WHERE state = 'GOA'",
+    );
+    await db.end();
+    expect(after.rows[0]).toEqual({ n: 2, total: "230.00" });
+    expect(parts.rows[0].n).toBe(38);
+    expect(goa.rows[0].n).toBe(before.rows[0].n + 2);
+    const found = await request(http)
+      .get("/api/v1/search/unclaimed")
+      .query({ fullName: "Fernando Menezes", state: "GOA" })
+      .set(auth("analyst"))
+      .expect(200);
+    expect(found.body.results[0]).toMatchObject({
+      investorFullName: "Fernando Menezes",
+      folioNumber: "ITC0000001",
+      unclaimedDividendPaise: 15000,
+    });
+  });
+});
+
 describe("audit log", () => {
   it("is append-only, even for the table owner", async () => {
     const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -849,8 +1086,24 @@ describe("audit log", () => {
 describe("companies and stats", () => {
   it("serves a company page payload with actions and records", async () => {
     const res = await request(http).get("/api/v1/companies/wipro-limited").expect(200);
-    expect(res.body).toMatchObject({
-      name: "Wipro Limited",
+    expect(res.body).toMatchObject({ name: "Wipro Limited", tickerNse: "WIPRO" });
+    // Contacts and identifiers stay with staff.
+    for (const key of ["cin", "isin", "rta", "nodalOfficer", "irPageUrl", "statutoryBasis"])
+      expect(res.body).not.toHaveProperty(key);
+    expect(
+      res.body.corporateActions.filter((a: { actionType: string }) => a.actionType === "BONUS"),
+    ).toHaveLength(7);
+    expect(res.body.corporateActions.every((a: { source: string | null }) => a.source)).toBe(true);
+    await request(http).get("/api/v1/admin/companies/wipro-limited").expect(401);
+    await request(http)
+      .get("/api/v1/admin/companies/wipro-limited")
+      .set(auth("sunita"))
+      .expect(403);
+    const internal = await request(http)
+      .get("/api/v1/admin/companies/wipro-limited")
+      .set(auth("analyst"))
+      .expect(200);
+    expect(internal.body).toMatchObject({
       isin: "INE075A01022",
       rta: { name: "KFIN", label: "KFin Technologies Limited" },
       nodalOfficer: {
@@ -859,15 +1112,15 @@ describe("companies and stats", () => {
         phone: "+91 80 28440011",
       },
     });
-    expect(
-      res.body.corporateActions.filter((a: { actionType: string }) => a.actionType === "BONUS"),
-    ).toHaveLength(7);
-    expect(res.body.corporateActions.every((a: { source: string | null }) => a.source)).toBe(true);
-    const sbi = await request(http).get("/api/v1/companies/state-bank-of-india").expect(200);
+    const sbi = await request(http)
+      .get("/api/v1/admin/companies/state-bank-of-india")
+      .set(auth("analyst"))
+      .expect(200);
     expect(sbi.body.cin).toBeNull();
     expect(sbi.body.statutoryBasis).toContain("State Bank of India Act, 1955");
     const ril = await request(http)
-      .get("/api/v1/companies/reliance-industries-limited")
+      .get("/api/v1/admin/companies/reliance-industries-limited")
+      .set(auth("analyst"))
       .expect(200);
     expect(ril.body.nodalOfficer.deputies).toHaveLength(2);
     expect(ril.body.rta).toMatchObject({

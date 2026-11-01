@@ -1,7 +1,8 @@
 /**
- * The eleven service verticals. `status` keeps the trust rule from PRODUCT.md:
- * only "taking-cases" verticals run as paid cases today; the rest explain the
- * free official route and take a call-back request, nothing more.
+ * The eleven service verticals, as the public sees them. Each describes the
+ * outcome and what Finsol Enterprises handles; the filing mechanics stay
+ * with our staff. "taking-cases" verticals run as cases today; the rest take
+ * a call-back request.
  */
 export type ServiceStatus = "taking-cases" | "call-back";
 
@@ -13,200 +14,124 @@ export interface ServiceVertical {
   status: ServiceStatus;
   /** Who this is for. */
   forWhom: string;
-  /** What the work involves, in order. */
-  steps: string[];
-  /** The documents people usually need. */
-  documents: string[];
-  /** The free official route, always shown beside paid help. */
-  officialRoute: { label: string; href: string; note: string } | null;
+  /** What Finsol takes off the client's hands, in plain outcomes. */
+  weHandle: string[];
+  /** What the client may be asked to share once the case starts. */
+  youShare: string[];
   /** Honest limits of what we do. */
   limits: string[];
 }
 
+const KYC_SHARE = ["PAN", "Aadhaar", "Bank account proof", "Demat account details"];
+
 export const SERVICE_VERTICALS: ServiceVertical[] = [
   {
     slug: "iepf-claim",
-    name: "IEPF claim",
-    summary: "Recover shares and dividends moved to the IEPF Authority, through Form IEPF-5.",
+    name: "IEPF share recovery",
+    summary: "Shares and dividends moved to the IEPF Authority, recovered end to end by Finsol.",
     status: "taking-cases",
     forWhom:
-      "Holders and heirs whose shares moved to the IEPF after seven years of unclaimed dividends.",
-    steps: [
-      "Confirm the holding with the company's registrar (entitlement letter).",
-      "Prepare Form IEPF-5, the indemnity bond and the advance receipt.",
-      "File on the MCA portal and send the signed pack to the company's nodal officer.",
-      "Track company verification and the IEPF Authority's decision until credit.",
+      "Holders and families whose shares moved to the IEPF after seven years of unclaimed dividends.",
+    weHandle: [
+      "Confirming exactly what is held today, after every bonus and split.",
+      "All paperwork, legal execution and filings.",
+      "Every follow-up with the company until the claim is approved.",
+      "Tracking until shares reach your demat account and money your bank.",
     ],
-    documents: [
-      "PAN",
-      "Aadhaar",
-      "Client master list",
-      "Cancelled cheque",
-      "Certificates or FIR",
-      "Indemnity bond",
-    ],
-    officialRoute: {
-      label: "File IEPF-5 yourself on the MCA portal",
-      href: "https://www.mca.gov.in",
-      note: "There is no government filing fee for IEPF-5.",
-    },
-    limits: ["The IEPF Authority decides every claim. Nobody can guarantee or speed up approval."],
+    youShare: KYC_SHARE,
+    limits: ["Approval rests with the authorities. Nobody can honestly guarantee or speed it up."],
   },
   {
     slug: "duplicate-shares",
-    name: "Duplicate shares and letter of confirmation",
-    summary:
-      "Lost or damaged certificates replaced with a letter of confirmation, then dematerialised.",
+    name: "Lost or damaged share certificates",
+    summary: "Lost, torn or stolen certificates replaced, then moved into your demat account.",
     status: "taking-cases",
-    forWhom:
-      "Holders whose shares are still with the company but whose certificates are lost, torn or stolen.",
-    steps: [
-      "Lodge an FIR or police report for the lost certificates.",
-      "Apply to the registrar with Form ISR-4 and an indemnity.",
-      "Receive the letter of confirmation and lodge it with your depository participant within 120 days.",
+    forWhom: "Holders whose shares are still with the company but whose certificates are missing.",
+    weHandle: [
+      "Every application, affidavit and indemnity the company needs.",
+      "Coordination with the company until replacement is issued.",
+      "Conversion into your demat account.",
     ],
-    documents: ["FIR", "Form ISR-4", "Indemnity bond", "PAN", "Client master list"],
-    officialRoute: null,
-    limits: ["Companies may ask for a newspaper advertisement, whose cost is yours."],
+    youShare: [...KYC_SHARE, "Any old certificate copies or letters"],
+    limits: ["Some companies require a newspaper notice, whose cost is passed on at actuals."],
   },
   {
     slug: "transmission-of-shares",
-    name: "Transmission of shares",
+    name: "Transmission to heirs",
     summary: "Shares of a holder who has died moved to the nominee or legal heirs.",
     status: "taking-cases",
     forWhom: "Nominees, surviving joint holders and legal heirs.",
-    steps: [
-      "Work out which document proves succession for this holding's value.",
-      "Prepare Form ISR-5, affidavits and indemnities for the registrar.",
-      "If the shares already moved to the IEPF, claim them on IEPF-5 as heirs.",
+    weHandle: [
+      "Working out which succession document this holding needs.",
+      "Every affidavit, indemnity and application.",
+      "Recovery from the IEPF as well, if the shares already moved there.",
     ],
-    documents: [
-      "Death certificate",
-      "Succession or legal heir certificate",
-      "No-objection from other heirs",
-      "Claimant KYC",
-    ],
-    officialRoute: null,
-    limits: ["Disputes between heirs need a lawyer and a court; we stop until they are settled."],
+    youShare: ["Death certificate", "Details of the heirs", ...KYC_SHARE],
+    limits: ["Disputes between heirs need a court; we pause until they are settled."],
   },
   {
     slug: "physical-to-demat",
-    name: "Physical to demat (DRF)",
+    name: "Physical to demat",
     summary: "Old paper certificates converted into shares in your demat account.",
     status: "taking-cases",
     forWhom: "Holders with valid physical certificates in their own name.",
-    steps: [
-      "Update KYC with the registrar (Forms ISR-1 and ISR-2).",
-      "Submit the demat request form and certificates through your depository participant.",
-      "Track the registrar's confirmation until the shares appear in your account.",
+    weHandle: [
+      "KYC and signature updates with the company.",
+      "The conversion request and its follow-up.",
+      "Tracking until the shares appear in your account.",
     ],
-    documents: [
-      "Original certificates",
-      "Demat request form",
-      "ISR-1 and ISR-2",
-      "Client master list",
-    ],
-    officialRoute: null,
-    limits: ["Signature mismatches need a banker's attestation before the registrar will act."],
+    youShare: ["Original certificates", ...KYC_SHARE],
+    limits: ["Signature mismatches need a banker's attestation, which we arrange with you."],
   },
   {
     slug: "unclaimed-mutual-funds",
     name: "Unclaimed mutual funds",
-    summary:
-      "Forgotten folios and unclaimed redemptions or dividends, including amounts in the SCWF.",
+    summary: "Forgotten folios and unclaimed redemptions or dividends.",
     status: "call-back",
-    forWhom: "Investors and heirs with old mutual fund folios.",
-    steps: [
-      "Find folios on MF Central.",
-      "Update KYC and bank details with the registrar.",
-      "Claim the unclaimed amount from the fund house.",
-    ],
-    documents: ["PAN", "KYC", "Bank proof"],
-    officialRoute: {
-      label: "Find folios on MF Central",
-      href: "https://www.mfcentral.com",
-      note: "Free, run by CAMS and KFintech.",
-    },
-    limits: [
-      "We are not taking paid mutual fund cases yet. We will call you back with the free route.",
-    ],
+    forWhom: "Investors and families with old mutual fund folios.",
+    weHandle: ["Tracing old folios.", "KYC and bank updates.", "The claim itself."],
+    youShare: ["PAN", "Bank account proof"],
+    limits: ["We take a call-back request and confirm whether we can act before anything starts."],
   },
   {
     slug: "inoperative-bank-deposits",
-    name: "Inoperative bank deposits (DEAF)",
-    summary:
-      "Deposits unclaimed for ten years and moved to the RBI's DEAF, reclaimed from the bank.",
+    name: "Inoperative bank deposits",
+    summary: "Deposits unclaimed for ten years, reclaimed from the bank.",
     status: "call-back",
-    forWhom: "Depositors and heirs of dormant accounts and fixed deposits.",
-    steps: [
-      "Search several banks on RBI UDGAM.",
-      "Apply to the bank's branch with KYC.",
-      "The bank pays and reclaims from DEAF.",
-    ],
-    documents: [
-      "KYC",
-      "Passbook or deposit receipt if any",
-      "Heirs' documents if the depositor died",
-    ],
-    officialRoute: {
-      label: "Search on RBI UDGAM",
-      href: "https://udgam.rbi.org.in",
-      note: "Free. Searches several banks at once.",
-    },
-    limits: ["Banks pay you directly; no one needs to be paid to release a DEAF deposit."],
+    forWhom: "Depositors and families of dormant accounts and fixed deposits.",
+    weHandle: ["Tracing the deposit.", "The bank's claim process.", "Follow-up until payment."],
+    youShare: ["KYC", "Any passbook or deposit receipt"],
+    limits: ["Banks pay you directly; we never handle your money."],
   },
   {
     slug: "unclaimed-epf",
-    name: "Unclaimed EPF",
-    summary: "Provident fund balances in old or inoperative accounts transferred or withdrawn.",
+    name: "Unclaimed provident fund",
+    summary: "Provident fund in old or inoperative accounts, transferred or withdrawn.",
     status: "call-back",
-    forWhom: "Employees and heirs with PF in past employers' accounts.",
-    steps: [
-      "Activate your UAN.",
-      "Merge or transfer old member IDs.",
-      "Claim online from the member portal.",
-    ],
-    documents: ["UAN", "Aadhaar linked to UAN", "Bank details"],
-    officialRoute: {
-      label: "EPFO member portal",
-      href: "https://unifiedportal-mem.epfindia.gov.in",
-      note: "Free. Needs your own UAN login.",
-    },
-    limits: ["We will never ask for your EPFO password or OTP."],
+    forWhom: "Employees and families with PF in past employers' accounts.",
+    weHandle: ["Tracing old member accounts.", "Transfer or withdrawal paperwork."],
+    youShare: ["UAN if known", "Bank account proof"],
+    limits: ["We never ask for your EPFO password or any one-time code."],
   },
   {
     slug: "unclaimed-insurance",
     name: "Unclaimed insurance",
-    summary: "Maturity and death claims left with insurers after policies lapsed from view.",
+    summary: "Maturity and death claims left with insurers.",
     status: "call-back",
     forWhom: "Policyholders and nominees.",
-    steps: [
-      "Search each insurer's unclaimed amounts page.",
-      "Submit the claim form with KYC.",
-      "Escalate to the insurer's grievance cell or Bima Bharosa if it stalls.",
-    ],
-    documents: ["Policy number or bond", "KYC", "Death certificate for death claims"],
-    officialRoute: {
-      label: "IRDAI Bima Bharosa grievances",
-      href: "https://bimabharosa.irdai.gov.in",
-      note: "Free complaints against insurers.",
-    },
-    limits: ["We are not taking paid insurance cases yet."],
+    weHandle: ["Tracing the policy.", "The claim and any escalation."],
+    youShare: ["Policy details if known", "KYC"],
+    limits: ["We take a call-back request and confirm whether we can act before anything starts."],
   },
   {
     slug: "debtor-recovery",
     name: "Debtor recovery",
-    summary: "Help with legal notices and recovery routes for money owed to you.",
+    summary: "Legal notices and recovery routes for money owed to you.",
     status: "call-back",
     forWhom: "Individuals and small businesses owed money.",
-    steps: [
-      "Review the paper trail.",
-      "Introduce a panel advocate for a legal notice.",
-      "Discuss mediation or suit options with them.",
-    ],
-    documents: ["Invoices or agreements", "Correspondence"],
-    officialRoute: null,
-    limits: ["Legal advice comes only from a licensed advocate, never from us."],
+    weHandle: ["Reviewing the paper trail.", "Introducing a panel advocate."],
+    youShare: ["Invoices or agreements", "Correspondence"],
+    limits: ["Legal advice comes only from a licensed advocate."],
   },
   {
     slug: "litigation-funding",
@@ -214,39 +139,22 @@ export const SERVICE_VERTICALS: ServiceVertical[] = [
     summary: "Introductions to funders for strong recovery claims that need legal costs covered.",
     status: "call-back",
     forWhom: "Claimants with documented, high-value disputes.",
-    steps: [
-      "Screen the claim with a panel advocate.",
-      "Introduce funders who may assess it.",
-      "The funder and claimant agree terms directly.",
-    ],
-    documents: ["Case summary", "Key documents"],
-    officialRoute: null,
+    weHandle: ["Screening with a panel advocate.", "Introductions to funders."],
+    youShare: ["Case summary", "Key documents"],
     limits: ["We do not fund cases ourselves and make no promise a funder will."],
   },
   {
     slug: "nri-samadhan",
-    name: "NRI Samadhan",
-    summary:
-      "IEPF and share recovery for holders living abroad, with remote signing and apostille help.",
+    name: "NRI share recovery",
+    summary: "Share and IEPF recovery for holders living abroad, signed remotely.",
     status: "taking-cases",
-    forWhom: "Non-resident holders and heirs, and Indians whose papers are with family abroad.",
-    steps: [
-      "Check the holder's residency status and the demat account they need (NRO or NRE).",
-      "Arrange notarisation or apostille for documents signed abroad.",
-      "File IEPF-5 or the registrar route and track it from here.",
+    forWhom: "Non-resident holders and families, and Indians whose papers are with family abroad.",
+    weHandle: [
+      "The right demat account for your residency status.",
+      "Notarisation and apostille for documents signed abroad.",
+      "The full recovery, tracked from your client room.",
     ],
-    documents: [
-      "Passport",
-      "Overseas address proof",
-      "PAN",
-      "NRO/NRE demat CML",
-      "Apostilled indemnity bond",
-    ],
-    officialRoute: {
-      label: "MCA portal for IEPF-5",
-      href: "https://www.mca.gov.in",
-      note: "No government filing fee.",
-    },
+    youShare: ["Passport", "Overseas address proof", "PAN", "NRO/NRE demat details"],
     limits: ["Repatriation of proceeds follows FEMA rules and your bank's process."],
   },
 ];

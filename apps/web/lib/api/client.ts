@@ -1,7 +1,7 @@
 /**
  * Browser-side calls. They go to this app's /api/v1 route, which adds the
- * httpOnly session and unlock cookies and forwards to the API, so no token
- * is ever readable from JavaScript.
+ * httpOnly session cookie and forwards to the API, so no token is ever
+ * readable from JavaScript.
  */
 export class ClientApiError extends Error {
   constructor(

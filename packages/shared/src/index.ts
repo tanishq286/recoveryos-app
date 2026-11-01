@@ -8,3 +8,7 @@ export * from "./search.js";
 export * from "./reference/companies.js";
 export * from "./reference/rtas.js";
 export * from "./reference/services.js";
+export * from "./brand.js";
+export * from "./words.js";
+export * from "./reference/calculator-stocks.js";
+export * from "./valuation.js";

@@ -1,25 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowRightIcon, CalculatorIcon, SearchIcon, TrendingUpIcon } from "lucide-react";
 import {
-  ArrowRightIcon,
-  ArrowUpRightIcon,
-  BadgeCheckIcon,
-  Building2Icon,
-  CalculatorIcon,
-  MailIcon,
-  PhoneIcon,
-  SearchIcon,
-  TrendingUpIcon,
-  UserRoundCheckIcon,
-} from "lucide-react";
-import { computeEntitlement, CUSTODY_LABELS, holdingValuePaise } from "@recoveryos/shared";
+  BRAND,
+  computeEntitlement,
+  CUSTODY_LABELS,
+  holdingValuePaise,
+  PUBLIC_PRICING,
+  SERVICE_STEPS,
+} from "@recoveryos/shared";
 
 import { Button } from "@/components/ui/button";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getCompany, listCompanies } from "@/lib/companies";
 import { formatCount, formatDate, formatDateTime, formatPaise } from "@/lib/format";
-import { OFFICIAL_LINKS } from "@/lib/sources";
+import { CHECK_CTA } from "@/components/site/cta";
 import { SITE_URL } from "@/lib/site";
 
 // Matches the API's 15-minute price sync.
@@ -37,8 +33,8 @@ export async function generateMetadata({
   const c = await getCompany((await params).slug);
   if (!c) return {};
   return {
-    title: `Unclaimed ${c.name} shares: IEPF claim, nodal officer and registrar`,
-    description: `Recover ${c.name} shares and dividends from the IEPF: IEPF nodal officer ${c.nodalOfficer.name}, registrar ${c.rta.label}, bonus and split history, live share price and the IEPF-5 steps.`,
+    title: `Recover unclaimed ${c.name} shares and dividends`,
+    description: `Unclaimed ${c.name} shares recovered end to end by Finsol Enterprises: bonus and split history, live share price and a free 3-Minute Check. No upfront fee.`,
     alternates: { canonical: `/unclaimed-shares/${c.slug}` },
   };
 }
@@ -65,50 +61,6 @@ const ACTION_LABEL: Record<string, string> = {
   CASH_ENTITLEMENT: "Cash entitlement",
 };
 
-function ContactLines({
-  emails,
-  phone,
-  address,
-}: {
-  emails: string[];
-  phone: string | null;
-  address: string | null;
-}) {
-  return (
-    <ul className="mt-2 grid gap-1.5 text-sm">
-      {emails.map((e) => (
-        <li key={e}>
-          <a
-            href={`mailto:${e}`}
-            className="link inline-flex items-center gap-1.5 break-all text-fg-2"
-          >
-            <MailIcon className="size-3.5 shrink-0" aria-hidden="true" />
-            {e}
-          </a>
-        </li>
-      ))}
-      {phone &&
-        phone.split("/").map((p) => {
-          const label = p.trim();
-          const digits = label.replace(/[^\d+]/g, "");
-          return (
-            <li key={label} className="inline-flex items-center gap-1.5 text-fg-2">
-              <PhoneIcon className="size-3.5 shrink-0" aria-hidden="true" />
-              {digits.length >= 8 ? (
-                <a href={`tel:${digits}`} className="link tnum">
-                  {label}
-                </a>
-              ) : (
-                <span className="tnum">{label}</span>
-              )}
-            </li>
-          );
-        })}
-      {address && <li className="text-fg-2">{address}</li>}
-    </ul>
-  );
-}
-
 export default async function CompanyGuidePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const c = await getCompany(slug);
@@ -129,43 +81,15 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
   const exampleValue = price !== null ? holdingValuePaise(example.shares, price) : null;
   const totalFolios = c.records.reduce((n, r) => n + r.folios, 0);
 
-  const steps = [
-    {
-      name: "Confirm what moved, and when",
-      text: `Write to ${c.rta.label}, ${c.name}'s registrar, for an entitlement letter listing the folio, the shares and dividends transferred to the IEPF and the transfer dates.`,
-    },
-    {
-      name: "Gather the documents",
-      text: "PAN, Aadhaar, a client master list of your own demat account, a cancelled cheque, Forms ISR-1 and ISR-2, the original certificates (or an FIR if lost), and succession papers if the holder has died.",
-    },
-    {
-      name: "File Form IEPF-5 on the MCA portal",
-      text: "Fill the e-form online with the entitlement details. There is no government filing fee. Note the SRN it generates.",
-    },
-    {
-      name: `Send the signed pack to ${c.name}'s IEPF nodal officer`,
-      text: `Print the e-form, sign it with the indemnity bond and advance receipt, and send them with the documents to ${c.nodalOfficer.name}${c.nodalOfficer.address ? `, ${c.nodalOfficer.address}` : ""}.`,
-    },
-    {
-      name: "Company verification, then the IEPF Authority",
-      text: "The company verifies the claim and sends its report to the IEPF Authority, which approves the refund. Shares are credited to your demat account and dividends to your bank account.",
-    },
-  ];
-
   return (
     <article className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
       <JsonLd
         data={{
           "@context": "https://schema.org",
-          "@type": "HowTo",
-          name: `How to recover unclaimed ${c.name} shares from the IEPF`,
-          estimatedCost: { "@type": "MonetaryAmount", currency: "INR", value: "0" },
-          step: steps.map((s, i) => ({
-            "@type": "HowToStep",
-            position: i + 1,
-            name: s.name,
-            text: s.text,
-          })),
+          "@type": "Service",
+          name: `Recovery of unclaimed ${c.name} shares and dividends`,
+          provider: { "@type": "Organization", name: BRAND.name, url: SITE_URL },
+          areaServed: "IN",
         }}
       />
       <JsonLd
@@ -176,7 +100,7 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
             {
               "@type": "ListItem",
               position: 1,
-              name: "Company guides",
+              name: "Companies",
               item: `${SITE_URL}/unclaimed-shares`,
             },
             {
@@ -191,7 +115,7 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
 
       <nav aria-label="Breadcrumb" className="text-sm text-fg-3">
         <Link href="/unclaimed-shares" className="link text-fg-2">
-          Company guides
+          Companies
         </Link>{" "}
         / {c.name}
       </nav>
@@ -199,15 +123,16 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
         Recover unclaimed {c.name} shares and dividends
       </h1>
       <p className="mt-4 max-w-[62ch] text-lg text-fg-2">
-        If dividends on {c.name} shares went unclaimed for seven years in a row, the company had to
-        move the shares to the Investor Education and Protection Fund. They are still claimable, by
-        the holder or their heirs, on Form IEPF-5.
+        If dividends on {c.name} shares went unclaimed for years, the shares may have moved out of
+        the family&apos;s reach. They are still recoverable by the holder or their heirs, and{" "}
+        {BRAND.name} handles the whole recovery for you.
       </p>
+      <p className="mt-3 text-base font-medium text-signal">{BRAND.promise.join(" • ")}</p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild size="lg">
           <Link href="/search">
             <SearchIcon aria-hidden="true" />
-            Search by the holder&apos;s name
+            {CHECK_CTA}
           </Link>
         </Button>
         <Button asChild variant="outline" size="lg">
@@ -220,52 +145,6 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
 
       <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="grid min-w-0 grid-cols-1 content-start gap-10">
-          <section aria-labelledby="nodal-heading" className="panel border-iepf/30 p-5 sm:p-6">
-            <h2
-              id="nodal-heading"
-              className="flex items-center gap-2 text-xl font-semibold text-fg"
-            >
-              <UserRoundCheckIcon className="size-5 text-iepf" aria-hidden="true" />
-              IEPF nodal officer
-            </h2>
-            <p className="mt-3 text-lg font-medium text-fg">{c.nodalOfficer.name}</p>
-            <ContactLines
-              emails={c.nodalOfficer.emails}
-              phone={c.nodalOfficer.phone}
-              address={c.nodalOfficer.address}
-            />
-            {c.nodalOfficer.deputies.length > 0 && (
-              <div className="mt-4 border-t border-(--glass-border) pt-4">
-                <h3 className="text-sm font-medium text-fg-3">Deputy nodal officers</h3>
-                <ul className="mt-2 grid gap-1.5 text-sm">
-                  {c.nodalOfficer.deputies.map((d) => (
-                    <li key={d.name} className="text-fg-2">
-                      <span className="text-fg">{d.name}</span>
-                      {d.email && (
-                        <>
-                          {" · "}
-                          <a href={`mailto:${d.email}`} className="link break-all">
-                            {d.email}
-                          </a>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {c.contacts.verifiedAt && (
-              <p className="mt-4 flex items-start gap-1.5 text-sm text-fg-3">
-                <BadgeCheckIcon
-                  className="mt-0.5 size-4 shrink-0 text-confirmed"
-                  aria-hidden="true"
-                />
-                Verified {formatDate(c.contacts.verifiedAt)}
-                {c.contacts.source ? ` · ${c.contacts.source}` : ""}
-              </p>
-            )}
-          </section>
-
           <section aria-labelledby="example-heading" className="panel p-5 sm:p-6">
             <h2 id="example-heading" className="text-xl font-semibold text-fg">
               {EXAMPLE_SHARES} shares bought in {EXAMPLE_YEAR}, today
@@ -287,7 +166,7 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                   in cash entitlements
                 </>
               )}
-              . The registrar&apos;s entitlement letter confirms the real figure.
+              . Our analysts confirm the exact figure during verification.
             </p>
           </section>
 
@@ -298,7 +177,12 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
             {structural.length === 0 ? (
               <p className="mt-3 text-fg-2">{c.name} has made no bonus issue or share split.</p>
             ) : (
-              <div className="panel mt-4 overflow-x-auto">
+              <div
+                className="panel mt-4 overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-labelledby="actions-heading"
+              >
                 <table className="w-full min-w-[36rem] text-left">
                   <thead className="text-sm text-fg-3">
                     <tr className="border-b border-(--glass-border)">
@@ -354,35 +238,24 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
 
           <section aria-labelledby="steps-heading">
             <h2 id="steps-heading" className="text-xl font-semibold text-fg">
-              How to claim {c.name} shares from the IEPF
+              How {BRAND.name} recovers {c.name} shares for you
             </h2>
             <ol className="mt-5 grid gap-5">
-              {steps.map((s, i) => (
-                <li key={s.name} className="grid grid-cols-[2.5rem_1fr] gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-full border border-iepf/40 bg-iepf-wash font-semibold text-iepf tnum">
-                    {i + 1}
+              {SERVICE_STEPS.map((s) => (
+                <li key={s.step} className="grid grid-cols-[2.5rem_1fr] gap-3">
+                  <span className="flex size-9 items-center justify-center rounded-full border border-signal/40 bg-signal/10 font-semibold text-signal tnum">
+                    {s.step}
                   </span>
                   <div>
-                    <h3 className="text-base font-semibold text-fg">{s.name}</h3>
-                    <p className="mt-1 text-fg-2">{s.text}</p>
+                    <h3 className="text-base font-semibold text-fg">{s.title}</h3>
+                    <p className="mt-1 text-fg-2">{s.body}</p>
                   </div>
                 </li>
               ))}
             </ol>
             <p className="mt-6 text-fg-2">
-              You can do all of this yourself, free, on the{" "}
-              <a
-                href={OFFICIAL_LINKS.mcaIepf5.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link inline-flex items-center gap-1"
-              >
-                MCA portal
-                <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-                <span className="sr-only"> (opens in a new tab)</span>
-              </a>
-              . If you would rather we prepare and track it, our fee is a share of what is actually
-              credited, nothing upfront.
+              <strong className="text-fg">{PUBLIC_PRICING.headline}:</strong>{" "}
+              {PUBLIC_PRICING.detail}
             </p>
           </section>
         </div>
@@ -423,8 +296,6 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                   ["Sector", c.sector],
                   ["NSE", c.tickerNse],
                   ["BSE", c.tickerBse],
-                  ["ISIN", c.isin],
-                  ["CIN", c.cin],
                 ] as const
               )
                 .filter(([, v]) => v)
@@ -435,38 +306,12 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
                   </div>
                 ))}
             </dl>
-            {c.statutoryBasis && <p className="mt-3 text-sm text-fg-3">{c.statutoryBasis}.</p>}
-          </section>
-
-          <section aria-labelledby="rta-heading" className="panel p-5 sm:p-6">
-            <h2 id="rta-heading" className="flex items-center gap-2 text-lg font-semibold text-fg">
-              <Building2Icon className="size-5 text-signal" aria-hidden="true" />
-              Registrar (RTA)
-            </h2>
-            <p className="mt-3 font-medium text-fg">{c.rta.label}</p>
-            <ContactLines
-              emails={c.rta.email ? [c.rta.email] : []}
-              phone={c.rta.phone}
-              address={c.rta.address}
-            />
-            {c.rta.website && (
-              <a
-                href={c.rta.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link mt-3 inline-flex items-center gap-1 text-sm"
-              >
-                Registrar&apos;s investor services
-                <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-                <span className="sr-only"> (opens in a new tab)</span>
-              </a>
-            )}
           </section>
 
           {totalFolios > 0 && (
             <section aria-labelledby="records-heading" className="panel p-5 sm:p-6">
               <h2 id="records-heading" className="text-lg font-semibold text-fg">
-                From {c.name}&apos;s IEPF statements
+                Unclaimed {c.name} holders on record
               </h2>
               <ul className="mt-3 grid gap-2 text-sm">
                 {c.records.map((r) => (
@@ -478,24 +323,11 @@ export default async function CompanyGuidePage({ params }: { params: Promise<{ s
               </ul>
               <Button asChild variant="outline" size="sm" className="mt-4">
                 <Link href="/search">
-                  Search them by name
+                  Check your family&apos;s name
                   <ArrowRightIcon aria-hidden="true" />
                 </Link>
               </Button>
             </section>
-          )}
-
-          {c.irPageUrl && (
-            <a
-              href={c.irPageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link inline-flex items-center gap-1 text-sm"
-            >
-              {c.name}&apos;s unclaimed dividend and IEPF page
-              <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
           )}
         </aside>
       </div>

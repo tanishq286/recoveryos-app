@@ -146,7 +146,12 @@ export class ImportsService {
         db,
         this.prisma.fieldKeys,
         { buffer, fileName: job.fileName },
-        { companyId: job.companyId, form: job.formType, jobId: job.id },
+        {
+          companyId: job.companyId,
+          form: job.formType,
+          jobId: job.id,
+          databaseUrl: this.prisma.databaseUrl,
+        },
       );
       await db.ingestionJob.update({
         where: { id: job.id },
@@ -160,7 +165,8 @@ export class ImportsService {
           finishedAt: new Date(),
         },
       });
-      if (r.folioIds.length) await this.jobs.enqueue("search.sync", { folioIds: r.folioIds });
+      if (r.insertedRows + r.updatedRows)
+        await this.jobs.enqueue("search.sync", { ingestionJobId: job.id });
       this.log.log(
         `${job.fileName}: ${r.insertedRows} new, ${r.updatedRows} updated, ${r.skippedRows} skipped of ${r.totalRows}.`,
       );

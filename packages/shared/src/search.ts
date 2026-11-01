@@ -4,7 +4,6 @@ import type {
   IndianState,
   PhysicalCertStatus,
   Relationship,
-  RtaName,
 } from "./enums.js";
 import { normalizeName, splitName } from "./names.js";
 
@@ -19,6 +18,8 @@ import { normalizeName, splitName } from "./names.js";
 export type SearchMode = "FULL" | "FIRST" | "MIDDLE" | "LAST";
 
 export interface SearchInput {
+  /** A second name to check, e.g. a joint holder or another family member. */
+  jointHolderName?: string;
   firstName?: string;
   middleName?: string;
   lastName?: string;
@@ -53,90 +54,81 @@ export function resolveSearch(input: SearchInput): ResolvedSearch | null {
   return { mode, first, middle, last, state: input.state, custodyStatus: input.custodyStatus };
 }
 
-/** What every visitor sees for a matching folio. */
-export interface SearchTeaser {
+/**
+ * Who is looking decides what a result reveals:
+ *   public  holder name and place only; company and folio masked, no shares or value
+ *   member  signed in through the Login Gateway: company, shares and value; the
+ *           folio stays masked until an analyst releases it in the CRM
+ *   staff   everything
+ */
+export type ResultAccess = "public" | "member" | "staff";
+
+export interface SearchResultItem {
   id: string;
+  access: ResultAccess;
   investorFullName: string;
   fatherOrSpouseName: string | null;
   city: string | null;
   /** The holder's state, or UNKNOWN when the statement gives none. */
   state: FolioState;
   custodyStatus: CustodyStatus;
-  postActionShares: number;
-  /** "Date of Event" / proposed transfer date on the statement (YYYY-MM-DD). */
-  eventDate: string | null;
-  /** The statement's investment type, e.g. "Amount for unclaimed and unpaid dividend". */
-  investmentType: string | null;
-  /**
-   * Shares × the last synced market price + unclaimed amounts on record, in
-   * paise. An estimate, labelled as one. Without a price it is the unclaimed
-   * amount alone, and `sharePricePaise` is null.
-   */
-  estimatedTotalValuePaise: number;
-  /** Last synced market price per share, in paise; null until the first sync. */
-  sharePricePaise: number | null;
-  /** When that price was fetched (ISO). */
-  priceUpdatedAt: string | null;
-  /** "R******e Industries Ltd" until unlocked. */
+  /** "R******e Industries Ltd" for the public. */
   companyName: string;
-  /** "RIL***21" until unlocked. */
+  /** Null for the public. */
+  companySlug: string | null;
+  /** "RIL***21" unless released to this client or the viewer is staff. */
   folioNumber: string;
+  folioReleased: boolean;
+  /** Shares after bonuses and splits. Null for the public. */
+  postActionShares: number | null;
+  /** Shares × the last synced price + unclaimed amounts, in paise. Null for the public. */
+  estimatedTotalValuePaise: number | null;
+  /** Last synced market price per share, in paise. Null for the public or before the first sync. */
+  sharePricePaise: number | null;
+  priceUpdatedAt: string | null;
+  unclaimedDividendPaise: number | null;
+  eventDate: string | null;
+  investmentType: string | null;
   transferFinancialYear: string | null;
+  /** Which name on the check matched this row. */
+  matchedHolder: "primary" | "joint";
   /** 0..1, how closely the name matched. */
   matchScore: number;
-  /** Why it matched: "trigram", "phonetic" or "soundex". */
-  matchedBy: "exact" | "trigram" | "phonetic" | "soundex";
-  unlocked: false;
+  matchedBy: "exact" | "trigram" | "phonetic" | "sound-alike";
 }
-
-/** The same row after the visitor verified their phone for it. */
-export interface SearchUnlocked extends Omit<SearchTeaser, "unlocked"> {
-  unlocked: true;
-  companySlug: string;
-  rtaName: RtaName;
-  rtaLabel: string;
-  certificateNumbers: string | null;
-  unclaimedDividendPaise: number;
-  sourceFilingSrn: string | null;
-}
-
-export type SearchResultItem = SearchTeaser | SearchUnlocked;
 
 export interface SearchResponse {
   mode: SearchMode;
-  query: { first: string; middle: string; last: string; state: IndianState };
+  query: { first: string; middle: string; last: string; state: IndianState; jointHolder: string };
+  access: ResultAccess;
   total: number;
   results: SearchResultItem[];
   /** How the estimate is worked out, shown under every result list. */
   valuationBasis: string;
   engine: "meilisearch" | "postgres";
   tookMs: number;
+  /** Set when a live refresh was started for this name and state; poll or stream it. */
+  liveRefreshId: string | null;
 }
 
 export interface OtpRequestBody {
   phone: string;
-  purpose: "UNLOCK" | "LOGIN";
+  purpose: "LOGIN";
 }
 
-export interface UnlockRequestBody {
-  name: string;
-  phone: string;
-  otpCode: string;
-  email?: string;
+/** A signed-in member asks Finsol to take up the rows they picked. */
+export interface ClaimRequestBody {
+  folioIds: string[];
   relationshipToHolder: Relationship;
   physicalCertStatus: PhysicalCertStatus;
-  folioIds: string[];
-  /** Associate referral code, when the visitor arrived through a partner link. */
   referralCode?: string;
   consent: true;
 }
 
-export interface UnlockResponse {
+export interface ClaimResponse {
   leadId: string;
-  unlockToken: string;
-  expiresAt: string;
-  results: SearchUnlocked[];
+  folioCount: number;
 }
 
 export const VALUATION_BASIS =
-  "Estimate = shares after bonuses and splits × the latest NSE price, plus the unclaimed amount on the company's IEPF statement. The registrar's entitlement letter confirms the real share count, and value is fixed only on the day shares are credited.";
+  "Estimate = shares after bonuses and splits × the latest NSE price, plus the unclaimed amount on record. The final share count is confirmed during verification, and value is fixed only on the day shares are credited.";

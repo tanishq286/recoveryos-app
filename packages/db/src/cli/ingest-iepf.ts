@@ -116,6 +116,7 @@ try {
           inserted: result.insertedRows,
           updated: result.updatedRows,
           skipped: result.skippedRows,
+          ...(result.timings ? { timings: result.timings } : {}),
           unmappedHeaders: result.unmappedHeaders,
           firstErrors: result.errors.slice(0, 10),
           ...(dryRun ? { preview: result.preview } : {}),

@@ -3,8 +3,8 @@
  * (no browser impersonation), respect robots.txt, time out, and cap size.
  */
 export const USER_AGENT =
-  process.env.RECOVERYOS_FETCH_USER_AGENT ??
-  "RecoveryOS-IEPF-Fetcher/0.2 (+https://recoveryos.in/bot; collects public IEPF statutory statements)";
+  process.env.FETCH_USER_AGENT ??
+  "FinsolEnterprises-IEPF-Fetcher/0.3 (+https://finsolenterprises.com/bot; collects public IEPF statutory statements)";
 
 const MAX_BYTES = 40 * 1024 * 1024;
 

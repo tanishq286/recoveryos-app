@@ -14,6 +14,8 @@ import {
   associateCommission,
   canAdvanceRecoverStep,
   CUSTODY_LABELS,
+  CLIENT_DOC_LABELS,
+  CLIENT_DOC_REASONS,
   documentChecklist,
   DOC_TYPE_LABELS,
   holdingValuePaise,
@@ -24,6 +26,8 @@ import {
   RTA_LABELS,
   SCENARIO_LABELS,
   SCENARIO_TIMELINE_MONTHS,
+  SERVICE_STEPS,
+  serviceStepFor,
   STAFF_ROLES,
   type DocType,
   type TrackStatus,
@@ -173,14 +177,17 @@ export class CasesService {
 
   async get(code: string, user: SessionClaims) {
     const c = await this.access(code, user, "read");
-    const showFolio = isStaff(user) || c.clientUserId === user.sub;
+    const staff = isStaff(user);
+    const owner = c.clientUserId === user.sub;
+    // Clients see their folio number only once their analyst releases it.
+    const showFolio = staff || (owner && !!c.folioReleasedAt);
     const shares = c.folio?.postActionShares ?? 0;
     const price = c.company.currentMarketPrice === null ? null : num(c.company.currentMarketPrice);
     const estimatePaise = c.folio
       ? holdingValuePaise(shares, price ?? 0) +
         Math.round(num(c.folio.unclaimedDividendAmount) * 100)
       : 0;
-    const feeBps = pctToBps(num(c.agreedSuccessFeePct));
+    const feePct = c.agreedSuccessFeePct === null ? null : num(c.agreedSuccessFeePct);
     const basis = c.creditedValuePaise !== null ? Number(c.creditedValuePaise) : estimatePaise;
     const checklist = documentChecklist({
       scenario: c.scenarioType,
@@ -191,8 +198,8 @@ export class CasesService {
       const d = docs.get(item.docType);
       return {
         docType: item.docType,
-        label: DOC_TYPE_LABELS[item.docType],
-        reason: item.reason,
+        label: staff ? DOC_TYPE_LABELS[item.docType] : CLIENT_DOC_LABELS[item.docType],
+        reason: staff ? item.reason : CLIENT_DOC_REASONS[item.docType],
         beforeFiling: item.beforeFiling,
         status: d?.status ?? "PENDING",
         fileName: d?.fileName ?? null,
@@ -208,19 +215,28 @@ export class CasesService {
     const required = vault.filter((v) => v.beforeFiling);
     return {
       ...this.summary(c),
-      viewerRole: isStaff(user) ? "staff" : c.clientUserId === user.sub ? "client" : "associate",
-      client: { name: c.client.name, phone: showFolio ? c.client.phone : null },
+      viewerRole: staff ? "staff" : owner ? "client" : "associate",
+      client: { name: c.client.name, phone: staff || owner ? c.client.phone : null },
       associate: c.associate
         ? { firmName: c.associate.firmName, name: c.associate.user.name }
         : null,
       company: {
         name: c.company.name,
         slug: c.company.slug,
-        rtaLabel: c.company.rtaDisplayName ?? RTA_LABELS[c.company.rtaName],
-        rtaAddress: c.company.rtaAddress,
-        nodalOfficerName: c.company.nodalOfficerName,
-        nodalOfficerEmail: c.company.nodalOfficerEmail,
-        nodalOfficerPhone: c.company.nodalOfficerPhone,
+        // Registrar and nodal contacts are for the case team only.
+        internal: staff
+          ? {
+              rtaLabel: c.company.rtaDisplayName ?? RTA_LABELS[c.company.rtaName],
+              rtaAddress: c.company.rtaAddress,
+              rtaEmail: c.company.rtaEmail,
+              rtaPhone: c.company.rtaPhone,
+              nodalOfficerName: c.company.nodalOfficerName,
+              nodalOfficerEmail: c.company.nodalOfficerEmail,
+              nodalOfficerPhone: c.company.nodalOfficerPhone,
+              cin: c.company.cin,
+              isin: c.company.isin,
+            }
+          : null,
       },
       holding: c.folio
         ? {
@@ -228,6 +244,7 @@ export class CasesService {
             folioNumber: showFolio
               ? decryptField(c.folio.folioNumber, this.prisma.fieldKeys)
               : c.folio.folioNumberMasked,
+            folioReleased: showFolio,
             certificateNumbers: showFolio ? c.folio.certificateNumbers : null,
             originalShares: c.folio.originalShares,
             postActionShares: shares,
@@ -237,7 +254,22 @@ export class CasesService {
             transferFinancialYear: c.folio.transferFinancialYear,
           }
         : null,
-      steps: RECOVER_STEPS.map((s) => ({
+      serviceStep: serviceStepFor(c.recoverStep),
+      serviceSteps: SERVICE_STEPS.map((s) => ({
+        step: s.step,
+        title: s.title,
+        body: s.body,
+        state:
+          s.step < serviceStepFor(c.recoverStep)
+            ? "done"
+            : s.step === serviceStepFor(c.recoverStep)
+              ? c.recoverStep === 7 && c.dematCreditStatus === "DONE"
+                ? "done"
+                : "current"
+              : "upcoming",
+      })),
+      // The internal R.E.C.O.V.E.R. steps and filing references are staff-only.
+      steps: (staff ? RECOVER_STEPS : []).map((s) => ({
         ...s,
         state:
           s.step < c.recoverStep
@@ -248,12 +280,21 @@ export class CasesService {
                 : "current"
               : "upcoming",
       })),
+      // Plain progress for everyone; filing references and internal statuses for staff.
       tracking: {
-        rtaEntitlementStatus: c.rtaEntitlementStatus,
-        mcaIepf5Srn: c.mcaIepf5Srn,
-        nodalVerificationStatus: c.nodalVerificationStatus,
-        dematCreditStatus: c.dematCreditStatus,
+        holdingConfirmation: c.rtaEntitlementStatus,
+        claimFiled: !!c.mcaIepf5Srn,
+        companyVerification: c.nodalVerificationStatus,
+        dematCredit: c.dematCreditStatus,
       },
+      internal: staff
+        ? {
+            rtaEntitlementStatus: c.rtaEntitlementStatus,
+            mcaIepf5Srn: c.mcaIepf5Srn,
+            nodalVerificationStatus: c.nodalVerificationStatus,
+            dematCreditStatus: c.dematCreditStatus,
+          }
+        : null,
       esign: {
         status: c.esignStatus,
         signedAt: isoTime(c.esignSignedAt),
@@ -261,10 +302,13 @@ export class CasesService {
         requested: !!c.esignRequestId,
         hasMandate: !!c.esignMandateUrl,
       },
+      folioReleasedAt: isoTime(c.folioReleasedAt),
       money: {
-        feePct: num(c.agreedSuccessFeePct),
+        // Custom pricing: null until the case team sets this case's fee.
+        feePct,
         basis: c.creditedValuePaise !== null ? "credited" : "estimate",
-        ...netRealization(basis, feeBps),
+        grossPaise: Math.max(0, Math.round(basis)),
+        realization: feePct === null ? null : netRealization(basis, pctToBps(feePct)),
         sharePricePaise: price === null ? null : Math.round(price * 100),
         priceUpdatedAt: isoTime(c.company.priceUpdatedAt),
         priceSource: c.company.priceSource,
@@ -337,7 +381,7 @@ export class CasesService {
           "An MCA SRN is one letter and eight digits, such as T12345678.",
         );
       data.mcaIepf5Srn = srn;
-      notes.push(`IEPF-5 SRN ${srn} recorded.`);
+      notes.push("Claim filed; the filing reference is on record.");
     }
     for (const key of [
       "rtaEntitlementStatus",
@@ -347,7 +391,7 @@ export class CasesService {
       if (patch[key] && patch[key] !== c[key]) {
         data[key] = patch[key];
         notes.push(
-          `${key === "rtaEntitlementStatus" ? "Registrar entitlement" : key === "nodalVerificationStatus" ? "Nodal verification" : "Demat credit"}: ${patch[key]!.toLowerCase().replace(/_/g, " ")}.`,
+          `${key === "rtaEntitlementStatus" ? "Holding confirmation" : key === "nodalVerificationStatus" ? "Company verification" : "Demat credit"}: ${patch[key]!.toLowerCase().replace(/_/g, " ")}.`,
         );
       }
     }
@@ -372,6 +416,51 @@ export class CasesService {
     return this.get(code, user);
   }
 
+  /** Custom pricing: the case team sets this case's fee before the mandate is issued. */
+  async setFee(code: string, user: SessionClaims, pct: number) {
+    const c = await this.access(code, user, "staff-write");
+    if (c.esignStatus === "SIGNED" || c.esignRequestId)
+      throw new ConflictException("The mandate has been issued; the fee can no longer change.");
+    if (!(pct > 0 && pct <= 50))
+      throw new BadRequestException("Set a fee between 0.01% and 50% of the credited value.");
+    const fee = Math.round(pct * 100) / 100;
+    await this.prisma.client.recoveryCase.update({
+      where: { id: c.id },
+      data: { agreedSuccessFeePct: fee },
+    });
+    await this.event(c.id, user.sub, "quote", "Your custom quote is ready in the mandate.");
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "case.fee",
+      entityType: "case",
+      entityId: c.id,
+      data: { from: c.agreedSuccessFeePct === null ? null : num(c.agreedSuccessFeePct), to: fee },
+    });
+    return this.get(code, user);
+  }
+
+  /** Shows the client their folio number. Until then it stays masked for them. */
+  async releaseFolio(code: string, user: SessionClaims) {
+    const c = await this.access(code, user, "staff-write");
+    if (!c.folioId) throw new BadRequestException("Link a holding to this case first.");
+    if (!c.folioReleasedAt) {
+      await this.prisma.client.recoveryCase.update({
+        where: { id: c.id },
+        data: { folioReleasedAt: new Date() },
+      });
+      await this.event(c.id, user.sub, "release", "Your folio number is now visible to you.");
+      await this.audit.record({
+        actorId: user.sub,
+        actorRole: user.role,
+        action: "case.folio.release",
+        entityType: "case",
+        entityId: c.id,
+      });
+    }
+    return this.get(code, user);
+  }
+
   /** Once a referred case is credited, the associate's share of our fee goes on the ledger, once. */
   private async accrueCommission(caseId: string) {
     const db = this.prisma.client;
@@ -379,7 +468,13 @@ export class CasesService {
       where: { id: caseId },
       include: { associate: true },
     });
-    if (!c.associate || c.dematCreditStatus !== "DONE" || c.creditedValuePaise === null) return;
+    if (
+      !c.associate ||
+      c.dematCreditStatus !== "DONE" ||
+      c.creditedValuePaise === null ||
+      c.agreedSuccessFeePct === null
+    )
+      return;
     const exists = await db.commissionLedgerEntry.findFirst({
       where: { caseId, entryType: "ACCRUAL" },
     });
@@ -407,6 +502,10 @@ export class CasesService {
     if (c.recoverStep !== 5)
       throw new ConflictException("The mandate can be signed at step 5 (Verify).");
     if (c.esignStatus === "SIGNED") throw new ConflictException("The mandate is already signed.");
+    if (c.agreedSuccessFeePct === null)
+      throw new ConflictException(
+        "Your analyst is preparing your custom quote. The mandate opens for signing once it is ready.",
+      );
     const pdf = await buildMandatePdf({
       caseCode: c.caseCode,
       clientName: c.client.name,
@@ -414,7 +513,7 @@ export class CasesService {
       companyName: c.company.name,
       folioMasked: c.folio?.folioNumberMasked ?? "not linked",
       scenario: c.scenarioType,
-      feePct: num(c.agreedSuccessFeePct),
+      feePct: num(c.agreedSuccessFeePct!),
       issuedOn: new Date().toISOString().slice(0, 10),
     });
     const url = await this.storage.put(
@@ -436,7 +535,7 @@ export class CasesService {
       c.id,
       user.sub,
       "esign",
-      "Scope of Work generated and sent for Aadhaar eSign.",
+      "Digital Mandate generated and sent for Aadhaar eSign.",
     );
     return {
       requestId: req.requestId,
@@ -509,9 +608,17 @@ export class CasesService {
     }
     await db.recoveryCase.update({
       where: { id: c.id },
-      data: { esignStatus: "SIGNED", esignSignedAt: signedAt, esignMandateUrl: mandateUrl },
+      data: {
+        esignStatus: "SIGNED",
+        esignSignedAt: signedAt,
+        esignMandateUrl: mandateUrl,
+        // Signing the Digital Mandate releases the folio number to the client.
+        folioReleasedAt: c.folioReleasedAt ?? signedAt,
+      },
     });
     await this.event(c.id, c.clientUserId, "esign", "Mandate signed with Aadhaar eSign.");
+    if (!c.folioReleasedAt && c.folioId)
+      await this.event(c.id, null, "release", "Your folio number is now visible to you.");
     await this.audit.record({
       actorId: c.clientUserId,
       actorRole: "INVESTOR",
@@ -528,10 +635,12 @@ export class CasesService {
     if (c.esignMandateUrl && !c.esignMandateUrl.startsWith("seed://")) {
       return {
         body: await this.storage.get(c.esignMandateUrl),
-        fileName: `${c.caseCode}-scope-of-work.pdf`,
+        fileName: `${c.caseCode}-digital-mandate.pdf`,
       };
     }
     // Not generated yet (or a test fixture): render a preview on the fly.
+    if (c.agreedSuccessFeePct === null)
+      throw new ConflictException("The mandate is ready once the case team sets the fee.");
     const body = await buildMandatePdf({
       caseCode: c.caseCode,
       clientName: c.client.name,
@@ -539,10 +648,10 @@ export class CasesService {
       companyName: c.company.name,
       folioMasked: c.folio?.folioNumberMasked ?? "not linked",
       scenario: c.scenarioType,
-      feePct: num(c.agreedSuccessFeePct),
+      feePct: num(c.agreedSuccessFeePct!),
       issuedOn: new Date().toISOString().slice(0, 10),
     });
-    return { body, fileName: `${c.caseCode}-scope-of-work-preview.pdf` };
+    return { body, fileName: `${c.caseCode}-digital-mandate-preview.pdf` };
   }
 
   /* ── Document vault ─────────────────────────────────────────────────── */

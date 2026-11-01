@@ -19,7 +19,7 @@ describe("quote providers", () => {
     });
     const q = await nse.quote({ tickerNse: "RELIANCE", tickerBse: "500325" });
     expect(q).toMatchObject({ price: 1167.4, source: "NSE" });
-    expect(seen?.get("user-agent")).toContain("RecoveryOS-PriceSync");
+    expect(seen?.get("user-agent")).toContain("FinsolEnterprises-PriceSync");
     expect(seen?.get("cookie")).toBeNull();
   });
 

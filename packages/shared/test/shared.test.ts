@@ -19,6 +19,13 @@ import {
   resolveSearch,
   SERVICE_VERTICALS,
   splitName,
+  numberToIndianWords,
+  POPULAR_EXAMPLES,
+  rupeesInWords,
+  SERVICE_STEPS,
+  serviceStepFor,
+  valueHolding,
+  verifiedActionsFor,
 } from "../src/index.js";
 
 describe("states", () => {
@@ -202,5 +209,80 @@ describe("reference data", () => {
   });
   it("has the eleven service verticals", () => {
     expect(SERVICE_VERTICALS).toHaveLength(11);
+  });
+});
+
+describe("Finsol: words, calculator examples and service steps", () => {
+  it("writes amounts in the Indian system", () => {
+    expect(numberToIndianWords(0)).toBe("Zero");
+    expect(numberToIndianWords(7_712_345)).toBe(
+      "Seventy Seven Lakh Twelve Thousand Three Hundred Forty Five",
+    );
+    expect(numberToIndianWords(1_23_45_67_890)).toBe(
+      "One Hundred Twenty Three Crore Forty Five Lakh Sixty Seven Thousand Eight Hundred Ninety",
+    );
+    expect(rupeesInWords(1_00_050)).toBe("Rupees One Thousand and Fifty Paise Only");
+  });
+
+  it("computes every one-click example from verified bonus and split history", () => {
+    const shares = Object.fromEntries(
+      POPULAR_EXAMPLES.map((e) => {
+        const v = verifiedActionsFor(e.symbol)!;
+        const r = valueHolding(
+          {
+            symbol: e.symbol,
+            exchange: "NSE",
+            name: v.name,
+            purchaseYear: e.year,
+            originalShares: e.shares,
+            pricePerShare: 100,
+            priceIsManual: true,
+          },
+          v.actions,
+          [],
+        );
+        return [e.symbol, r.currentShares];
+      }),
+    );
+    expect(shares).toEqual({
+      TORNTPHARM: 1600,
+      EICHERMOT: 1000,
+      INFY: 25600,
+      RELIANCE: 800,
+      TITAN: 2000,
+      ITC: 4500,
+    });
+  });
+
+  it("counts dividends on the shares held at each ex-date", () => {
+    const v = valueHolding(
+      {
+        symbol: "X",
+        exchange: "NSE",
+        name: "X",
+        purchaseYear: 2010,
+        originalShares: 100,
+        pricePerShare: 10,
+        priceIsManual: false,
+      },
+      [{ actionType: "BONUS", exDate: "2015-01-01", ratioFrom: 1, ratioTo: 1 }],
+      [
+        { exDate: "2009-06-01", amount: 5 },
+        { exDate: "2012-06-01", amount: 2 },
+        { exDate: "2016-06-01", amount: 1.5 },
+      ],
+    );
+    expect(v).toMatchObject({ currentShares: 200, events: 1, marketValuePaise: 200_000 });
+    expect(v.dividendPaise).toBe(100 * 200 + 200 * 150);
+  });
+
+  it("maps the seven internal steps onto the four public ones", () => {
+    expect([1, 2, 3, 4, 5, 6, 7].map(serviceStepFor)).toEqual([1, 2, 2, 2, 3, 3, 4]);
+    expect(SERVICE_STEPS.map((s) => s.title)).toEqual([
+      "3-Minute Check",
+      "Portfolio Verification",
+      "Complete Paperwork & Legal Execution by Finsol",
+      "Direct Demat & Bank Credit",
+    ]);
   });
 });

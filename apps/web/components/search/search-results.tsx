@@ -3,24 +3,25 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  ArrowRightIcon,
-  Building2Icon,
   CheckIcon,
+  HandCoinsIcon,
   KeyRoundIcon,
   LockIcon,
-  UnlockIcon,
+  SendIcon,
   UserRoundIcon,
 } from "lucide-react";
 import {
   CUSTODY_LABELS,
   folioStateLabel,
   type CustodyStatus,
+  type ResultAccess,
   type SearchResultItem,
 } from "@recoveryos/shared";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
-import { UnlockDialog } from "@/components/search/unlock-dialog";
+import { LoginGatewayDialog } from "@/components/auth/login-gateway-dialog";
+import { ClaimDialog } from "@/components/search/claim-dialog";
 import { formatCount, formatPaiseCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +37,7 @@ const MATCH_LABEL = {
   exact: "Exact name",
   trigram: "Close spelling",
   phonetic: "Sounds alike",
-  soundex: "Similar sound",
+  "sound-alike": "Similar sound",
 } as const;
 
 function Fact({
@@ -64,43 +65,64 @@ function Fact({
 }
 
 /**
- * The teaser list. Masked rows can be selected (up to ten) and unlocked in
- * one go; unlocked rows show the company, registrar, folio and certificates.
+ * Results of the 3-Minute Check. The public sees who matched and where;
+ * after the Login Gateway, members see the company, shares and value. Folio
+ * numbers stay masked until the member's analyst releases them.
  */
 export function SearchResults({
   results,
+  access,
   referralCode,
 }: {
   results: SearchResultItem[];
+  access: ResultAccess;
   referralCode?: string;
 }) {
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [open, setOpen] = React.useState(false);
+  const [claimOpen, setClaimOpen] = React.useState(false);
+  const [gatewayOpen, setGatewayOpen] = React.useState(false);
   // A partner's referral link sets ?ref=; it is kept for later searches in this tab.
   const [ref] = React.useState(() => {
     if (referralCode || typeof window === "undefined") return referralCode;
     try {
-      return sessionStorage.getItem("recoveryos:ref") ?? undefined;
+      return sessionStorage.getItem("finsol:ref") ?? undefined;
     } catch {
       return undefined;
     }
   });
   React.useEffect(() => {
     try {
-      if (referralCode) sessionStorage.setItem("recoveryos:ref", referralCode);
+      if (referralCode) sessionStorage.setItem("finsol:ref", referralCode);
     } catch {
       /* storage unavailable: the code only lasts for this page */
     }
   }, [referralCode]);
 
-  const locked = results.filter((r) => !r.unlocked);
+  const isPublic = access === "public";
   const toggle = (id: string) =>
     setSelected((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX_SELECT ? s : [...s, id],
     );
+  const signIn = (
+    <button type="button" className="link font-medium" onClick={() => setGatewayOpen(true)}>
+      Sign in to see
+    </button>
+  );
 
   return (
     <div>
+      {isPublic && (
+        <div className="panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <p className="text-base text-fg-2">
+            <LockIcon className="mr-1.5 inline size-4 text-signal" aria-hidden="true" />
+            Company names, share counts and values open after a free sign-in.
+          </p>
+          <Button onClick={() => setGatewayOpen(true)}>
+            <KeyRoundIcon aria-hidden="true" />
+            Open the Login Gateway
+          </Button>
+        </div>
+      )}
       <ul className="grid gap-3">
         {results.map((r) => {
           const isSelected = selected.includes(r.id);
@@ -111,7 +133,6 @@ export function SearchResults({
                 className={cn(
                   "panel relative grid gap-4 p-4 transition-[border-color,box-shadow] duration-150 sm:p-5",
                   isSelected && "border-signal shadow-[inset_0_0_0_1px_var(--color-signal)]",
-                  r.unlocked && "border-confirmed/40",
                 )}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -135,70 +156,65 @@ export function SearchResults({
                       {CUSTODY_LABELS[r.custodyStatus]}
                     </StatusBadge>
                     <StatusBadge tone="neutral" live={false}>
-                      {MATCH_LABEL[r.matchedBy]}
+                      {r.matchedHolder === "joint"
+                        ? "Joint holder match"
+                        : MATCH_LABEL[r.matchedBy]}
                     </StatusBadge>
                   </div>
                 </div>
 
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
                   <Fact label="Company">
-                    {r.unlocked ? (
+                    {r.companySlug ? (
                       <Link href={`/unclaimed-shares/${r.companySlug}`} className="link">
                         {r.companyName}
                       </Link>
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
                         <LockIcon className="size-3.5 shrink-0 text-fg-3" aria-hidden="true" />
-                        <span aria-label="Company name hidden until unlocked">{r.companyName}</span>
+                        <span aria-label="Company name hidden until you sign in">
+                          {r.companyName}
+                        </span>
                       </span>
                     )}
                   </Fact>
                   <Fact label="Folio" mono>
-                    {r.folioNumber}
+                    <span
+                      title={
+                        r.folioReleased ? undefined : "Shown once your analyst confirms the claim"
+                      }
+                    >
+                      {r.folioNumber}
+                    </span>
                   </Fact>
                   <Fact label="Shares today">
-                    <span className="tnum">{formatCount(r.postActionShares)}</span>
+                    {r.postActionShares === null ? (
+                      signIn
+                    ) : (
+                      <span className="tnum">{formatCount(r.postActionShares)}</span>
+                    )}
                   </Fact>
                   <Fact label="Estimated value">
-                    <span className="tnum font-semibold">
-                      {formatPaiseCompact(r.estimatedTotalValuePaise)}
-                    </span>
+                    {r.estimatedTotalValuePaise === null ? (
+                      signIn
+                    ) : (
+                      <span className="tnum font-semibold">
+                        {formatPaiseCompact(r.estimatedTotalValuePaise)}
+                      </span>
+                    )}
                   </Fact>
                 </dl>
 
-                {r.unlocked ? (
-                  <div className="grid gap-3 border-t border-(--glass-border) pt-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-                      <Fact label="Registrar">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Building2Icon
-                            className="size-3.5 shrink-0 text-fg-3"
-                            aria-hidden="true"
-                          />
-                          {r.rtaLabel}
-                        </span>
-                      </Fact>
-                      <Fact label="Certificates" mono>
-                        {r.certificateNumbers ?? "Not on record"}
-                      </Fact>
-                      <Fact label="Source filing" mono>
-                        {r.sourceFilingSrn ?? "Not on record"}
-                        {r.transferFinancialYear ? ` · FY ${r.transferFinancialYear}` : ""}
-                      </Fact>
-                    </dl>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/unclaimed-shares/${r.companySlug}`}>
-                        How to claim it
-                        <ArrowRightIcon aria-hidden="true" />
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--glass-border) pt-4">
-                    <p className="text-sm text-fg-3">
-                      {r.transferFinancialYear ? `Moved in FY ${r.transferFinancialYear}. ` : ""}
-                      Verify your phone to see the company and folio.
-                    </p>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--glass-border) pt-4">
+                  <p className="text-sm text-fg-3">
+                    {r.transferFinancialYear ? `Recorded for FY ${r.transferFinancialYear}. ` : ""}
+                    {isPublic
+                      ? "Sign in to see the company, shares and value."
+                      : r.folioReleased
+                        ? "Folio released by your analyst."
+                        : "Your analyst confirms the folio during verification."}
+                  </p>
+                  {!isPublic && access !== "staff" && (
                     <Button
                       type="button"
                       variant={isSelected ? "secondary" : "outline"}
@@ -210,43 +226,44 @@ export function SearchResults({
                       {isSelected ? (
                         <CheckIcon aria-hidden="true" />
                       ) : (
-                        <UnlockIcon aria-hidden="true" />
+                        <HandCoinsIcon aria-hidden="true" />
                       )}
-                      {isSelected ? "Selected" : "This could be mine"}
+                      {isSelected ? "Selected" : "This is my family's"}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </article>
             </li>
           );
         })}
       </ul>
 
-      {locked.length > 0 && (
+      {access === "member" && (
         <div className="sticky bottom-4 z-10 mt-6">
           <div className="vault-glass flex flex-col gap-3 rounded-[16px] p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
             <p className="text-base text-fg-2" aria-live="polite">
               {selected.length
                 ? `${selected.length} of ${MAX_SELECT} selected.`
-                : "Select the holdings that could be your family's, then unlock them together."}
+                : "Select the holdings that are your family's. Finsol recovers them end to end."}
             </p>
-            <Button size="lg" disabled={!selected.length} onClick={() => setOpen(true)}>
-              <KeyRoundIcon aria-hidden="true" />
-              Unlock {selected.length ? selected.length : ""} with my phone
+            <Button size="lg" disabled={!selected.length} onClick={() => setClaimOpen(true)}>
+              <SendIcon aria-hidden="true" />
+              Start free trace{selected.length ? ` (${selected.length})` : ""}
             </Button>
           </div>
         </div>
       )}
 
-      <UnlockDialog
-        open={open}
+      <ClaimDialog
+        open={claimOpen}
         onOpenChange={(o) => {
-          setOpen(o);
+          setClaimOpen(o);
           if (!o) setSelected([]);
         }}
         folioIds={selected}
         referralCode={ref}
       />
+      <LoginGatewayDialog open={gatewayOpen} onOpenChange={setGatewayOpen} />
     </div>
   );
 }

@@ -39,7 +39,7 @@ export interface ReferenceCompany {
 
 /**
  * The company catalogue. Nodal officer, registrar and identifier details were
- * supplied by the RecoveryOS operations team from each company's investor
+ * supplied by the Finsol Enterprises operations team from each company's investor
  * disclosures and recorded on the date below. There are no prices here:
  * they come from the live market sync (apps/api/src/market).
  *
@@ -49,7 +49,7 @@ export interface ReferenceCompany {
  * announced components are kept (noted per action).
  */
 export const CONTACTS_SOURCE =
-  "RecoveryOS operations, from the company's investor-relations and IEPF disclosures";
+  "Finsol Enterprises operations, from the company's investor-relations and IEPF disclosures";
 const VERIFIED_ON = "2026-10-29";
 
 const EXCHANGE = "Exchange split history (via Yahoo Finance)";

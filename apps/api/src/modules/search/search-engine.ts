@@ -5,7 +5,7 @@ import { phoneticKeys, type ResolvedSearch } from "@recoveryos/shared";
 export interface SearchHit {
   id: string;
   score: number;
-  matchedBy: "exact" | "trigram" | "phonetic" | "soundex";
+  matchedBy: "exact" | "trigram" | "phonetic" | "sound-alike";
 }
 
 export interface SearchEngine {
@@ -21,18 +21,85 @@ const COLUMN: Record<Part, { norm: Prisma.Sql; key: Prisma.Sql }> = {
 };
 
 /**
- * Fuzzy search in Postgres. Every name part given must match by at least
- * one of: trigram similarity (pg_trgm `%`), our Indian phonetic key, or
- * Soundex with a small Levenshtein distance (fuzzystrmatch). A single letter
- * ("K") matches as an initial. Results are scoped to one state, plus holders
- * whose statement gives no state at all (they rank on the name alone).
+ * Search in Postgres, in two phases, always inside one state's partition
+ * (plus UNKNOWN, holders whose statement gives no state):
+ * 1. Exact phonetic keys for every name part given, answered from the
+ *    composite (last key, first key) index: about a millisecond even with
+ *    millions of rows in the partition. Most searches end here.
+ * 2. Only when phase 1 finds fewer than FUZZY_BELOW holders: fuzzy matching
+ *    (see fuzzy()). A single letter ("K") matches as an initial.
  */
+const FUZZY_BELOW = 10;
+
 export class PostgresSearchEngine implements SearchEngine {
   readonly name = "postgres" as const;
   constructor(private readonly db: PrismaClient) {}
 
   async search(q: ResolvedSearch, limit: number): Promise<SearchHit[]> {
+    const exact = await this.byKeys(q, limit);
+    if (exact.length >= Math.min(limit, FUZZY_BELOW)) return exact;
+    const fuzzy = await this.fuzzy(q, limit);
+    const byId = new Map(exact.map((h) => [h.id, h]));
+    for (const h of fuzzy) {
+      const seen = byId.get(h.id);
+      if (!seen || h.score > seen.score) byId.set(h.id, h);
+    }
+    return [...byId.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  }
+
+  private stateFilter(q: ResolvedSearch) {
+    const custody = q.custodyStatus
+      ? Prisma.sql`AND f.custody_status = ${q.custodyStatus}::"CustodyStatus"`
+      : Prisma.empty;
+    return Prisma.sql`(f.state = ${q.state}::"IndianState" OR f.state = 'UNKNOWN'::"IndianState") ${custody}`;
+  }
+
+  /** Phase 1: every given part (initials excepted) matches its phonetic key exactly. */
+  private async byKeys(q: ResolvedSearch, limit: number): Promise<SearchHit[]> {
     const parts = (["first", "middle", "last"] as const).filter((p) => q[p]);
+    const keyed = parts.filter((p) => q[p].length > 1);
+    if (!keyed.length) return [];
+    const conditions = parts.map((p) =>
+      q[p].length === 1
+        ? Prisma.sql`${COLUMN[p].norm} LIKE ${q[p] + "%"}`
+        : Prisma.sql`${COLUMN[p].key} = ${phoneticKeys(q[p])}`,
+    );
+    const exact = parts.map((p) =>
+      q[p].length === 1 ? Prisma.sql`true` : Prisma.sql`${COLUMN[p].norm} = ${q[p]}`,
+    );
+    const rows = await this.db.$queryRaw<{ id: string; exact: boolean }[]>`
+      SELECT f.id, (${Prisma.join(exact, " AND ")}) AS exact
+      FROM unclaimed_folios f
+      WHERE ${this.stateFilter(q)}
+        AND ${Prisma.join(conditions, " AND ")}
+      ORDER BY f.post_action_shares DESC
+      LIMIT ${limit}`;
+    return rows
+      .map((r) => ({
+        id: r.id,
+        score: r.exact ? 1 : 0.86,
+        matchedBy: (r.exact ? "exact" : "phonetic") as SearchHit["matchedBy"],
+      }))
+      .sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Phase 2. Candidates come from two bounded branches, each capped at 200
+   * rows and answered by B-tree lookups:
+   *   A. sound-alike: Double Metaphone of surname and first name together,
+   *      from the composite (dmetaphone(last), dmetaphone(first)) index;
+   *   B. spelling: the 20 closest real spellings of each name part are found
+   *      in the small `name_words` vocabulary (trigram similarity at least
+   *      0.45), then looked up exactly in the (surname, first name) index.
+   * Trigram scans never touch the folio table: on a partition with
+   * millions of rows they cost tens of milliseconds even when nothing
+   * matches. The few hundred candidates are then checked against every
+   * part (initials included) and scored.
+   */
+  private async fuzzy(q: ResolvedSearch, limit: number): Promise<SearchHit[]> {
+    const parts = (["first", "middle", "last"] as const).filter((p) => q[p]);
+    const words = parts.filter((p) => q[p].length > 1);
+    if (!words.length) return [];
     const conditions: Prisma.Sql[] = [];
     const scores: Prisma.Sql[] = [];
     const exact: Prisma.Sql[] = [];
@@ -50,35 +117,52 @@ export class PostgresSearchEngine implements SearchEngine {
       const k = phoneticKeys(value);
       conditions.push(Prisma.sql`(
         ${norm} % ${value}
+        OR dmetaphone(${norm}) = dmetaphone(${value})
+        OR f.name_tokens @> ARRAY[${value.toLowerCase()}]::text[]
         OR ${key} = ${k}
-        OR (soundex(${norm}) = soundex(${value}) AND levenshtein(${norm}, ${value}) <= 3)
       )`);
       scores.push(Prisma.sql`GREATEST(
         similarity(${norm}, ${value}),
         CASE WHEN ${key} = ${k} THEN 0.86 ELSE 0 END,
-        CASE WHEN soundex(${norm}) = soundex(${value})
+        CASE WHEN dmetaphone(${norm}) = dmetaphone(${value})
           THEN GREATEST(0, 0.8 - 0.1 * levenshtein(${norm}, ${value})) ELSE 0 END
       )`);
       exact.push(Prisma.sql`(${norm} = ${value})`);
       phonetic.push(Prisma.sql`(${key} = ${k})`);
     }
-    const custody = q.custodyStatus
-      ? Prisma.sql`AND f.custody_status = ${q.custodyStatus}::"CustodyStatus"`
-      : Prisma.empty;
-    const rows = await this.db.$queryRaw<
-      { id: string; score: number; exact: boolean; phonetic: boolean; trigram: number }[]
-    >`
-      SELECT f.id,
-             (${Prisma.join(scores, " + ")}) / ${parts.length}::float AS score,
-             (${Prisma.join(exact, " AND ")}) AS exact,
-             (${Prisma.join(phonetic, " AND ")}) AS phonetic,
-             similarity(f.full_name_norm, ${[q.first, q.middle, q.last].filter(Boolean).join(" ")}) AS trigram
-      FROM unclaimed_folios f
-      WHERE (f.state = ${q.state}::"IndianState" OR f.state = 'UNKNOWN'::"IndianState")
-        ${custody}
-        AND ${Prisma.join(conditions, " AND ")}
-      ORDER BY score DESC, trigram DESC, f.post_action_shares DESC
-      LIMIT ${limit}`;
+    const similar = (value: string) =>
+      Prisma.sql`(SELECT w.word FROM name_words w WHERE w.word % ${value}
+        ORDER BY similarity(w.word, ${value}) DESC LIMIT 20)`;
+    // Surname and first name drive the lookups; a middle name only filters.
+    const drivers = words.filter((p) => p !== "middle");
+    if (!drivers.length) return [];
+    const branch = (cond: (p: (typeof drivers)[number]) => Prisma.Sql) =>
+      Prisma.sql`(SELECT f.id FROM unclaimed_folios f
+        WHERE ${this.stateFilter(q)} AND ${Prisma.join(drivers.map(cond), " AND ")}
+        LIMIT 200)`;
+    const soundAlike = branch(
+      (p) => Prisma.sql`dmetaphone(${COLUMN[p].norm}) = dmetaphone(${q[p]})`,
+    );
+    const spelling = branch((p) => Prisma.sql`${COLUMN[p].norm} IN ${similar(q[p])}`);
+    const rows = await this.db.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SET LOCAL pg_trgm.similarity_threshold = 0.45");
+      await tx.$executeRawUnsafe("SET LOCAL gin_fuzzy_search_limit = 500");
+      return tx.$queryRaw<
+        { id: string; score: number; exact: boolean; phonetic: boolean; trigram: number }[]
+      >`
+        WITH cand AS (${soundAlike} UNION ${spelling})
+        SELECT f.id,
+               (${Prisma.join(scores, " + ")}) / ${parts.length}::float AS score,
+               (${Prisma.join(exact, " AND ")}) AS exact,
+               (${Prisma.join(phonetic, " AND ")}) AS phonetic,
+               similarity(f.full_name_norm, ${[q.first, q.middle, q.last].filter(Boolean).join(" ")}) AS trigram
+        FROM unclaimed_folios f
+        WHERE ${this.stateFilter(q)}
+          AND f.id IN (SELECT id FROM cand)
+          AND ${Prisma.join(conditions, " AND ")}
+        ORDER BY score DESC, trigram DESC, f.post_action_shares DESC
+        LIMIT ${limit}`;
+    });
     return rows.map((r) => ({
       id: r.id,
       score: Math.round(Math.min(1, Number(r.score)) * 100) / 100,
@@ -88,7 +172,7 @@ export class PostgresSearchEngine implements SearchEngine {
           ? "trigram"
           : r.phonetic
             ? "phonetic"
-            : "soundex",
+            : "sound-alike",
     }));
   }
 }
@@ -99,20 +183,25 @@ interface MeiliHit {
 }
 
 /**
- * Meilisearch for sub-50 ms queries at scale. Documents carry the phonetic
- * keys as well as the names, so a key match ranks like a typo-tolerant hit.
- * Falls back to Postgres on any error, so search never goes down with it.
+ * Meilisearch, sharded like the Postgres table: one index per state
+ * (`folios_maharashtra`, …, `folios_unknown`). A search queries only its
+ * state's shard and the UNKNOWN shard, in one multi-search request.
+ * Documents carry the phonetic keys as well as the names, so a key match
+ * ranks like a typo-tolerant hit. Any error falls back to Postgres.
  */
 export class MeiliSearchEngine implements SearchEngine {
   readonly name = "meilisearch" as const;
   private readonly log = new Logger("Meilisearch");
-  static readonly INDEX = "unclaimed_folios";
 
   constructor(
     private readonly host: string,
     private readonly apiKey: string | undefined,
     private readonly fallback: PostgresSearchEngine,
   ) {}
+
+  static indexFor(state: string): string {
+    return `folios_${state.toLowerCase()}`;
+  }
 
   private headers() {
     return {
@@ -125,40 +214,43 @@ export class MeiliSearchEngine implements SearchEngine {
     try {
       const words = [q.first, q.middle, q.last].filter(Boolean);
       const keys = words.filter((w) => w.length > 1).map(phoneticKeys);
-      const filter = [
-        `state = "${q.state}"`,
-        q.custodyStatus ? `custodyStatus = "${q.custodyStatus}"` : null,
-      ]
-        .filter(Boolean)
-        .join(" AND ");
-      const res = await fetch(`${this.host}/indexes/${MeiliSearchEngine.INDEX}/search`, {
+      const filter = q.custodyStatus ? `custodyStatus = "${q.custodyStatus}"` : undefined;
+      const query = (state: string) => ({
+        indexUid: MeiliSearchEngine.indexFor(state),
+        q: [...words, ...keys].join(" "),
+        filter,
+        limit,
+        showRankingScore: true,
+        matchingStrategy: "all",
+      });
+      const res = await fetch(`${this.host}/multi-search`, {
         method: "POST",
         headers: this.headers(),
-        body: JSON.stringify({
-          q: [...words, ...keys].join(" "),
-          filter,
-          limit,
-          showRankingScore: true,
-          matchingStrategy: "all",
-        }),
+        body: JSON.stringify({ queries: [query(q.state), query("UNKNOWN")] }),
         signal: AbortSignal.timeout(800),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = (await res.json()) as { hits: MeiliHit[] };
-      return body.hits.map((h) => ({
-        id: h.id,
-        score: Math.round((h._rankingScore ?? 0.5) * 100) / 100,
-        matchedBy: "trigram" as const,
-      }));
+      const body = (await res.json()) as { results: { hits: MeiliHit[] }[] };
+      return body.results
+        .flatMap((r) => r.hits)
+        .sort((a, b) => (b._rankingScore ?? 0) - (a._rankingScore ?? 0))
+        .slice(0, limit)
+        .map((h) => ({
+          id: h.id,
+          score: Math.round((h._rankingScore ?? 0.5) * 100) / 100,
+          matchedBy: "trigram" as const,
+        }));
     } catch (e) {
       this.log.warn(`Search fell back to Postgres: ${(e as Error).message}`);
       return this.fallback.search(q, limit);
     }
   }
 
-  /** Pushes folios to the index (all of them when no ids are given). */
-  async sync(db: PrismaClient, folioIds?: string[]): Promise<number> {
-    await fetch(`${this.host}/indexes/${MeiliSearchEngine.INDEX}/settings`, {
+  private readonly configured = new Set<string>();
+
+  private async configure(index: string) {
+    if (this.configured.has(index)) return;
+    await fetch(`${this.host}/indexes/${index}/settings`, {
       method: "PATCH",
       headers: this.headers(),
       body: JSON.stringify({
@@ -171,16 +263,23 @@ export class MeiliSearchEngine implements SearchEngine {
           "firstKey",
           "middleKey",
         ],
-        filterableAttributes: ["state", "custodyStatus"],
+        filterableAttributes: ["custodyStatus"],
       }),
     });
+    this.configured.add(index);
+  }
+
+  /** Pushes folios to their state shards: one import's rows, or every row. */
+  async sync(db: PrismaClient, scope: { ingestionJobId?: string } = {}): Promise<number> {
     let cursor: string | undefined;
     let total = 0;
     for (;;) {
       const batch = await db.unclaimedFolio.findMany({
-        where: folioIds ? { id: { in: folioIds } } : undefined,
-        take: 1000,
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        where: {
+          ...(scope.ingestionJobId ? { ingestionJobId: scope.ingestionJobId } : {}),
+          ...(cursor ? { id: { gt: cursor } } : {}),
+        },
+        take: 5000,
         orderBy: { id: "asc" },
         select: {
           id: true,
@@ -196,27 +295,33 @@ export class MeiliSearchEngine implements SearchEngine {
         },
       });
       if (!batch.length) break;
-      const docs = batch.map((f) => ({
-        id: f.id,
-        state: f.state,
-        custodyStatus: f.custodyStatus,
-        fullName: f.fullNameNorm,
-        firstName: f.firstNameNorm,
-        middleName: f.middleNameNorm,
-        lastName: f.lastNameNorm,
-        firstKey: f.firstNameKey,
-        middleKey: f.middleNameKey,
-        lastKey: f.lastNameKey,
-      }));
-      const res = await fetch(
-        `${this.host}/indexes/${MeiliSearchEngine.INDEX}/documents?primaryKey=id`,
-        {
+      const byIndex = new Map<string, object[]>();
+      for (const f of batch) {
+        const index = MeiliSearchEngine.indexFor(f.state);
+        byIndex.set(index, [
+          ...(byIndex.get(index) ?? []),
+          {
+            id: f.id,
+            custodyStatus: f.custodyStatus,
+            fullName: f.fullNameNorm,
+            firstName: f.firstNameNorm,
+            middleName: f.middleNameNorm,
+            lastName: f.lastNameNorm,
+            firstKey: f.firstNameKey,
+            middleKey: f.middleNameKey,
+            lastKey: f.lastNameKey,
+          },
+        ]);
+      }
+      for (const [index, docs] of byIndex) {
+        await this.configure(index);
+        const res = await fetch(`${this.host}/indexes/${index}/documents?primaryKey=id`, {
           method: "POST",
           headers: this.headers(),
           body: JSON.stringify(docs),
-        },
-      );
-      if (!res.ok) throw new Error(`Meilisearch rejected documents (${res.status}).`);
+        });
+        if (!res.ok) throw new Error(`Meilisearch rejected documents (${res.status}).`);
+      }
       total += batch.length;
       cursor = batch[batch.length - 1]!.id;
     }

@@ -153,7 +153,7 @@ export function LeadForm() {
             required
             className="mt-0.5 size-5 shrink-0 accent-(--color-signal)"
           />
-          The client has agreed that RecoveryOS may call them about this holding.
+          The client has agreed that Finsol Enterprises may call them about this holding.
         </label>
         <Button type="submit" disabled={busy} className="justify-self-start">
           {busy ? (

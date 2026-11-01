@@ -3,10 +3,10 @@ import type { MetadataRoute } from "next";
 /** Name, colours and icons for "Add to home screen". */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "RecoveryOS",
-    short_name: "RecoveryOS",
+    name: "Finsol Enterprises",
+    short_name: "Finsol",
     description:
-      "Guided recovery of unclaimed shares and dividends from India's IEPF. See every document, every step and who owns it.",
+      "Turnkey recovery of unclaimed shares and dividends. No upfront fee, no recovery no fee, 100% confidential.",
     start_url: "/",
     display: "standalone",
     background_color: "#05080E",

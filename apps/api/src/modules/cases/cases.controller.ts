@@ -23,6 +23,8 @@ import { CasesService, type UploadedFile as File } from "./cases.service.js";
 
 const code = z.string().regex(/^RC-\d{4}-\d{4,6}$/i, "Not a case code.");
 const docType = z.enum(DOC_TYPES);
+const feeSchema = z.object({ feePct: z.number().gt(0).max(50) });
+
 const advanceSchema = z.object({ toStep: z.number().int().min(1).max(7) });
 const trackingSchema = z.object({
   rtaEntitlementStatus: z.enum(TRACK_STATUSES).optional(),
@@ -83,6 +85,25 @@ export class CasesController {
     @CurrentUser() user: SessionClaims,
   ) {
     return this.cases.updateTracking(c, user, body);
+  }
+
+  /** Custom pricing: the case team sets the fee before the Digital Mandate is issued. */
+  @Roles("VALUATION_ANALYST", "LEGAL_OPS_EXEC")
+  @Patch(":code/fee")
+  setFee(
+    @Param("code", { schema: code }) c: string,
+    @Body({ schema: feeSchema }) body: z.infer<typeof feeSchema>,
+    @CurrentUser() user: SessionClaims,
+  ) {
+    return this.cases.setFee(c, user, body.feePct);
+  }
+
+  /** Reveals the folio number to the client. */
+  @Roles("VALUATION_ANALYST", "LEGAL_OPS_EXEC")
+  @Post(":code/release-folio")
+  @HttpCode(200)
+  releaseFolio(@Param("code", { schema: code }) c: string, @CurrentUser() user: SessionClaims) {
+    return this.cases.releaseFolio(c, user);
   }
 
   @Post(":code/esign/start")

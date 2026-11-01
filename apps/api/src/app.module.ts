@@ -19,7 +19,10 @@ import { AuthController } from "./modules/auth/auth.controller.js";
 import { OtpService } from "./modules/auth/otp.service.js";
 import { CasesController, WebhooksController } from "./modules/cases/cases.controller.js";
 import { CasesService } from "./modules/cases/cases.service.js";
-import { CompaniesController } from "./modules/companies/companies.controller.js";
+import {
+  AdminCompaniesController,
+  CompaniesController,
+} from "./modules/companies/companies.controller.js";
 import { CrmController } from "./modules/crm/crm.controller.js";
 import { CrmService } from "./modules/crm/crm.service.js";
 import { HealthController } from "./modules/health/health.controller.js";
@@ -28,10 +31,13 @@ import { ImportsService } from "./modules/imports/imports.service.js";
 import { SearchController } from "./modules/search/search.controller.js";
 import { MeiliSearchEngine, PostgresSearchEngine } from "./modules/search/search-engine.js";
 import { SearchService } from "./modules/search/search.service.js";
+import { LiveMcaSyncService } from "./modules/search/live-mca-sync.service.js";
 import { SEARCH_ENGINE } from "./modules/search/search.tokens.js";
 import { StatsController } from "./modules/stats/stats.controller.js";
 import { MarketController } from "./market/market.controller.js";
 import { defaultProviders, MarketService, QUOTE_PROVIDERS } from "./market/market.service.js";
+import { EquitiesService } from "./market/equities.service.js";
+import { ValuationController } from "./modules/valuation/valuation.controller.js";
 
 /**
  * One module: the API is small enough that feature folders are clearer than
@@ -51,6 +57,7 @@ import { defaultProviders, MarketService, QUOTE_PROVIDERS } from "./market/marke
     AuthController,
     SearchController,
     CompaniesController,
+    AdminCompaniesController,
     StatsController,
     CasesController,
     WebhooksController,
@@ -58,6 +65,7 @@ import { defaultProviders, MarketService, QUOTE_PROVIDERS } from "./market/marke
     AssociatesController,
     ImportsController,
     MarketController,
+    ValuationController,
   ],
   providers: [
     { provide: ENV, useFactory: () => loadEnv() },
@@ -79,11 +87,13 @@ import { defaultProviders, MarketService, QUOTE_PROVIDERS } from "./market/marke
     JobHandlersService,
     OtpService,
     SearchService,
+    LiveMcaSyncService,
     CasesService,
     CrmService,
     AssociatesService,
     ImportsService,
     MarketService,
+    EquitiesService,
     { provide: QUOTE_PROVIDERS, useFactory: defaultProviders },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

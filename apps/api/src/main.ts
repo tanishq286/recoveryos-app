@@ -6,4 +6,4 @@ import { ENV, type Env } from "./config/env.js";
 const app = await createApp();
 const env = app.get<Env>(ENV);
 await app.listen(env.PORT);
-new Logger("RecoveryOS").log(`API listening on http://localhost:${env.PORT}/api/v1`);
+new Logger("FinsolEnterprises").log(`API listening on http://localhost:${env.PORT}/api/v1`);

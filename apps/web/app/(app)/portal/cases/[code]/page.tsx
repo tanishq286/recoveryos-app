@@ -11,7 +11,7 @@ import { TRACK_LABELS, type TrackStatus } from "@recoveryos/shared";
 
 import { DocumentVault } from "@/components/portal/document-vault";
 import { EsignPanel } from "@/components/portal/esign-panel";
-import { RecoverTracker } from "@/components/portal/recover-tracker";
+import { RecoverTracker, ServiceTracker } from "@/components/portal/recover-tracker";
 import { StaffControls } from "@/components/portal/staff-controls";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { api } from "@/lib/api/server";
@@ -48,7 +48,9 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
   } catch (e) {
     handleApiError(e, path);
   }
-  const current = d.steps.find((s) => s.state === "current");
+  const staff = d.viewerRole === "staff";
+  const current = d.serviceSteps.find((s) => s.state === "current");
+  const internalStep = d.steps.find((s) => s.state === "current");
 
   return (
     <div className="mx-auto max-w-[84rem] px-4 py-8 sm:px-6 sm:py-12">
@@ -71,17 +73,27 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
           </p>
         </div>
         <StatusBadge tone={current ? "active" : "success"} live={false}>
-          {current ? `Step ${current.step} of 7: ${current.name}` : "Credited"}
+          {current ? `Step ${current.step} of 4: ${current.title}` : "Credited"}
         </StatusBadge>
       </header>
 
       <div className="panel mt-8 p-5 sm:p-6">
-        <RecoverTracker steps={d.steps} />
+        <ServiceTracker steps={d.serviceSteps} />
       </div>
+      {staff && (
+        <div className="panel mt-4 p-5 sm:p-6">
+          <p className="mb-4 text-sm text-fg-3">
+            Internal R.E.C.O.V.E.R. step
+            {internalStep ? ` ${internalStep.step} of 7: ${internalStep.name}` : "s complete"}{" "}
+            (staff only)
+          </p>
+          <RecoverTracker steps={d.steps} />
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="grid min-w-0 grid-cols-1 content-start gap-6">
-          {d.viewerRole === "staff" && <StaffControls detail={d} />}
+          {staff && <StaffControls detail={d} />}
           <EsignPanel detail={d} />
           <DocumentVault detail={d} />
         </div>
@@ -93,21 +105,14 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
               className="flex items-center gap-2 text-lg font-semibold text-fg"
             >
               <ScrollTextIcon className="size-5 text-iepf" aria-hidden="true" />
-              Filing and verification
+              Progress
             </h2>
             <dl className="mt-3 divide-y divide-(--glass-border)">
-              <Row label="IEPF-5 SRN">
-                {d.tracking.mcaIepf5Srn ? (
-                  <span className="font-mono tnum">{d.tracking.mcaIepf5Srn}</span>
-                ) : (
-                  <span className="text-fg-3">Not filed yet</span>
-                )}
-              </Row>
               {(
                 [
-                  ["Registrar entitlement", d.tracking.rtaEntitlementStatus],
-                  ["Nodal officer verification", d.tracking.nodalVerificationStatus],
-                  ["Demat credit", d.tracking.dematCreditStatus],
+                  ["Holding confirmed", d.tracking.holdingConfirmation],
+                  ["Company verification", d.tracking.companyVerification],
+                  ["Credit to your demat and bank", d.tracking.dematCredit],
                 ] as const
               ).map(([label, status]) => (
                 <Row key={label} label={label}>
@@ -116,10 +121,22 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
                   </StatusBadge>
                 </Row>
               ))}
+              <Row label="Claim filed by Finsol">
+                {d.tracking.claimFiled ? "Yes" : <span className="text-fg-3">Not yet</span>}
+              </Row>
+              {staff && d.internal && (
+                <Row label="IEPF-5 SRN (staff)">
+                  {d.internal.mcaIepf5Srn ? (
+                    <span className="font-mono tnum">{d.internal.mcaIepf5Srn}</span>
+                  ) : (
+                    <span className="text-fg-3">Not filed</span>
+                  )}
+                </Row>
+              )}
             </dl>
             <p className="mt-3 text-sm text-fg-3">
-              Indicative time for this route: {d.timelineMonths[0]} to {d.timelineMonths[1]} months
-              after signing. The IEPF Authority sets the pace; nobody can promise a date.
+              Indicative time: {d.timelineMonths[0]} to {d.timelineMonths[1]} months after signing.
+              Approval rests with the authorities; nobody can honestly promise a date.
             </p>
           </section>
 
@@ -136,6 +153,11 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
                 <Row label="Holder">{d.holding.holderName}</Row>
                 <Row label="Folio">
                   <span className="font-mono tnum">{d.holding.folioNumber}</span>
+                  {!d.holding.folioReleased && (
+                    <span className="block text-xs text-fg-3">
+                      Shown once your analyst releases it
+                    </span>
+                  )}
                 </Row>
                 {d.holding.certificateNumbers && (
                   <Row label="Certificates">
@@ -164,17 +186,25 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
               <Row label={d.money.basis === "credited" ? "Value credited" : "Estimated value"}>
                 <span className="tnum">{formatPaise(d.money.grossPaise)}</span>
               </Row>
-              <Row label={`Our fee (${d.money.feePct}%)`}>
-                <span className="tnum">− {formatPaise(d.money.feePaise)}</span>
-              </Row>
-              <Row label="GST on our fee (18%)">
-                <span className="tnum">− {formatPaise(d.money.gstPaise)}</span>
-              </Row>
-              <Row label="To you">
-                <span className="tnum text-lg font-semibold text-confirmed">
-                  {formatPaise(d.money.netPaise)}
-                </span>
-              </Row>
+              {d.money.realization ? (
+                <>
+                  <Row label={`Agreed fee (${d.money.feePct}%)`}>
+                    <span className="tnum">− {formatPaise(d.money.realization.feePaise)}</span>
+                  </Row>
+                  <Row label="GST on the fee">
+                    <span className="tnum">− {formatPaise(d.money.realization.gstPaise)}</span>
+                  </Row>
+                  <Row label="To you">
+                    <span className="tnum text-lg font-semibold text-confirmed">
+                      {formatPaise(d.money.realization.netPaise)}
+                    </span>
+                  </Row>
+                </>
+              ) : (
+                <Row label="Fee">
+                  <span className="text-fg-2">Custom quote in preparation · ₹0 upfront</span>
+                </Row>
+              )}
             </dl>
             {d.money.basis === "estimate" && (
               <p className="mt-3 text-sm text-fg-3">
@@ -187,40 +217,46 @@ export default async function CasePage({ params }: { params: Promise<{ code: str
                 ) : (
                   "Shares are not valued yet: the exchange price has not synced."
                 )}{" "}
-                The fee is worked out on the closing price on the day of credit.
+                Value is fixed on the closing price on the day of credit.
               </p>
             )}
           </section>
 
-          <section aria-labelledby="rta-heading" className="panel p-5 sm:p-6">
-            <h2 id="rta-heading" className="flex items-center gap-2 text-lg font-semibold text-fg">
-              <Building2Icon className="size-5 text-signal" aria-hidden="true" />
-              Registrar and nodal officer
-            </h2>
-            <p className="mt-3 font-medium text-fg">{d.company.rtaLabel}</p>
-            {d.company.rtaAddress && (
-              <p className="mt-1 text-sm text-fg-2">{d.company.rtaAddress}</p>
-            )}
-            <p className="mt-3 text-sm text-fg-2">
-              Nodal officer:{" "}
-              {d.company.nodalOfficerName ? (
-                <>
-                  {d.company.nodalOfficerName}
-                  {d.company.nodalOfficerEmail ? ` (${d.company.nodalOfficerEmail})` : ""}
-                </>
-              ) : (
-                <span className="text-fg-3">
-                  confirmed by your case team from the company&apos;s IEPF page
-                </span>
-              )}
-            </p>
-            <Link
-              href={`/unclaimed-shares/${d.company.slug}`}
-              className="link mt-3 inline-block text-sm"
-            >
-              Company guide
-            </Link>
-          </section>
+          {staff && d.company.internal && (
+            <section aria-labelledby="rta-heading" className="panel border-signal/30 p-5 sm:p-6">
+              <h2
+                id="rta-heading"
+                className="flex items-center gap-2 text-lg font-semibold text-fg"
+              >
+                <Building2Icon className="size-5 text-signal" aria-hidden="true" />
+                Company file (staff only)
+              </h2>
+              <dl className="mt-3 divide-y divide-(--glass-border)">
+                <Row label="Registrar">{d.company.internal.rtaLabel}</Row>
+                {d.company.internal.rtaEmail && (
+                  <Row label="RTA email">{d.company.internal.rtaEmail}</Row>
+                )}
+                {d.company.internal.nodalOfficerName && (
+                  <Row label="Nodal officer">
+                    {d.company.internal.nodalOfficerName}
+                    {d.company.internal.nodalOfficerEmail && (
+                      <span className="block text-sm text-fg-2">
+                        {d.company.internal.nodalOfficerEmail}
+                      </span>
+                    )}
+                  </Row>
+                )}
+                {d.company.internal.isin && <Row label="ISIN">{d.company.internal.isin}</Row>}
+                {d.company.internal.cin && <Row label="CIN">{d.company.internal.cin}</Row>}
+              </dl>
+              <Link
+                href={`/admin/companies/${d.company.slug}`}
+                className="link mt-3 inline-block text-sm"
+              >
+                Full company file
+              </Link>
+            </section>
+          )}
 
           <section aria-labelledby="activity-heading" className="panel p-5 sm:p-6">
             <h2

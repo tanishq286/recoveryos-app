@@ -15,10 +15,8 @@ const schema = z
     API_PUBLIC_URL: z.string().default("http://localhost:4000"),
 
     JWT_SECRET: z.string().min(32).optional(),
-    UNLOCK_JWT_SECRET: z.string().min(32).optional(),
     OTP_SECRET: z.string().min(32).optional(),
     SESSION_TTL_HOURS: z.coerce.number().default(24 * 7),
-    UNLOCK_TTL_HOURS: z.coerce.number().default(24),
 
     OTP_PROVIDER: z.enum(["console", "msg91", "twilio"]).default("console"),
     MSG91_AUTH_KEY: z.string().optional(),
@@ -47,7 +45,17 @@ const schema = z
     MEILI_HOST: z.string().optional(),
     MEILI_API_KEY: z.string().optional(),
 
-    UNLOCKS_PER_PHONE_PER_DAY: z.coerce.number().int().default(5),
+    /** Valuation PDF reports a mobile number may download per day. */
+    VALUATION_REPORTS_PER_DAY: z.coerce.number().int().min(0).default(2),
+    /** Searches a signed-in member may run per day before an analyst takes over. */
+    MEMBER_SEARCHES_PER_DAY: z.coerce.number().int().min(1).default(60),
+    /** On-demand refresh of company-published statements when a search runs. Off under test. */
+    LIVE_SYNC_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((v) => (v === undefined ? process.env.NODE_ENV !== "test" : v === "true")),
+    /** Hours before the same company's published statements are fetched again. */
+    LIVE_SYNC_TTL_HOURS: z.coerce.number().min(1).default(24),
     /** Live NSE/BSE price sync. Off by default under test. */
     MARKET_SYNC_ENABLED: z
       .enum(["true", "false"])
@@ -60,7 +68,6 @@ const schema = z
     if (env.NODE_ENV !== "production") return;
     for (const key of [
       "JWT_SECRET",
-      "UNLOCK_JWT_SECRET",
       "OTP_SECRET",
       "ESIGN_WEBHOOK_SECRET",
       "STORAGE_ENCRYPTION_KEY",
@@ -85,12 +92,11 @@ const schema = z
 
 export type Env = z.infer<typeof schema> & {
   JWT_SECRET: string;
-  UNLOCK_JWT_SECRET: string;
   OTP_SECRET: string;
   ESIGN_WEBHOOK_SECRET: string;
 };
 
-const DEV_SECRET = (label: string) => `recoveryos-development-only-${label}-0123456789abcdef`;
+const DEV_SECRET = (label: string) => `finsol-development-only-${label}-0123456789abcdef`;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = schema.safeParse(source);
@@ -102,7 +108,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return {
     ...env,
     JWT_SECRET: env.JWT_SECRET ?? DEV_SECRET("session"),
-    UNLOCK_JWT_SECRET: env.UNLOCK_JWT_SECRET ?? DEV_SECRET("unlock"),
     OTP_SECRET: env.OTP_SECRET ?? DEV_SECRET("otp"),
     ESIGN_WEBHOOK_SECRET: env.ESIGN_WEBHOOK_SECRET ?? DEV_SECRET("esign"),
   };

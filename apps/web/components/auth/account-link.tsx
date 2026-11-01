@@ -12,7 +12,7 @@ const subscribe = () => () => {};
 const cookieSnapshot = () => document.cookie;
 const serverSnapshot = () => "";
 
-function readWho(cookie: string): { name: string; role: Role } | null {
+export function readWho(cookie: string): { name: string; role: Role } | null {
   try {
     const raw = cookie.split("; ").find((c) => c.startsWith(`${WHO_COOKIE}=`));
     if (!raw) return null;

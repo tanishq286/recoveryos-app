@@ -11,18 +11,7 @@ export interface SessionClaims {
   name: string;
 }
 
-export interface UnlockClaims {
-  typ: "unlock";
-  /** The lead the unlock created or updated. */
-  lid: string;
-  /** Folio ids this token may see unmasked. */
-  fids: string[];
-}
-
-/**
- * Two token kinds with separate secrets, so an unlock token can never be
- * replayed as a session and the other way round.
- */
+/** Signed sessions, issued after the Login Gateway's mobile OTP. */
 @Injectable()
 export class TokensService {
   constructor(
@@ -55,33 +44,6 @@ export class TokensService {
         audience: "recoveryos-session",
       });
       return c.typ === "session" ? c : null;
-    } catch {
-      return null;
-    }
-  }
-
-  signUnlock(leadId: string, folioIds: string[]): { token: string; expiresAt: string } {
-    const expiresIn = this.env.UNLOCK_TTL_HOURS * 3600;
-    const token = this.jwt.sign(
-      { typ: "unlock", lid: leadId, fids: folioIds } satisfies UnlockClaims,
-      {
-        secret: this.env.UNLOCK_JWT_SECRET,
-        expiresIn,
-        issuer: "recoveryos",
-        audience: "recoveryos-unlock",
-      },
-    );
-    return { token, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() };
-  }
-
-  verifyUnlock(token: string): UnlockClaims | null {
-    try {
-      const c = this.jwt.verify<UnlockClaims>(token, {
-        secret: this.env.UNLOCK_JWT_SECRET,
-        issuer: "recoveryos",
-        audience: "recoveryos-unlock",
-      });
-      return c.typ === "unlock" && Array.isArray(c.fids) ? c : null;
     } catch {
       return null;
     }

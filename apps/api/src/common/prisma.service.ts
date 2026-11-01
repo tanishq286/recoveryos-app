@@ -8,8 +8,11 @@ import { ENV, type Env } from "../config/env.js";
 export class PrismaService implements OnModuleDestroy {
   readonly client: PrismaClient;
   readonly fieldKeys: FieldKeys;
+  /** For raw connections, such as the bulk COPY loader. */
+  readonly databaseUrl: string;
 
   constructor(@Inject(ENV) env: Env) {
+    this.databaseUrl = env.DATABASE_URL;
     this.client = createPrismaClient(env.DATABASE_URL);
     this.fieldKeys = keysFromEnv();
   }

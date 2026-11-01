@@ -18,19 +18,40 @@ const TRACKS = [
   { key: "dematCreditStatus", label: "Demat credit" },
 ] as const;
 
-/** Case team only: move the case on, record the SRN and the three tracked statuses. */
+/**
+ * Case team only: set the custom fee, release the folio number to the
+ * client, move the case on, record the SRN and the three tracked statuses.
+ */
 export function StaffControls({ detail }: { detail: CaseDetail }) {
   const router = useRouter();
-  const [busy, setBusy] = React.useState<"advance" | "save" | null>(null);
+  const [busy, setBusy] = React.useState<"advance" | "save" | "fee" | "release" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
+  const internal = detail.internal!;
   const [track, setTrack] = React.useState({
-    rtaEntitlementStatus: detail.tracking.rtaEntitlementStatus,
-    nodalVerificationStatus: detail.tracking.nodalVerificationStatus,
-    dematCreditStatus: detail.tracking.dematCreditStatus,
-    mcaIepf5Srn: detail.tracking.mcaIepf5Srn ?? "",
+    rtaEntitlementStatus: internal.rtaEntitlementStatus,
+    nodalVerificationStatus: internal.nodalVerificationStatus,
+    dematCreditStatus: internal.dematCreditStatus,
+    mcaIepf5Srn: internal.mcaIepf5Srn ?? "",
     creditedValueRupees: "",
   });
+  const [fee, setFee] = React.useState(
+    detail.money.feePct === null ? "" : String(detail.money.feePct),
+  );
+  const feeLocked = detail.esign.requested || detail.esign.status === "SIGNED";
+
+  async function run(kind: "fee" | "release", fn: () => Promise<unknown>) {
+    setBusy(kind);
+    setError(null);
+    try {
+      await fn();
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
   const next = detail.steps.find((s) => s.step === detail.recoverStep + 1);
 
   async function advance() {
@@ -61,7 +82,7 @@ export function StaffControls({ detail }: { detail: CaseDetail }) {
           nodalVerificationStatus: track.nodalVerificationStatus,
           dematCreditStatus: track.dematCreditStatus,
           mcaIepf5Srn:
-            track.mcaIepf5Srn.trim() && track.mcaIepf5Srn.trim() !== detail.tracking.mcaIepf5Srn
+            track.mcaIepf5Srn.trim() && track.mcaIepf5Srn.trim() !== internal.mcaIepf5Srn
               ? track.mcaIepf5Srn.trim()
               : undefined,
           creditedValueRupees: track.creditedValueRupees
@@ -89,6 +110,65 @@ export function StaffControls({ detail }: { detail: CaseDetail }) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <form
+          className="flex flex-wrap items-end gap-3 rounded-[12px] border border-(--glass-border) p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run("fee", () =>
+              callApi(`cases/${detail.caseCode}/fee`, {
+                method: "PATCH",
+                body: { feePct: Number(fee) },
+              }),
+            );
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <label htmlFor="t-fee" className="mb-1.5 block text-sm text-fg-2">
+              Custom fee, % of value credited
+            </label>
+            <Input
+              id="t-fee"
+              inputMode="decimal"
+              value={fee}
+              disabled={feeLocked}
+              onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ""))}
+              placeholder="Set before the mandate"
+              className="tnum"
+            />
+          </div>
+          <Button type="submit" size="sm" variant="outline" disabled={!!busy || feeLocked || !fee}>
+            {busy === "fee" && <LoaderCircleIcon className="animate-spin" aria-hidden="true" />}
+            {detail.money.feePct === null ? "Set fee" : "Update fee"}
+          </Button>
+          {feeLocked && (
+            <p className="w-full text-xs text-fg-3">Fixed: the Digital Mandate has been issued.</p>
+          )}
+        </form>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-(--glass-border) p-3">
+          <p className="text-sm text-fg-2">
+            Folio number{" "}
+            {detail.folioReleasedAt ? "released to the client" : "masked for the client"}.
+          </p>
+          {!detail.folioReleasedAt && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!busy || !detail.holding}
+              onClick={() =>
+                void run("release", () =>
+                  callApi(`cases/${detail.caseCode}/release-folio`, { body: {} }),
+                )
+              }
+            >
+              {busy === "release" && (
+                <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+              )}
+              Release folio
+            </Button>
+          )}
+        </div>
+      </div>
       {next && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-(--glass-border) p-3">
           <p className="text-sm text-fg-2">

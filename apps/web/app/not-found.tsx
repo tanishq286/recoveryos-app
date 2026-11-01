@@ -20,18 +20,15 @@ export default function NotFound() {
           This route doesn&apos;t lead anywhere
         </h1>
         <p className="mt-4 text-lg text-fg-2">
-          The link may be old or mistyped. Nothing about any case has changed. Search with{" "}
-          <kbd className="rounded-[5px] border border-line px-1.5 py-px font-sans text-sm text-fg-2">
-            Ctrl K
-          </kbd>{" "}
-          or start from one of these.
+          The link may be old or mistyped. Nothing about any case has changed. Start from one of
+          these.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild>
             <Link href="/">Go to the home page</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/check">{CHECK_CTA}</Link>
+            <Link href="/search">{CHECK_CTA}</Link>
           </Button>
         </div>
       </main>

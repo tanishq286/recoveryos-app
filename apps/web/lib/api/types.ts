@@ -33,8 +33,6 @@ export interface CompanyListItem {
   name: string;
   sector: string | null;
   tickerNse: string | null;
-  rtaName: RtaName;
-  rtaLabel: string;
   currentMarketPrice: number | null;
   priceUpdatedAt: string | null;
   folioCount: number;
@@ -51,7 +49,28 @@ export interface CompanyAction {
   source: string | null;
 }
 
+/** The public company page. Contacts and identifiers are in AdminCompany (staff only). */
 export interface CompanyDetail {
+  slug: string;
+  name: string;
+  sector: string | null;
+  tickerNse: string | null;
+  tickerBse: string | null;
+  /** Last synced market price (rupees); null until the first sync. */
+  currentMarketPrice: number | null;
+  priceUpdatedAt: string | null;
+  priceSource: string | null;
+  corporateActions: CompanyAction[];
+  records: {
+    custodyStatus: CustodyStatus;
+    folios: number;
+    shares: number;
+    dividendRupees: number;
+  }[];
+}
+
+/** The internal company file, for the case team. */
+export interface AdminCompany {
   slug: string;
   name: string;
   cin: string | null;
@@ -60,10 +79,6 @@ export interface CompanyDetail {
   sector: string | null;
   tickerNse: string | null;
   tickerBse: string | null;
-  /** Last synced market price (rupees); null until the first sync. */
-  currentMarketPrice: number | null;
-  priceUpdatedAt: string | null;
-  priceSource: string | null;
   rta: {
     name: RtaName;
     label: string;
@@ -81,13 +96,17 @@ export interface CompanyDetail {
   };
   contacts: { source: string | null; verifiedAt: string | null };
   irPageUrl: string | null;
-  corporateActions: CompanyAction[];
-  records: {
-    custodyStatus: CustodyStatus;
-    folios: number;
-    shares: number;
-    dividendRupees: number;
-  }[];
+  records: CompanyDetail["records"];
+}
+
+export interface AdminCompanyListItem {
+  slug: string;
+  name: string;
+  cin: string | null;
+  isin: string | null;
+  rtaLabel: string;
+  nodalOfficerName: string;
+  nodalOfficerEmail: string | null;
 }
 
 export interface Me {
@@ -135,14 +154,24 @@ export interface CaseDetail extends CaseSummary {
   company: {
     name: string;
     slug: string;
-    rtaLabel: string;
-    rtaAddress: string | null;
-    nodalOfficerName: string | null;
-    nodalOfficerEmail: string | null;
+    /** Registrar, nodal officer and identifiers: staff only, null for everyone else. */
+    internal: {
+      rtaLabel: string;
+      rtaAddress: string | null;
+      rtaEmail: string | null;
+      rtaPhone: string | null;
+      nodalOfficerName: string | null;
+      nodalOfficerEmail: string | null;
+      nodalOfficerPhone: string | null;
+      cin: string | null;
+      isin: string | null;
+    } | null;
   };
   holding: {
     holderName: string;
+    /** Masked for clients until their analyst releases it. */
     folioNumber: string;
+    folioReleased: boolean;
     certificateNumbers: string | null;
     originalShares: number;
     postActionShares: number;
@@ -151,6 +180,15 @@ export interface CaseDetail extends CaseSummary {
     custodyLabel: string;
     transferFinancialYear: string | null;
   } | null;
+  /** The public 4-step service, which every viewer sees. */
+  serviceStep: 1 | 2 | 3 | 4;
+  serviceSteps: {
+    step: number;
+    title: string;
+    body: string;
+    state: "done" | "current" | "upcoming";
+  }[];
+  /** The internal R.E.C.O.V.E.R. steps: staff only, empty for everyone else. */
   steps: {
     step: number;
     key: string;
@@ -161,11 +199,18 @@ export interface CaseDetail extends CaseSummary {
     state: "done" | "current" | "upcoming";
   }[];
   tracking: {
+    holdingConfirmation: TrackStatus;
+    claimFiled: boolean;
+    companyVerification: TrackStatus;
+    dematCredit: TrackStatus;
+  };
+  internal: {
     rtaEntitlementStatus: TrackStatus;
     mcaIepf5Srn: string | null;
     nodalVerificationStatus: TrackStatus;
     dematCreditStatus: TrackStatus;
-  };
+  } | null;
+  folioReleasedAt: string | null;
   esign: {
     status: EsignStatus;
     signedAt: string | null;
@@ -174,13 +219,17 @@ export interface CaseDetail extends CaseSummary {
     hasMandate: boolean;
   };
   money: {
-    feePct: number;
+    /** Custom pricing: null until the case team sets this case's fee. */
+    feePct: number | null;
     basis: "credited" | "estimate";
     grossPaise: number;
-    feeBps: number;
-    feePaise: number;
-    gstPaise: number;
-    netPaise: number;
+    realization: {
+      grossPaise: number;
+      feeBps: number;
+      feePaise: number;
+      gstPaise: number;
+      netPaise: number;
+    } | null;
     sharePricePaise: number | null;
     priceUpdatedAt: string | null;
     priceSource: string | null;
@@ -207,7 +256,14 @@ export interface LeadCard {
   relationship: string;
   certificates: string;
   estimatedValuePaise: number;
-  holdings: { folioId: string; holder: string; company: string; shares: number; custody: string }[];
+  holdings: {
+    folioId: string;
+    holder: string;
+    company: string;
+    shares: number;
+    custody: string;
+    folioReleased: boolean;
+  }[];
   assignedAnalyst: { id: string; name: string } | null;
   associate: { firmName: string; referralCode: string } | null;
   notes: string | null;
@@ -226,6 +282,8 @@ export interface CaseCard {
   recoverStepName: string;
   esignStatus: EsignStatus;
   mcaIepf5Srn: string | null;
+  feePct: number | null;
+  folioReleased: boolean;
   rtaEntitlementStatus: TrackStatus;
   nodalVerificationStatus: TrackStatus;
   dematCreditStatus: TrackStatus;

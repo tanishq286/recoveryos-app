@@ -26,7 +26,7 @@ export async function createApp(opts: { logger?: false } = {}): Promise<INestApp
   app.enableCors({
     origin: env.WEB_ORIGIN.split(",").map((s) => s.trim()),
     credentials: true,
-    allowedHeaders: ["content-type", "authorization", "x-unlock-token"],
+    allowedHeaders: ["content-type", "authorization"],
   });
   app.setGlobalPrefix("api/v1");
   app.useGlobalPipes(new StandardSchemaValidationPipe());

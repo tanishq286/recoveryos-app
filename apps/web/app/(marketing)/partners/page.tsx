@@ -9,7 +9,7 @@ import {
   PercentIcon,
   ShieldCheckIcon,
 } from "lucide-react";
-import { isIndianState, STATE_LABELS, type IndianState } from "@recoveryos/shared";
+import { BRAND_EMAILS, isIndianState, STATE_LABELS, type IndianState } from "@recoveryos/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,7 @@ const POINTS = [
   {
     Icon: HandshakeIcon,
     title: "Your client stays yours",
-    body: "You see the case move through all seven steps. We do the filing, the chasing and the paperwork.",
+    body: "You see every case move from check to credit. Finsol does the filing, the chasing and the paperwork.",
   },
   {
     Icon: ShieldCheckIcon,
@@ -61,7 +61,7 @@ export default async function PartnersPage({
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
       <h1 className="display max-w-[20ch] text-[clamp(2rem,4vw,3rem)] text-fg">
-        Partner with RecoveryOS
+        Partner with Finsol Enterprises
       </h1>
       <p className="mt-4 max-w-[62ch] text-lg text-fg-2">
         Chartered accountants, company secretaries, advocates, wealth advisors and former bankers
@@ -78,6 +78,12 @@ export default async function PartnersPage({
           <Link href="/login?next=/partners/dashboard">Partner sign in</Link>
         </Button>
       </div>
+      <p className="mt-4 text-sm text-fg-2">
+        Partner / Associate Desk:{" "}
+        <a href={`mailto:${BRAND_EMAILS.partners}`} className="link">
+          {BRAND_EMAILS.partners}
+        </a>
+      </p>
 
       <ul className="mt-14 grid gap-4 md:grid-cols-3">
         {POINTS.map(({ Icon, title, body }) => (

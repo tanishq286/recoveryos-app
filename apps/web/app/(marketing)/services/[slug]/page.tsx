@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRightIcon, CheckIcon, CircleAlertIcon, SearchIcon, UsersIcon } from "lucide-react";
-import { SERVICE_VERTICALS, serviceBySlug } from "@recoveryos/shared";
+import { CheckIcon, CircleAlertIcon, MailIcon, SearchIcon } from "lucide-react";
+import {
+  BRAND,
+  BRAND_EMAILS,
+  PUBLIC_PRICING,
+  SERVICE_VERTICALS,
+  serviceBySlug,
+} from "@recoveryos/shared";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -44,7 +50,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {Icon && <Icon className="size-7 text-signal" aria-hidden="true" />}
         <StatusBadge tone={s.status === "taking-cases" ? "success" : "neutral"} live={false}>
-          {s.status === "taking-cases" ? "Taking cases now" : "Free route plus a call-back"}
+          {s.status === "taking-cases" ? "Taking cases now" : "Call-back service"}
         </StatusBadge>
       </div>
       <h1 className="display mt-4 max-w-[22ch] text-[clamp(2rem,4.4vw,3.25rem)] text-fg">
@@ -60,10 +66,10 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         <div className="grid min-w-0 grid-cols-1 content-start gap-10">
           <section aria-labelledby="steps-heading">
             <h2 id="steps-heading" className="text-xl font-semibold text-fg">
-              How it works
+              What {BRAND.name} handles for you
             </h2>
             <ol className="mt-5 grid gap-4">
-              {s.steps.map((step, i) => (
+              {s.weHandle.map((step, i) => (
                 <li key={step} className="grid grid-cols-[2.5rem_1fr] items-start gap-3">
                   <span className="flex size-9 items-center justify-center rounded-full border border-signal/35 bg-signal-wash font-semibold text-signal tnum">
                     {i + 1}
@@ -75,10 +81,10 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
           </section>
           <section aria-labelledby="docs-heading">
             <h2 id="docs-heading" className="text-xl font-semibold text-fg">
-              Documents people usually need
+              What you may be asked to share
             </h2>
             <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-              {s.documents.map((d) => (
+              {s.youShare.map((d) => (
                 <li key={d} className="flex items-start gap-2 text-fg-2">
                   <CheckIcon className="mt-1 size-4 shrink-0 text-confirmed" aria-hidden="true" />
                   {d}
@@ -88,24 +94,13 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
           </section>
         </div>
         <aside className="grid min-w-0 grid-cols-1 content-start gap-6">
-          {s.officialRoute && (
-            <section aria-labelledby="free-heading" className="panel p-5 sm:p-6">
-              <h2 id="free-heading" className="text-lg font-semibold text-fg">
-                The free official route
-              </h2>
-              <p className="mt-2 text-fg-2">{s.officialRoute.note}</p>
-              <a
-                href={s.officialRoute.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link mt-3 inline-flex items-center gap-1 font-medium"
-              >
-                {s.officialRoute.label}
-                <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-                <span className="sr-only"> (opens in a new tab)</span>
-              </a>
-            </section>
-          )}
+          <section aria-labelledby="price-heading" className="panel p-5 sm:p-6">
+            <h2 id="price-heading" className="text-lg font-semibold text-fg">
+              {PUBLIC_PRICING.headline}
+            </h2>
+            <p className="mt-2 text-fg-2">{PUBLIC_PRICING.detail}</p>
+            <p className="mt-2 text-sm font-medium text-signal">{BRAND.promise.join(" • ")}</p>
+          </section>
           <Alert variant="pending">
             <CircleAlertIcon aria-hidden="true" />
             <AlertTitle>What we don&apos;t promise</AlertTitle>
@@ -121,25 +116,27 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
             {s.status === "taking-cases" ? (
               <>
                 <p className="text-fg-2">
-                  Start by finding the holding. Search is free, with no sign-up.
+                  Start with the free 3-Minute Check: just a name and a state.
                 </p>
                 <Button asChild>
                   <Link href="/search">
                     <SearchIcon aria-hidden="true" />
-                    Search by name
+                    Start 3-Minute Check
                   </Link>
                 </Button>
               </>
             ) : (
               <>
                 <p className="text-fg-2">
-                  Want help with this? A partner near you can take it on, or we call you back.
+                  Write to us and an analyst will call you back to confirm whether we can act.
                 </p>
                 <Button asChild variant="outline">
-                  <Link href="/partners#locator">
-                    <UsersIcon aria-hidden="true" />
-                    Find a partner near you
-                  </Link>
+                  <a
+                    href={`mailto:${BRAND_EMAILS.info}?subject=${encodeURIComponent(`Call-back request: ${s.name}`)}`}
+                  >
+                    <MailIcon aria-hidden="true" />
+                    Request a call-back
+                  </a>
                 </Button>
               </>
             )}

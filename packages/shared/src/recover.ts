@@ -227,3 +227,33 @@ export const CALCULATOR_SITUATIONS = [
 }[];
 
 export type CalculatorSituation = (typeof CALCULATOR_SITUATIONS)[number]["key"];
+
+/**
+ * Document names as clients see them. Statutory form names stay inside the
+ * staff CRM; clients are told what to share, never how to file.
+ */
+export const CLIENT_DOC_LABELS: Record<DocType, string> = {
+  PAN: "PAN card",
+  AADHAAR: "Aadhaar (masked)",
+  CML_COPY: "Demat account statement (client master list)",
+  CANCELLED_CHEQUE: "Cancelled cheque",
+  ORIGINAL_CERT_OR_FIR: "Original certificates, or police report if lost",
+  ISR1_ISR2_KYC: "KYC forms (prepared by Finsol for your signature)",
+  INDEMNITY_BOND: "Indemnity (prepared by Finsol for your signature)",
+  DEATH_CERTIFICATE: "Death certificate",
+  LEGAL_HEIR_OR_SUCCESSION_CERT: "Legal heir or succession certificate",
+  IEPF5_ACKNOWLEDGEMENT: "Filing acknowledgement (added by Finsol)",
+};
+
+export const CLIENT_DOC_REASONS: Record<DocType, string> = {
+  PAN: "Confirms your identity.",
+  AADHAAR: "Confirms your address and lets you sign digitally.",
+  CML_COPY: "Shares are credited only to a demat account in your own name.",
+  CANCELLED_CHEQUE: "Money is paid only into your own bank account.",
+  ORIGINAL_CERT_OR_FIR: "Proves the original holding.",
+  ISR1_ISR2_KYC: "We prepare these; you only sign.",
+  INDEMNITY_BOND: "We prepare this; you only sign.",
+  DEATH_CERTIFICATE: "Needed when the holder has passed away.",
+  LEGAL_HEIR_OR_SUCCESSION_CERT: "Shows who inherits the holding.",
+  IEPF5_ACKNOWLEDGEMENT: "Finsol adds this once your claim is filed.",
+};

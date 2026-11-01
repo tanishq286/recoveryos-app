@@ -10,13 +10,15 @@ import { OtpService } from "./otp.service.js";
 
 const requestSchema = z.object({
   phone: z.string().min(10).max(20),
-  purpose: z.enum(["UNLOCK", "LOGIN"]),
+  purpose: z.literal("LOGIN").default("LOGIN"),
 });
 
+/** The Login Gateway: full name, mobile (verified by OTP) and email. */
 const verifySchema = z.object({
   phone: z.string().min(10).max(20),
   code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code."),
-  name: z.string().trim().min(2).max(120).optional(),
+  name: z.string().trim().min(2, "Enter your full name.").max(120),
+  email: z.email("Enter a valid email address.").max(200),
 });
 
 @Controller("auth")
@@ -28,7 +30,7 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
-  /** Sends a code for signing in or for unlocking search results. */
+  /** Sends a sign-in code to the mobile number. */
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("otp/request")
@@ -40,7 +42,10 @@ export class AuthController {
     return this.otp.request(body.phone, body.purpose, clientIp(req));
   }
 
-  /** Signs in with a LOGIN code. A first sign-in creates an investor account. */
+  /**
+   * Signs in through the Login Gateway. A first sign-in creates an investor
+   * account with the name and email given; later sign-ins fill a missing email.
+   */
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("otp/verify")
@@ -51,12 +56,14 @@ export class AuthController {
   ) {
     const phone = await this.otp.verify(body.phone, "LOGIN", body.code);
     const db = this.prisma.client;
+    const known = await db.user.findUnique({ where: { phone }, select: { email: true } });
     const user = await db.user.upsert({
       where: { phone },
-      update: { lastLoginAt: new Date() },
+      update: { lastLoginAt: new Date(), ...(known?.email ? {} : { email: body.email }) },
       create: {
         phone,
-        name: body.name ?? "New investor",
+        name: body.name,
+        email: body.email,
         role: "INVESTOR",
         lastLoginAt: new Date(),
       },
@@ -73,7 +80,7 @@ export class AuthController {
     const session = this.tokens.signSession(user);
     return {
       ...session,
-      user: { id: user.id, name: user.name, role: user.role, phone: user.phone },
+      user: { id: user.id, name: user.name, role: user.role, phone: user.phone, email: user.email },
     };
   }
 

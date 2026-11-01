@@ -158,3 +158,11 @@ export function formatPaiseCompact(paise: number): string {
     return `₹${(rupees / 1_00_000).toFixed(rupees >= 10_00_000 ? 0 : 1)} lakh`;
   return inr.format(Math.round(rupees));
 }
+
+/** A lower bound for headline figures: 73,81,440 rupees → "₹73+ Lakhs"; 3.03 crore → "₹3+ Crore". */
+export function formatPaisePlus(paise: number): string {
+  const rupees = paise / 100;
+  if (rupees >= 1_00_00_000) return `₹${Math.floor(rupees / 1_00_00_000)}+ Crore`;
+  if (rupees >= 1_00_000) return `₹${Math.floor(rupees / 1_00_000)}+ Lakhs`;
+  return `₹${formatCount(Math.floor(rupees / 1000))}+ thousand`;
+}

@@ -3,99 +3,306 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { CheckIcon, InfoIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
+  ArrowRightIcon,
+  DownloadIcon,
+  FileTextIcon,
+  LoaderCircleIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  Trash2Icon,
+  ZapIcon,
+} from "lucide-react";
 import {
-  CALCULATOR_SITUATIONS,
-  DOC_TYPE_LABELS,
-  documentChecklist,
-  entitlementRangeForDecade,
-  holdingValuePaise,
-  netRealization,
-  pctToBps,
-  SCENARIO_LABELS,
-  SCENARIO_TIMELINE_MONTHS,
-  sevenYearsBefore,
-  type CalculatorSituation,
-  type EntitlementResult,
+  MIN_PURCHASE_YEAR,
+  POPULAR_EXAMPLES,
+  portfolioTotals,
+  valueHolding,
+  type CorporateActionLike,
+  type HoldingValuation,
 } from "@recoveryos/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { callApi } from "@/lib/api/client";
-import type { CompanyDetail } from "@/lib/api/types";
-import { formatCount, formatDateTime, formatPaise, formatPaiseCompact } from "@/lib/format";
+import { readWho } from "@/components/auth/account-link";
+import { LoginGatewayDialog } from "@/components/auth/login-gateway-dialog";
+import { CHECK_CTA } from "@/components/site/cta";
+import { callApi, ClientApiError } from "@/lib/api/client";
+import {
+  formatCount,
+  formatDateTime,
+  formatPaise,
+  formatPaiseCompact,
+  formatPaisePlus,
+} from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const DECADES = [1970, 1980, 1990, 2000, 2010];
-const TODAY = new Date().toISOString().slice(0, 10);
-
-function growthSeries(result: EntitlementResult, decade: number) {
-  const points = [{ year: decade, shares: result.steps[0]?.sharesBefore ?? 0 }];
-  for (const s of result.steps) {
-    if (s.action.actionType === "DIVIDEND") continue;
-    points.push({ year: Number(s.action.exDate.slice(0, 4)), shares: s.sharesAfter });
-  }
-  points.push({ year: Number(TODAY.slice(0, 4)), shares: result.shares });
-  return points;
+interface Listing {
+  symbol: string;
+  name: string;
+  exchange: "NSE" | "BSE";
 }
 
-function Figure({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: React.ReactNode;
-  note?: React.ReactNode;
-}) {
+interface EquityDetail extends Listing {
+  price: number | null;
+  priceUpdatedAt: string | null;
+  priceSource: string | null;
+  actions: CorporateActionLike[];
+  actionsBasis: "verified" | "exchange";
+  dividends: { exDate: string; amount: number }[];
+}
+
+interface Row {
+  key: string;
+  detail: EquityDetail;
+  valuation: HoldingValuation;
+}
+
+const THIS_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: THIS_YEAR - MIN_PURCHASE_YEAR + 1 }, (_, i) => THIS_YEAR - i);
+
+async function loadEquity(l: Pick<Listing, "symbol" | "exchange">, fresh = false) {
+  return callApi<EquityDetail>(
+    `market/equities/${l.exchange}/${encodeURIComponent(l.symbol)}${fresh ? "?fresh=1" : ""}`,
+  );
+}
+
+function value(
+  detail: EquityDetail,
+  year: number,
+  shares: number,
+  price: number | null,
+  manual: boolean,
+) {
+  return valueHolding(
+    {
+      symbol: detail.symbol,
+      exchange: detail.exchange,
+      name: detail.name,
+      purchaseYear: year,
+      originalShares: shares,
+      pricePerShare: price,
+      priceIsManual: manual,
+    },
+    detail.actions,
+    detail.dividends,
+  );
+}
+
+const growth = (x: number) => `${x >= 10 ? Math.round(x) : x.toFixed(x % 1 ? 1 : 0)}x`;
+
+/**
+ * One-click examples. Labels are never typed in: each is computed with the
+ * same valueHolding() call the calculator uses, from the verified history
+ * and the live price, so a pill always matches the result it adds.
+ */
+function QuickTry({ onPick }: { onPick: (d: EquityDetail, year: number, shares: number) => void }) {
+  const [details, setDetails] = React.useState<Record<string, EquityDetail>>({});
+  React.useEffect(() => {
+    let live = true;
+    for (const e of POPULAR_EXAMPLES)
+      loadEquity({ symbol: e.symbol, exchange: "NSE" })
+        .then((d) => live && setDetails((s) => ({ ...s, [e.symbol]: d })))
+        .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   return (
-    <div className="min-w-0">
-      <dt className="text-sm text-fg-3">{label}</dt>
-      <dd className="mt-1 text-2xl font-semibold text-fg tnum [font-stretch:104%]">{value}</dd>
-      {note && <dd className="mt-0.5 text-sm text-fg-3">{note}</dd>}
+    <section aria-labelledby="quick-heading">
+      <h2 id="quick-heading" className="text-sm font-medium text-fg-2">
+        Quick Try Popular High-Growth Stocks
+      </h2>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {POPULAR_EXAMPLES.map((e) => {
+          const d = details[e.symbol];
+          const v = d ? value(d, e.year, e.shares, d.price, false) : null;
+          return (
+            <li key={e.symbol}>
+              <button
+                type="button"
+                disabled={!d}
+                onClick={() => d && onPick(d, e.year, e.shares)}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--glass-border) bg-(--glass-elevated) px-3.5 py-2 text-left text-sm text-fg-2 transition-colors duration-150 hover:border-signal/60 hover:text-fg disabled:opacity-60"
+              >
+                <ZapIcon className="size-3.5 shrink-0 text-signal" aria-hidden="true" />
+                <span>
+                  <span className="font-medium text-fg">{e.label}:</span> {e.shares} in {e.year}
+                  {v ? (
+                    <>
+                      {" "}
+                      → <span className="tnum">{formatCount(v.currentShares)}</span> shares
+                      {v.marketValuePaise ? (
+                        <>
+                          {" "}
+                          = <span className="tnum">{formatPaisePlus(v.marketValuePaise)}</span>
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="text-fg-3"> (calculating…)</span>
+                  )}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** Company picker: NSE-listed equities, plus BSE listings found live. */
+function CompanyPicker({
+  selected,
+  onSelect,
+}: {
+  selected: Listing | null;
+  onSelect: (l: Listing) => void;
+}) {
+  const [q, setQ] = React.useState(selected?.name ?? "");
+  const [results, setResults] = React.useState<Listing[]>([]);
+  const [size, setSize] = React.useState<number | null>(null);
+  const [open, setOpen] = React.useState(false);
+  const [active, setActive] = React.useState(0);
+  const listId = React.useId();
+
+  // Keep the box in step when a quick-try pill picks a company.
+  const [lastSelected, setLastSelected] = React.useState(selected);
+  if (selected !== lastSelected) {
+    setLastSelected(selected);
+    setQ(selected?.name ?? "");
+  }
+
+  React.useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      callApi<{ directorySize: number; results: Listing[] }>(
+        `market/equities?q=${encodeURIComponent(q)}`,
+      )
+        .then((r) => {
+          setResults(r.results);
+          setSize(r.directorySize);
+          setActive(0);
+        })
+        .catch(() => setResults([]));
+    }, 180);
+    return () => clearTimeout(t);
+  }, [q, open]);
+
+  const choose = (l: Listing) => {
+    onSelect(l);
+    setQ(l.name);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <label htmlFor="calc-company" className="mb-1.5 block text-sm text-fg-2">
+        1. Company Name *
+      </label>
+      <Input
+        id="calc-company"
+        role="combobox"
+        aria-expanded={open && results.length > 0}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={open && results[active] ? `${listId}-${active}` : undefined}
+        autoComplete="off"
+        placeholder="Search any NSE or BSE company"
+        value={q}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActive((a) => Math.min(a + 1, results.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((a) => Math.max(a - 1, 0));
+          } else if (e.key === "Enter" && open && results[active]) {
+            e.preventDefault();
+            choose(results[active]!);
+          } else if (e.key === "Escape") setOpen(false);
+        }}
+      />
+      {size !== null && (
+        <p className="mt-1 text-xs text-fg-3">
+          {formatCount(size)} NSE equities, plus BSE listings looked up live.
+        </p>
+      )}
+      {open && results.length > 0 && (
+        <ul
+          id={listId}
+          role="listbox"
+          className="vault-glass absolute inset-x-0 top-[4.75rem] z-20 max-h-72 overflow-y-auto rounded-[12px] p-1"
+        >
+          {results.map((r, i) => (
+            <li
+              key={`${r.exchange}:${r.symbol}`}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                choose(r);
+              }}
+              className={cn(
+                "flex cursor-pointer items-center justify-between gap-3 rounded-[8px] px-3 py-2 text-sm",
+                i === active ? "bg-signal/15 text-fg" : "text-fg-2",
+              )}
+            >
+              <span className="min-w-0 truncate">{r.name}</span>
+              <span className="shrink-0 font-mono text-xs text-fg-3">
+                {r.exchange}: {r.symbol}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
 /**
- * Corporate action and fee calculator. Everything is computed in the
- * browser with the same rules the API uses (packages/shared): bonuses and
- * splits since the purchase decade, dividends from the last seven years, our
- * fee and GST, the indicative timeline and the document checklist.
+ * The Family Wealth Calculator: add each stock the family held, see shares
+ * today after every bonus and split, the live market value and the
+ * dividends paid since purchase. Computed in the browser with the same
+ * shared rules the API uses for the valuation report.
  */
-export function Calculator({
-  companies,
-  initial,
-}: {
-  companies: { slug: string; name: string }[];
-  initial: CompanyDetail | null;
-}) {
-  const [company, setCompany] = React.useState<CompanyDetail | null>(initial);
+export function Calculator() {
+  const [listing, setListing] = React.useState<Listing | null>(null);
+  const [detail, setDetail] = React.useState<EquityDetail | null>(null);
+  const [year, setYear] = React.useState(2000);
+  const [shares, setShares] = React.useState("100");
+  const [price, setPrice] = React.useState("");
+  const [manual, setManual] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [decade, setDecade] = React.useState(1990);
-  const [shares, setShares] = React.useState("100");
-  const [situation, setSituation] = React.useState<CalculatorSituation>("ALIVE_WITH_CERTS");
-  const [feePct, setFeePct] = React.useState(10);
+  const [rows, setRows] = React.useState<Row[]>([]);
+  const [gateway, setGateway] = React.useState(false);
+  const [report, setReport] = React.useState<{ busy: boolean; message: string | null }>({
+    busy: false,
+    message: null,
+  });
 
-  async function pick(slug: string) {
+  async function select(l: Listing, fresh = false) {
+    setListing(l);
     setLoading(true);
     setError(null);
     try {
-      setCompany(await callApi<CompanyDetail>(`companies/${slug}`));
-      const url = new URL(window.location.href);
-      url.searchParams.set("company", slug);
-      window.history.replaceState(null, "", url);
+      const d = await loadEquity(l, fresh);
+      setDetail(d);
+      setPrice(d.price === null ? "" : String(d.price));
+      setManual(false);
     } catch (e) {
+      setDetail(null);
       setError((e as Error).message);
     } finally {
       setLoading(false);
@@ -103,342 +310,334 @@ export function Calculator({
   }
 
   const original = Math.max(0, Math.min(10_000_000, Math.floor(Number(shares) || 0)));
-  const sit = CALCULATOR_SITUATIONS.find((s) => s.key === situation)!;
-  const range = company
-    ? entitlementRangeForDecade(original, decade, company.corporateActions, {
-        dividendsFrom: sevenYearsBefore(TODAY),
-      })
-    : null;
-  const price = company?.currentMarketPrice ?? null;
-  const cash = (r: { dividendPaise: number; cashPaise: number }) => r.dividendPaise + r.cashPaise;
-  const lowGross = range ? holdingValuePaise(range.low.shares, price ?? 0) + cash(range.low) : 0;
-  const highGross = range ? holdingValuePaise(range.high.shares, price ?? 0) + cash(range.high) : 0;
-  const lowNet = netRealization(lowGross, pctToBps(feePct));
-  const highNet = netRealization(highGross, pctToBps(feePct));
-  const checklist = documentChecklist({ scenario: sit.scenario, certStatus: sit.certStatus });
-  const [tMin, tMax] = SCENARIO_TIMELINE_MONTHS[sit.scenario];
-  const series = range ? growthSeries(range.high, decade) : [];
-  const same = range && range.low.shares === range.high.shares;
+  const priceNum = price === "" ? null : Number(price);
+  const preview =
+    detail && original > 0 && priceNum !== null && Number.isFinite(priceNum)
+      ? value(detail, year, original, priceNum, manual)
+      : detail && original > 0
+        ? value(detail, year, original, null, manual)
+        : null;
+
+  function add(d = detail, y = year, s = original, p = priceNum, m = manual) {
+    if (!d || s <= 0) return;
+    setRows((r) => [
+      ...r,
+      {
+        key: `${d.exchange}:${d.symbol}:${y}:${Date.now()}`,
+        detail: d,
+        valuation: value(d, y, s, p, m),
+      },
+    ]);
+  }
+
+  function quickTry(d: EquityDetail, y: number, s: number) {
+    setListing(d);
+    setDetail(d);
+    setYear(y);
+    setShares(String(s));
+    setPrice(d.price === null ? "" : String(d.price));
+    setManual(false);
+    add(d, y, s, d.price, false);
+  }
+
+  const totals = portfolioTotals(rows.map((r) => r.valuation));
+
+  async function downloadReport() {
+    // Signed-out visitors go straight to the gateway; the API checks the session either way.
+    if (!readWho(document.cookie)) {
+      setGateway(true);
+      return;
+    }
+    setReport({ busy: true, message: null });
+    try {
+      const res = await fetch("/api/v1/valuation/report", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          holdings: rows.map((r) => ({
+            symbol: r.valuation.symbol,
+            exchange: r.valuation.exchange,
+            purchaseYear: r.valuation.purchaseYear,
+            originalShares: r.valuation.originalShares,
+            manualPrice: r.valuation.priceIsManual ? r.valuation.pricePerShare : null,
+          })),
+        }),
+      });
+      if (res.status === 401) {
+        setGateway(true);
+        setReport({ busy: false, message: null });
+        return;
+      }
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new ClientApiError(res.status, body?.message ?? "The report could not be created.");
+      }
+      const code = res.headers.get("x-report-code") ?? "FE-VAL";
+      const left = res.headers.get("x-reports-left-today");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${code}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setReport({
+        busy: false,
+        message: `Report ${code} downloaded.${left !== null ? ` ${left} more today on this mobile number.` : ""}`,
+      });
+    } catch (e) {
+      setReport({ busy: false, message: (e as Error).message });
+    }
+  }
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-      <form
-        className="panel grid min-w-0 grid-cols-1 content-start gap-5 self-start p-5 sm:p-6 lg:sticky lg:top-24"
-        onSubmit={(e) => e.preventDefault()}
-        aria-label="Your holding"
-      >
-        <div>
-          <label htmlFor="c-company" className="mb-1.5 block text-sm text-fg-2">
-            Company
-          </label>
-          <Select
-            id="c-company"
-            value={company?.slug ?? ""}
-            onChange={(e) => e.target.value && pick(e.target.value)}
-          >
-            <option value="">Choose a company</option>
-            {companies.map((c) => (
-              <option key={c.slug} value={c.slug}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <fieldset>
-          <legend className="mb-1.5 text-sm text-fg-2">Bought in the</legend>
-          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 lg:grid-cols-3">
-            {DECADES.map((d) => (
-              <label key={d} className="relative cursor-pointer">
-                <input
-                  type="radio"
-                  name="decade"
-                  value={d}
-                  checked={decade === d}
-                  onChange={() => setDecade(d)}
-                  className="peer sr-only"
-                />
-                <span className="flex min-h-11 items-center justify-center rounded-[10px] border border-(--glass-border) bg-(--glass-elevated) text-sm text-fg-2 transition-colors peer-checked:border-signal peer-checked:bg-signal-wash peer-checked:text-fg peer-focus-visible:outline-2 peer-focus-visible:outline-signal tnum">
-                  {d}s
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <div>
-          <label htmlFor="c-shares" className="mb-1.5 block text-sm text-fg-2">
-            Shares on the certificate
-          </label>
-          <Input
-            id="c-shares"
-            inputMode="numeric"
-            value={shares}
-            onChange={(e) => setShares(e.target.value.replace(/\D/g, ""))}
-            className="tnum"
-          />
-        </div>
-        <div>
-          <label htmlFor="c-sit" className="mb-1.5 block text-sm text-fg-2">
-            Situation
-          </label>
-          <Select
-            id="c-sit"
-            value={situation}
-            onChange={(e) => setSituation(e.target.value as CalculatorSituation)}
-          >
-            {CALCULATOR_SITUATIONS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <label htmlFor="c-fee" className="mb-1.5 flex justify-between text-sm text-fg-2">
-            Success fee <span className="text-fg tnum">{feePct}%</span>
-          </label>
-          <input
-            id="c-fee"
-            type="range"
-            min={5}
-            max={20}
-            step={0.5}
-            value={feePct}
-            onChange={(e) => setFeePct(Number(e.target.value))}
-            className="w-full accent-(--color-signal)"
-          />
-          <p className="mt-1 text-sm text-fg-3">
-            Ours is 10% of what is credited, nothing upfront.
-          </p>
-        </div>
-      </form>
+    <div className="grid gap-8">
+      <QuickTry onPick={quickTry} />
 
-      <div className="grid min-w-0 grid-cols-1 content-start gap-6" aria-live="polite">
+      <form
+        className="panel grid gap-5 p-5 sm:p-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+      >
+        <h2 className="text-lg font-semibold text-fg">Add Stock Holding</h2>
         {error && (
           <Alert variant="blocker" role="alert">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        {loading && (
-          <p className="flex items-center gap-2 text-fg-2">
-            <LoaderCircleIcon className="size-4 animate-spin" aria-hidden="true" /> Loading the
-            company&apos;s history…
+        <div className="grid gap-4 md:grid-cols-2">
+          <CompanyPicker selected={listing} onSelect={(l) => void select(l)} />
+          <div>
+            <label htmlFor="calc-year" className="mb-1.5 block text-sm text-fg-2">
+              2. Exact Purchase Year * ({MIN_PURCHASE_YEAR}–{THIS_YEAR})
+            </label>
+            <Select id="calc-year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {YEARS.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label htmlFor="calc-shares" className="mb-1.5 block text-sm text-fg-2">
+              3. Original Shares *
+            </label>
+            <Input
+              id="calc-shares"
+              required
+              inputMode="numeric"
+              value={shares}
+              onChange={(e) => setShares(e.target.value.replace(/\D/g, ""))}
+              className="tnum"
+            />
+          </div>
+          <div>
+            <label htmlFor="calc-price" className="mb-1.5 block text-sm text-fg-2">
+              4. Current Price per Share (₹)
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="calc-price"
+                inputMode="decimal"
+                value={price}
+                placeholder={detail ? "No live price" : "Pick a company"}
+                onChange={(e) => {
+                  setPrice(e.target.value.replace(/[^\d.]/g, ""));
+                  setManual(true);
+                }}
+                className="tnum"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!listing || loading}
+                onClick={() => listing && void select(listing, true)}
+              >
+                {loading ? (
+                  <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <RefreshCwIcon aria-hidden="true" />
+                )}
+                ₹ Sync
+              </Button>
+            </div>
+            <p className="mt-1 text-xs text-fg-3">
+              {manual
+                ? "Price entered by you."
+                : detail?.price
+                  ? `Live: ${detail.priceSource ?? "market data"}${detail.priceUpdatedAt ? `, ${formatDateTime(detail.priceUpdatedAt)}` : ""}`
+                  : "Synced from NSE/BSE when available; you can type a price."}
+            </p>
+          </div>
+        </div>
+        {detail && (
+          <p className="text-sm text-fg-2">
+            Recorded Corporate Actions (Splits &amp; Bonuses):{" "}
+            <span className="font-semibold text-fg tnum">{preview?.events ?? 0} events</span> since{" "}
+            {year}
+            <span className="text-fg-3">
+              {" "}
+              ·{" "}
+              {detail.actionsBasis === "verified"
+                ? "history verified against company filings"
+                : "from the exchange record"}
+            </span>
+            {preview && (
+              <>
+                {" "}
+                →{" "}
+                <span className="font-semibold text-fg tnum">
+                  {formatCount(preview.currentShares)} shares today
+                </span>
+              </>
+            )}
           </p>
         )}
-        {!company || !range ? (
-          <div className="panel p-6 text-fg-2">
-            Choose a company to see its bonus and split history applied to your shares.
-          </div>
+        <div>
+          <Button type="submit" size="lg" disabled={!detail || original <= 0}>
+            <PlusIcon aria-hidden="true" />
+            Add to Wealth Calculation
+          </Button>
+        </div>
+      </form>
+
+      <section aria-labelledby="holdings-heading" className="grid gap-4">
+        <h2 id="holdings-heading" className="text-xl font-semibold text-fg">
+          Your Calculated Holdings
+        </h2>
+        {rows.length === 0 ? (
+          <p className="panel p-5 text-fg-2">
+            Nothing added yet. Try a popular stock above, or add your own.
+          </p>
         ) : (
           <>
-            <section aria-labelledby="calc-shares" className="panel p-5 sm:p-6">
-              <h2 id="calc-shares" className="text-lg font-semibold text-fg">
-                {formatCount(original)} {company.name} shares from the {decade}s
-              </h2>
-              <dl className="mt-4 grid gap-6 sm:grid-cols-3">
-                <Figure
-                  label="Shares today"
-                  value={
-                    same
-                      ? formatCount(range.high.shares)
-                      : `${formatCount(range.low.shares)} to ${formatCount(range.high.shares)}`
-                  }
-                  note={
-                    same
-                      ? "No actions inside the decade change it"
-                      : "Depends on when in the decade they were bought"
-                  }
-                />
-                <Figure
-                  label="Value at today's price"
-                  value={
-                    price === null
-                      ? "Price pending"
-                      : same
-                        ? formatPaiseCompact(highGross)
-                        : `${formatPaiseCompact(lowGross)} to ${formatPaiseCompact(highGross)}`
-                  }
-                  note={
-                    price !== null
-                      ? `${formatPaise(Math.round(price * 100), { exact: true })} a share (${company.priceSource ?? "exchange feed"}${company.priceUpdatedAt ? `, ${formatDateTime(company.priceUpdatedAt)}` : ""}), with dividends`
-                      : "Waiting for the first price from the exchange feed"
-                  }
-                />
-                <Figure
-                  label={
-                    range.high.cashPaise > 0
-                      ? "Dividends (7 years) and cash"
-                      : "Dividends, last 7 years"
-                  }
-                  value={formatPaiseCompact(cash(range.high))}
-                  note={
-                    range.high.cashPaise > 0
-                      ? `Includes ${formatPaiseCompact(range.high.cashPaise)} of other cash entitlements`
-                      : "Claimable with the shares if unpaid"
-                  }
-                />
-              </dl>
-              {series.length > 2 && (
-                <figure className="mt-6">
-                  <div className="h-56" aria-hidden="true">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        accessibilityLayer={false}
-                        data={series}
-                        margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-                      >
-                        <CartesianGrid stroke="var(--color-line)" vertical={false} />
-                        <XAxis
-                          dataKey="year"
-                          type="number"
-                          domain={["dataMin", "dataMax"]}
-                          allowDecimals={false}
-                          stroke="var(--color-fg-3)"
-                          tick={{ fill: "var(--color-fg-3)", fontSize: 12 }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          stroke="var(--color-fg-3)"
-                          tick={{ fill: "var(--color-fg-3)", fontSize: 12 }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={56}
-                          tickFormatter={(v: number) => formatCount(v)}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            background: "var(--color-ink-850)",
-                            border: "1px solid var(--color-line)",
-                            borderRadius: 10,
-                            color: "var(--color-fg)",
-                          }}
-                          formatter={(v) => [formatCount(Number(v)), "Shares"]}
-                          labelFormatter={(l) => `Year ${l}`}
-                        />
-                        <Area
-                          type="stepAfter"
-                          dataKey="shares"
-                          stroke="var(--color-chart-signal)"
-                          strokeWidth={2}
-                          fill="var(--color-chart-signal)"
-                          fillOpacity={0.18}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+            <dl className="vault-glass grid grid-cols-1 gap-x-6 gap-y-5 rounded-[20px] p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
+              <div className="sm:col-span-2 lg:col-span-1">
+                <dt className="text-sm text-fg-3">Total Estimated Family Wealth</dt>
+                <dd className="display text-gradient-cyan mt-1 text-[clamp(1.75rem,3.4vw,2.5rem)] tnum">
+                  {formatPaiseCompact(totals.totalPaise)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-fg-3">Total Current Shares</dt>
+                <dd className="mt-1 text-2xl font-semibold text-fg tnum">
+                  {formatCount(totals.currentShares)}{" "}
+                  <span className="text-base text-signal">
+                    ({growth(totals.growthMultiple)} Growth)
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-fg-3">Share Market Value</dt>
+                <dd className="mt-1 text-2xl font-semibold text-fg tnum">
+                  {formatPaiseCompact(totals.marketValuePaise)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-fg-3">Est. Unclaimed Dividends</dt>
+                <dd className="mt-1 text-2xl font-semibold text-fg tnum">
+                  {formatPaiseCompact(totals.dividendPaise)}
+                </dd>
+              </div>
+            </dl>
+            <ul className="grid gap-3">
+              {rows.map((r) => (
+                <li
+                  key={r.key}
+                  className="panel grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-fg">
+                      {r.valuation.name}{" "}
+                      <span className="font-mono text-xs text-fg-3">
+                        {r.valuation.exchange}: {r.valuation.symbol}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-sm text-fg-2 tnum">
+                      {formatCount(r.valuation.originalShares)} in {r.valuation.purchaseYear} →{" "}
+                      {formatCount(r.valuation.currentShares)} shares (
+                      {growth(r.valuation.growthMultiple)}, {r.valuation.events} events) ·{" "}
+                      {r.valuation.pricePerShare === null
+                        ? "no price"
+                        : `${formatPaise(Math.round(r.valuation.pricePerShare * 100), { exact: true })}/share${r.valuation.priceIsManual ? " (yours)" : ""}`}
+                    </p>
+                    <p className="mt-1 text-sm text-fg-3 tnum">
+                      Market value {formatPaise(r.valuation.marketValuePaise)} · dividends{" "}
+                      {formatPaise(r.valuation.dividendPaise)}
+                    </p>
                   </div>
-                  <figcaption className="mt-2 text-sm text-fg-3">
-                    Shares held since the start of the {decade}s, after each bonus or split:{" "}
-                    {series.map((p) => `${p.year}: ${formatCount(p.shares)}`).join(", ")}.
-                  </figcaption>
-                </figure>
-              )}
-            </section>
-
-            <section aria-labelledby="calc-net" className="panel p-5 sm:p-6">
-              <h2 id="calc-net" className="text-lg font-semibold text-fg">
-                What would reach you
-              </h2>
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[26rem] text-left">
-                  <thead className="text-sm text-fg-3">
-                    <tr>
-                      <th scope="col" className="pb-2 font-medium">
-                        <span className="sr-only">Line</span>
-                      </th>
-                      <th scope="col" className="pb-2 text-right font-medium">
-                        Bought late in the decade
-                      </th>
-                      <th scope="col" className="pb-2 text-right font-medium">
-                        Bought early
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-(--glass-border) tnum">
-                    {(
-                      [
-                        ["Estimated value", lowNet.grossPaise, highNet.grossPaise, ""],
-                        [`Success fee (${feePct}%)`, lowNet.feePaise, highNet.feePaise, "− "],
-                        ["GST on the fee (18%)", lowNet.gstPaise, highNet.gstPaise, "− "],
-                      ] as const
-                    ).map(([label, a, b, sign]) => (
-                      <tr key={label}>
-                        <th scope="row" className="py-2.5 font-normal text-fg-2">
-                          {label}
-                        </th>
-                        <td className="py-2.5 text-right text-fg">
-                          {sign}
-                          {formatPaise(a)}
-                        </td>
-                        <td className="py-2.5 text-right text-fg">
-                          {sign}
-                          {formatPaise(b)}
-                        </td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <th scope="row" className="py-2.5 font-semibold text-fg">
-                        To you
-                      </th>
-                      <td className="py-2.5 text-right text-lg font-semibold text-confirmed">
-                        {formatPaise(lowNet.netPaise)}
-                      </td>
-                      <td className="py-2.5 text-right text-lg font-semibold text-confirmed">
-                        {formatPaise(highNet.netPaise)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-3 text-sm text-fg-3">
-                Filing IEPF-5 yourself costs nothing in government fees. Our fee applies only if we
-                do the work and value is credited.
-              </p>
-            </section>
-
-            <section aria-labelledby="calc-docs" className="panel p-5 sm:p-6">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 id="calc-docs" className="text-lg font-semibold text-fg">
-                  {SCENARIO_LABELS[sit.scenario]}
-                </h2>
-                <p className="text-sm text-fg-2 tnum">
-                  About {tMin} to {tMax} months
-                </p>
-              </div>
-              <ul className="mt-4 grid gap-3">
-                {checklist.map((d) => (
-                  <li key={d.docType} className="flex items-start gap-3">
-                    <CheckIcon className="mt-1 size-4 shrink-0 text-confirmed" aria-hidden="true" />
-                    <span>
-                      <span className="text-fg">{DOC_TYPE_LABELS[d.docType]}</span>
-                      {!d.beforeFiling && (
-                        <span className="text-sm text-fg-3"> (after filing)</span>
-                      )}
-                      <span className="block text-sm text-fg-3">{d.reason}</span>
+                  <div className="flex items-center gap-3 sm:justify-end">
+                    <span className="text-lg font-semibold text-fg tnum">
+                      {formatPaiseCompact(r.valuation.totalPaise)}
                     </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <Alert variant="info">
-              <InfoIcon aria-hidden="true" />
-              <AlertDescription className="text-sm">
-                An estimate from {company.name}&apos;s recorded bonuses, splits and dividends and
-                the latest exchange price, never a quote. The registrar confirms the real count, and
-                value is fixed on the day shares are credited.
-              </AlertDescription>
-            </Alert>
-            <div>
-              <Button asChild size="lg">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove ${r.valuation.name}`}
+                      onClick={() => setRows((all) => all.filter((x) => x.key !== r.key))}
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="flex items-center gap-2 font-semibold text-fg">
+                  <FileTextIcon className="size-4 text-signal" aria-hidden="true" />
+                  Official Share Valuation PDF Report
+                </p>
+                <p className="mt-1 text-sm text-fg-3">
+                  With a Report ID, the total in words and the basis of every figure. Free after a
+                  sign-in; two reports a day per mobile number.
+                </p>
+                {report.message && (
+                  <p className="mt-2 text-sm text-fg-2" role="status">
+                    {report.message}
+                  </p>
+                )}
+              </div>
+              <Button onClick={downloadReport} disabled={report.busy}>
+                {report.busy ? (
+                  <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <DownloadIcon aria-hidden="true" />
+                )}
+                Download report
+              </Button>
+            </div>
+            <div className="panel flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-fg-2">
+                Are any of these unclaimed? Check the family&apos;s name in three minutes.
+              </p>
+              <Button asChild variant="outline">
                 <Link href="/search">
                   <SearchIcon aria-hidden="true" />
-                  Find the holding by name
+                  {CHECK_CTA}
+                  <ArrowRightIcon aria-hidden="true" />
                 </Link>
               </Button>
             </div>
           </>
         )}
-      </div>
+        <p className="text-sm text-fg-3">
+          Shares are counted from 1 January of the purchase year, after every recorded bonus and
+          split. Dividends are those paid per share on each ex-date while held, as if never
+          encashed. Estimates only; the exact entitlement is confirmed during verification.
+        </p>
+      </section>
+
+      <LoginGatewayDialog
+        open={gateway}
+        onOpenChange={setGateway}
+        reason="to download your Share Valuation Report"
+        onSignedIn={() => void downloadReport()}
+      />
     </div>
   );
 }

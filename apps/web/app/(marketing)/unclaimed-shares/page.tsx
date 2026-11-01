@@ -8,9 +8,9 @@ import { listCompanies } from "@/lib/companies";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Unclaimed shares by company: IEPF claim guides",
+  title: "Unclaimed shares by company",
   description:
-    "Company-by-company guides to recovering unclaimed shares and dividends from the IEPF: registrar contacts, bonus and split history, and the IEPF-5 steps.",
+    "Unclaimed shares and dividends recovered company by company by Finsol Enterprises: bonus and split history, live prices and a free 3-Minute Check.",
   alternates: { canonical: "/unclaimed-shares" },
 };
 
@@ -27,8 +27,8 @@ export default async function CompanyIndexPage() {
         Unclaimed shares, company by company
       </h1>
       <p className="mt-4 max-w-[62ch] text-lg text-fg-2">
-        Who the registrar is, how bonuses and splits have grown an old holding, and the IEPF-5 steps
-        for each company. Pick a company, or search by the holder&apos;s name.
+        How bonuses and splits have grown an old holding, and what it is worth today. Pick a
+        company, or start the 3-Minute Check with the investor&apos;s name.
       </p>
       <UnclaimedSearchForm className="mt-8 max-w-[56rem]" compact />
       <div className="mt-14 grid gap-10">
@@ -52,7 +52,8 @@ export default async function CompanyIndexPage() {
                       />
                     </span>
                     <span className="text-sm text-fg-2">
-                      {c.sector ?? "Listed company"} · Registrar: {c.rtaLabel}
+                      {c.sector ?? "Listed company"}
+                      {c.tickerNse ? ` · NSE: ${c.tickerNse}` : ""}
                     </span>
                   </Link>
                 </li>

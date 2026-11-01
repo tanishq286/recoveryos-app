@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
-/** The mark: a path that turns back on itself and ends at a lit point. Geometry unchanged. */
+/** The mark: an F drawn as a path that ends at a lit point (value reaching its owner). */
 export function Mark({ className }: { className?: string }) {
   return (
     <svg
@@ -20,7 +20,7 @@ export function Mark({ className }: { className?: string }) {
         strokeWidth="1.25"
       />
       <path
-        d="M8.5 18.5V11a3.5 3.5 0 0 1 3.5-3.5h3.5a3.5 3.5 0 0 1 0 7H12l5.5 5.5"
+        d="M10 20V10.5A3 3 0 0 1 13 7.5h5.5M10 14h5.5"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -47,7 +47,7 @@ export function Wordmark({ href = "/", className }: { href?: string; className?:
     >
       <Mark />
       <span className="text-[1.125rem] leading-none font-[620] tracking-[-0.01em] [font-stretch:108%]">
-        RecoveryOS
+        Finsol <span className="font-[480] text-fg-2">Enterprises</span>
       </span>
     </Link>
   );

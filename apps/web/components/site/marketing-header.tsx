@@ -3,18 +3,18 @@ import Link from "next/link";
 import { Wordmark } from "@/components/brand/wordmark";
 import { Button } from "@/components/ui/button";
 import { CHECK_CTA } from "@/components/site/cta";
-import { CommandTrigger } from "@/components/command/command-trigger";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { NavLinks } from "@/components/site/nav-links";
 import { AccountLink } from "@/components/auth/account-link";
 
 const NAV = [
-  { href: "/search", label: "Search" },
+  { href: "/search", label: "3-Minute Check" },
   { href: "/services", label: "Services" },
   { href: "/calculator", label: "Calculator" },
-  { href: "/unclaimed-shares", label: "Company guides" },
+  { href: "/unclaimed-shares", label: "Companies" },
   { href: "/partners", label: "Partners" },
   { href: "/#pricing", label: "Pricing" },
+  { href: "/#contact", label: "Contact" },
 ];
 
 export function MarketingHeader() {
@@ -29,7 +29,6 @@ export function MarketingHeader() {
           <NavLinks items={NAV} label="Main" />
         </div>
         <div className="order-2 flex items-center gap-3 lg:order-3">
-          <CommandTrigger compactAtLg />
           <ThemeToggle />
           <AccountLink />
           <Button
@@ -37,7 +36,7 @@ export function MarketingHeader() {
             size="sm"
             className="hidden whitespace-nowrap sm:inline-flex lg:hidden 2xl:inline-flex"
           >
-            <Link href="/check">{CHECK_CTA}</Link>
+            <Link href="/search">{CHECK_CTA}</Link>
           </Button>
         </div>
       </div>

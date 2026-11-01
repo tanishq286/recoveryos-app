@@ -7,9 +7,9 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { SERVICE_ICONS } from "@/components/services/icons";
 
 export const metadata: Metadata = {
-  title: "Services: IEPF claims, duplicate shares, transmission and more",
+  title: "Services: share recovery, transmission, demat and more",
   description:
-    "Eleven recovery services, from IEPF-5 claims and duplicate shares to transmission after a death, demat conversion and NRI recovery. Free official routes shown beside each.",
+    "Eleven turnkey recovery services from Finsol Enterprises, from IEPF share recovery and lost certificates to transmission after a death, demat conversion and NRI recovery. No upfront fee.",
   alternates: { canonical: "/services" },
 };
 
@@ -20,8 +20,8 @@ export default function ServicesPage() {
         What we help recover
       </h1>
       <p className="mt-4 max-w-[62ch] text-lg text-fg-2">
-        Shares and dividends are where we take cases today. For the rest we show the free official
-        route first, and call you back if you want help with it.
+        Shares and dividends are where we take cases today, end to end. For the other services we
+        call you back and confirm whether we can act. No upfront fee, ever.
       </p>
       <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {SERVICE_VERTICALS.map((s) => {
@@ -44,7 +44,7 @@ export default function ServicesPage() {
                 <span className="text-lg font-semibold text-fg">{s.name}</span>
                 <span className="text-fg-2">{s.summary}</span>
                 <span className="mt-auto inline-flex items-center gap-1 pt-2 text-sm font-medium text-fg">
-                  How it works
+                  What we handle
                   <ArrowRightIcon
                     className="size-4 transition-transform duration-150 group-hover:translate-x-0.5"
                     aria-hidden="true"

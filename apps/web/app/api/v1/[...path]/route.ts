@@ -1,15 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { API_URL, SESSION_COOKIE, UNLOCK_COOKIE, WHO_COOKIE } from "@/lib/api/config";
+import { API_URL, SESSION_COOKIE, WHO_COOKIE } from "@/lib/api/config";
 
 /**
  * Backend-for-frontend: the browser calls /api/v1/*, this handler adds the
- * httpOnly session and unlock cookies as headers and forwards to the API.
- * Sign-in and unlock responses have their tokens moved into cookies, so the
- * browser never sees a token. Only listed API areas are reachable.
+ * httpOnly session cookie as a header and forwards to the API. Sign-in
+ * responses have their token moved into the cookie, so the browser never
+ * sees a token. Only listed API areas are reachable.
  */
 const ALLOWED =
-  /^(auth\/(otp\/request|otp\/verify|me)|search\/(unclaimed|unlock)|companies(\/.*)?|stats|cases(\/.*)?|crm\/.+|associates\/.+|admin\/ingestion(\/.*)?|health)$/;
+  /^(auth\/(otp\/request|otp\/verify|me)|search\/(unclaimed|claim|live\/[0-9a-f-]{36})|companies(\/.*)?|market\/(prices|equities(\/.*)?)|valuation\/report|stats|cases(\/.*)?|crm\/.+|associates\/.+|admin\/(ingestion|companies)(\/.*)?|health)$/;
 
 const secure = process.env.NODE_ENV === "production";
 
@@ -37,9 +37,7 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     if (v) headers.set(h, v);
   }
   const session = req.cookies.get(SESSION_COOKIE)?.value;
-  const unlock = req.cookies.get(UNLOCK_COOKIE)?.value;
   if (session) headers.set("authorization", `Bearer ${session}`);
-  if (unlock && path.startsWith("search/")) headers.set("x-unlock-token", unlock);
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) headers.set("x-forwarded-for", fwd);
 
@@ -56,22 +54,19 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     } as RequestInit);
   } catch {
     return NextResponse.json(
-      { message: "The RecoveryOS service is not reachable right now. Please try again shortly." },
+      { message: "Finsol Enterprises is not reachable right now. Please try again shortly." },
       { status: 503 },
     );
   }
 
   const type = upstream.headers.get("content-type") ?? "";
-  const movesToken =
-    path === "auth/otp/verify" || path === "search/unlock" || path === "associates/register";
+  const movesToken = path === "auth/otp/verify" || path === "associates/register";
   if (upstream.ok && type.includes("json") && movesToken) {
     const body = (await upstream.json()) as Record<string, unknown>;
     const res = NextResponse.json(
       path === "auth/otp/verify"
         ? { user: body.user, expiresAt: body.expiresAt }
-        : path === "search/unlock"
-          ? { leadId: body.leadId, expiresAt: body.expiresAt, results: body.results }
-          : { associate: body.associate },
+        : { associate: body.associate },
       { status: upstream.status },
     );
     if (path === "auth/otp/verify") {
@@ -81,13 +76,6 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
         ...cookieOptions(String(body.expiresAt)),
         httpOnly: false,
       });
-    }
-    if (path === "search/unlock") {
-      res.cookies.set(
-        UNLOCK_COOKIE,
-        String(body.unlockToken),
-        cookieOptions(String(body.expiresAt)),
-      );
     }
     if (path === "associates/register") {
       const s = body.session as { token: string; expiresAt: string };
@@ -100,8 +88,14 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     return res;
   }
 
-  const out = new Headers({ "cache-control": "private, no-store" });
-  for (const h of ["content-type", "content-disposition", "x-content-type-options"]) {
+  const out = new Headers({ "cache-control": "private, no-store, no-transform" });
+  for (const h of [
+    "content-type",
+    "content-disposition",
+    "x-content-type-options",
+    "x-report-code",
+    "x-reports-left-today",
+  ]) {
     const v = upstream.headers.get(h);
     if (v) out.set(h, v);
   }

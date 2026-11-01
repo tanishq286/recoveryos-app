@@ -1,10 +1,11 @@
 import { ImageResponse } from "next/og";
 
-// The card shown when a RecoveryOS link is shared (WhatsApp, LinkedIn, X...).
+// The card shown when a Finsol Enterprises link is shared (WhatsApp, LinkedIn, X...).
 // Built once at build time from the brand palette; uses next/og's bundled
 // Geist, since the image renderer cannot read the site's WOFF2 fonts.
 
-export const alt = "RecoveryOS: find the path back to your assets. IEPF claims, prepared with you.";
+export const alt =
+  "Finsol Enterprises: your family's forgotten shares, recovered for you. No upfront fee, no recovery no fee, 100% confidential.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -106,7 +107,7 @@ export default function Image() {
           <svg width="46" height="46" viewBox="0 0 28 28" fill="none">
             <circle cx="14" cy="14" r="12.5" stroke={FG} strokeOpacity="0.5" strokeWidth="1.25" />
             <path
-              d="M8.5 18.5V11a3.5 3.5 0 0 1 3.5-3.5h3.5a3.5 3.5 0 0 1 0 7H12l5.5 5.5"
+              d="M10 20V10.5A3 3 0 0 1 13 7.5h5.5M10 14h5.5"
               stroke={FG}
               strokeWidth="1.5"
               strokeLinecap="round"
@@ -115,7 +116,7 @@ export default function Image() {
             <circle cx="18.5" cy="20" r="1.75" fill={CYAN} />
           </svg>
           <div style={{ display: "flex", fontSize: 34, color: FG, letterSpacing: -0.5 }}>
-            RecoveryOS
+            Finsol Enterprises
           </div>
         </div>
 
@@ -135,7 +136,7 @@ export default function Image() {
             }}
           >
             <div style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: CYAN }} />
-            IEPF claims, prepared with you
+            Turnkey share and dividend recovery
           </div>
           <div
             style={{
@@ -149,7 +150,7 @@ export default function Image() {
             }}
           >
             <div style={{ display: "flex" }}>
-              <span>Find the&nbsp;</span>
+              <span>Forgotten&nbsp;</span>
               <span
                 style={{
                   backgroundImage: `linear-gradient(90deg, ${CYAN}, ${BLUE})`,
@@ -157,20 +158,20 @@ export default function Image() {
                   color: "transparent",
                 }}
               >
-                path back
+                shares,
               </span>
             </div>
-            <div style={{ display: "flex" }}>to your assets.</div>
-            <div style={{ display: "flex", color: FG3 }}>See every step.</div>
+            <div style={{ display: "flex" }}>recovered for you.</div>
+            <div style={{ display: "flex", color: FG3 }}>Start a 3-Minute Check.</div>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 34, fontSize: 24, color: FG2 }}>
-          <span>No upfront fee</span>
+          <span>No Upfront Fee</span>
           <span style={{ color: FG3 }}>·</span>
-          <span>We never ask for your codes</span>
+          <span>No Recovery, No Fee</span>
           <span style={{ color: FG3 }}>·</span>
-          <span>No sign-up to check</span>
+          <span>100% Confidential</span>
         </div>
       </div>
     </div>,

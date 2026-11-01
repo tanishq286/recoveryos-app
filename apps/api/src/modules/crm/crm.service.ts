@@ -121,6 +121,7 @@ export class CrmService {
                     company: f.company.name,
                     shares: f.postActionShares,
                     custody: CUSTODY_LABELS[f.custodyStatus],
+                    folioReleased: l.releasedFolioIds.includes(f.id),
                   },
                 ]
               : [];
@@ -149,6 +150,8 @@ export class CrmService {
           recoverStepName: RECOVER_STEPS[c.recoverStep - 1]!.name,
           esignStatus: c.esignStatus,
           mcaIepf5Srn: c.mcaIepf5Srn,
+          feePct: c.agreedSuccessFeePct === null ? null : num(c.agreedSuccessFeePct),
+          folioReleased: !!c.folioReleasedAt,
           rtaEntitlementStatus: c.rtaEntitlementStatus,
           nodalVerificationStatus: c.nodalVerificationStatus,
           dematCreditStatus: c.dematCreditStatus,
@@ -209,6 +212,27 @@ export class CrmService {
     };
   }
 
+  /** Releases folio numbers to the claimant; everything not released stays masked for them. */
+  async releaseFolios(id: string, user: SessionClaims, folioIds: string[]) {
+    const lead = await this.lead(id);
+    const unknown = folioIds.filter((f) => !lead.matchedFolioIds.includes(f));
+    if (unknown.length) throw new BadRequestException("Release only holdings on this lead.");
+    const released = [...new Set([...lead.releasedFolioIds, ...folioIds])];
+    await this.prisma.client.leadInquiry.update({
+      where: { id },
+      data: { releasedFolioIds: released },
+    });
+    await this.audit.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: "lead.folio.release",
+      entityType: "lead",
+      entityId: id,
+      data: { folioIds },
+    });
+    return { id, releasedFolioIds: released };
+  }
+
   private async nextCaseCode(tx: Prisma.TransactionClient): Promise<string> {
     const year = new Date().getUTCFullYear();
     const last = await tx.recoveryCase.findFirst({
@@ -223,7 +247,7 @@ export class CrmService {
   async convert(
     id: string,
     user: SessionClaims,
-    body: { folioId: string; scenarioType: ScenarioType; agreedSuccessFeePct: number },
+    body: { folioId: string; scenarioType: ScenarioType; agreedSuccessFeePct?: number | null },
   ) {
     const lead = await this.lead(id);
     if (lead.crmStage === "CONVERTED_TO_CASE")
@@ -257,7 +281,8 @@ export class CrmService {
               folioId: folio.id,
               scenarioType: body.scenarioType,
               recoverStep: STEP_FOR_STAGE[lead.crmStage],
-              agreedSuccessFeePct: body.agreedSuccessFeePct,
+              agreedSuccessFeePct: body.agreedSuccessFeePct ?? null,
+              folioReleasedAt: lead.releasedFolioIds.includes(folio.id) ? new Date() : null,
             },
           });
           await tx.leadInquiry.update({
@@ -290,7 +315,8 @@ export class CrmService {
         return {
           caseCode: created.caseCode,
           recoverStep: created.recoverStep,
-          agreedSuccessFeePct: num(created.agreedSuccessFeePct),
+          agreedSuccessFeePct:
+            created.agreedSuccessFeePct === null ? null : num(created.agreedSuccessFeePct),
         };
       } catch (e) {
         // Two conversions raced for the same case code: take the next one.

@@ -1,6 +1,13 @@
 import { Logger } from "@nestjs/common";
 
+import { BRAND } from "@recoveryos/shared";
+
 import type { Env } from "../../config/env.js";
+
+/** The SMS every provider sends. MSG91 sends its DLT-approved template with the same wording. */
+export function otpMessage(code: string): string {
+  return `${code} is your ${BRAND.name} login code. It expires in 5 minutes. Never share it with anyone, including our staff.`;
+}
 
 /** Sends a one-time code. The code is generated and checked by AuthService, never here. */
 export interface OtpSender {
@@ -64,7 +71,7 @@ export class TwilioOtpSender implements OtpSender {
     const body = new URLSearchParams({
       To: phone,
       From: this.from,
-      Body: `${code} is your RecoveryOS verification code. It expires in 5 minutes. Never share it with anyone who calls you, including us.`,
+      Body: otpMessage(code),
     });
     const res = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${this.sid}/Messages.json`,

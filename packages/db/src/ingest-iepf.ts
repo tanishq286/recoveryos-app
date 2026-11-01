@@ -11,6 +11,7 @@ import {
 
 import { blindIndex, type FieldKeys } from "./crypto.js";
 import { folioColumns, folioSearchColumns } from "./columns.js";
+import { bulkUpsertFolios, type StagedFolio } from "./bulk-copy.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { readStatement, type RawTable } from "./statement-reader.js";
 
@@ -430,6 +431,8 @@ export interface IngestOptions {
   form?: IngestionForm;
   /** ingestion_jobs.id to stamp on rows. */
   jobId?: string | null;
+  /** Connection for the bulk COPY; defaults to DATABASE_URL. */
+  databaseUrl?: string;
   /** Parse and report without writing. */
   dryRun?: boolean;
   /** Called with progress counts every batch. */
@@ -443,8 +446,8 @@ export interface IngestResult {
   insertedRows: number;
   updatedRows: number;
   skippedRows: number;
-  /** Folio ids written, for the search index. */
-  folioIds: string[];
+  /** Time spent streaming rows in (binary COPY) and merging them, when written. */
+  timings?: { copyMs: number; mergeMs: number };
   errors: { row: number; message: string }[];
   unmappedHeaders: string[];
   /** First few parsed rows (dry runs only), for checking a new layout. */
@@ -560,7 +563,6 @@ export async function ingestStatement(
     insertedRows: 0,
     updatedRows: 0,
     skippedRows: skipped,
-    folioIds: [],
     errors,
     unmappedHeaders: unmapped,
     preview: [],
@@ -574,94 +576,51 @@ export async function ingestStatement(
     return result;
   }
 
-  for (let i = 0; i < list.length; i += 250) {
-    const batch = list.slice(i, i + 250);
-    const prepared = await Promise.all(
-      batch.map(async (g) => {
-        // Shares keep growing inside the IEPF: apply actions after the transfer.
-        const after = g.row.eventDate ? g.row.eventDate.toISOString().slice(0, 10) : null;
-        const post =
-          g.shares > 0 && after
-            ? computeEntitlement(g.shares, await actions(g.companyId), { acquiredOn: after }).shares
-            : g.shares;
-        // Actions dated on the transfer day itself are already reflected in the statement's count.
-        return { g, post: after ? Math.max(g.shares, post) : post };
-      }),
-    );
-    await db.$transaction(async (tx) => {
-      for (const { g, post } of prepared) {
-        const r = g.row;
-        const fullName = [r.first, r.middle, r.last].filter(Boolean).join(" ");
-        const folio = folioColumns(r.folio, keys);
-        const where = {
-          companyId_folioNumberHash_investorFullName: {
-            companyId: g.companyId,
-            folioNumberHash: folio.folioNumberHash,
-            investorFullName: fullName,
-          },
-        };
-        const existing = await tx.unclaimedFolio.findUnique({ where });
-        const custody =
-          form === "IEPF_4"
-            ? "IEPF_AUTHORITY"
-            : (existing?.custodyStatus ?? (g.shares > 0 ? "COMPANY_SUSPENSE" : "PHYSICAL_DORMANT"));
-        const sum = (m: Record<string, number>) =>
-          Math.round(Object.values(m).reduce((a, b) => a + b, 0) * 100) / 100;
-        if (existing) {
-          const amounts = {
-            ...((existing.amountsByEvent as Record<string, number> | null) ?? {}),
-            ...g.amounts,
-          };
-          await tx.unclaimedFolio.update({
-            where: { id: existing.id },
-            data: {
-              custodyStatus: custody,
-              ...(g.shares > 0 ? { originalShares: g.shares, postActionShares: post } : {}),
-              amountsByEvent: amounts,
-              unclaimedDividendAmount: sum(amounts),
-              eventDate: r.eventDate ?? existing.eventDate,
-              transferFinancialYear: r.transferFinancialYear ?? existing.transferFinancialYear,
-              investmentType: r.investmentType ?? existing.investmentType,
-              sourceFilingSrn: r.srn ?? existing.sourceFilingSrn,
-              ingestionJobId: opts.jobId ?? existing.ingestionJobId,
-            },
-          });
-          result.updatedRows++;
-          result.folioIds.push(existing.id);
-        } else {
-          const created = await tx.unclaimedFolio.create({
-            data: {
-              companyId: g.companyId,
-              investorFirstName: r.first,
-              investorMiddleName: r.middle || null,
-              investorLastName: r.last || null,
-              investorFullName: fullName,
-              fatherOrSpouseName: r.fatherOrSpouse,
-              addressLine: r.address,
-              city: r.city,
-              state: r.state,
-              pincode: r.pincode,
-              ...folio,
-              certificateNumbers: r.certificates,
-              originalShares: g.shares,
-              postActionShares: post,
-              amountsByEvent: g.amounts,
-              unclaimedDividendAmount: sum(g.amounts),
-              custodyStatus: custody,
-              eventDate: r.eventDate,
-              transferFinancialYear: r.transferFinancialYear,
-              investmentType: r.investmentType,
-              sourceFilingSrn: r.srn,
-              ingestionJobId: opts.jobId ?? null,
-              ...folioSearchColumns({ first: r.first, middle: r.middle, last: r.last }),
-            },
-          });
-          result.insertedRows++;
-          result.folioIds.push(created.id);
-        }
-      }
+  // Post-action shares: the IEPF keeps receiving bonuses and splits after the transfer.
+  const staged: StagedFolio[] = [];
+  for (const g of list) {
+    const r = g.row;
+    const after = r.eventDate ? r.eventDate.toISOString().slice(0, 10) : null;
+    const computed =
+      g.shares > 0 && after
+        ? computeEntitlement(g.shares, await actions(g.companyId), { acquiredOn: after }).shares
+        : g.shares;
+    // Actions dated on the transfer day itself are already reflected in the statement's count.
+    const post = after ? Math.max(g.shares, computed) : computed;
+    staged.push({
+      companyId: g.companyId,
+      investorFirstName: r.first,
+      investorMiddleName: r.middle || null,
+      investorLastName: r.last || null,
+      investorFullName: [r.first, r.middle, r.last].filter(Boolean).join(" "),
+      fatherOrSpouseName: r.fatherOrSpouse,
+      addressLine: r.address,
+      city: r.city,
+      state: r.state,
+      pincode: r.pincode,
+      ...folioColumns(r.folio, keys),
+      certificateNumbers: r.certificates,
+      originalShares: g.shares,
+      postActionShares: post,
+      amountsByEvent: g.amounts,
+      custodyStatus:
+        form === "IEPF_4"
+          ? "IEPF_AUTHORITY"
+          : g.shares > 0
+            ? "COMPANY_SUSPENSE"
+            : "PHYSICAL_DORMANT",
+      eventDate: r.eventDate,
+      transferFinancialYear: r.transferFinancialYear,
+      investmentType: r.investmentType,
+      sourceFilingSrn: r.srn,
+      ingestionJobId: opts.jobId ?? null,
+      ...folioSearchColumns({ first: r.first, middle: r.middle, last: r.last }),
     });
-    opts.onProgress?.(Math.min(i + 250, list.length), list.length);
   }
+  const bulk = await bulkUpsertFolios(staged, { form, databaseUrl: opts.databaseUrl });
+  result.insertedRows = bulk.inserted;
+  result.updatedRows = bulk.updated;
+  result.timings = { copyMs: bulk.copyMs, mergeMs: bulk.mergeMs };
+  opts.onProgress?.(list.length, list.length);
   return result;
 }

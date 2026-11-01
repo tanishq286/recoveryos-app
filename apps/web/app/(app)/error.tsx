@@ -40,7 +40,7 @@ export default function AppError({
       <div className="mt-8 flex flex-wrap gap-3">
         <Button onClick={() => retry()}>Try again</Button>
         <Button asChild variant="outline">
-          <Link href="/cases">Back to cases</Link>
+          <Link href="/portal">Back to my cases</Link>
         </Button>
       </div>
     </div>

@@ -26,9 +26,9 @@ export class JobHandlersService implements OnModuleInit {
 
   readonly handlers: JobHandlers = {
     "ingestion.process": async ({ jobId }) => this.imports.process(jobId),
-    "search.sync": async ({ folioIds }) => {
+    "search.sync": async ({ ingestionJobId }) => {
       if (this.engine instanceof MeiliSearchEngine) {
-        const n = await this.engine.sync(this.prisma.client, folioIds);
+        const n = await this.engine.sync(this.prisma.client, { ingestionJobId });
         this.log.log(`Indexed ${n} folios in Meilisearch.`);
       }
       // Postgres search reads the table directly; nothing to sync.
@@ -41,7 +41,7 @@ export class JobHandlersService implements OnModuleInit {
       if (!lead) return;
       // Hook for email, WhatsApp Business or Slack. The analyst also sees the lead on the CRM board.
       this.log.log(
-        `New unlocked lead for ${lead.assignedAnalyst?.name ?? "the unassigned queue"}: ${lead.claimantName} (${maskPhone(lead.phone)}), ${lead.matchedFolioIds.length} holding(s), estimate ₹${(Number(lead.estimatedValuePaise) / 100).toLocaleString("en-IN")}.`,
+        `New claim request for ${lead.assignedAnalyst?.name ?? "the unassigned queue"}: ${lead.claimantName} (${maskPhone(lead.phone)}), ${lead.matchedFolioIds.length} holding(s), estimate ₹${(Number(lead.estimatedValuePaise) / 100).toLocaleString("en-IN")}.`,
       );
     },
   };

@@ -22,7 +22,7 @@ import type { CaseDetail } from "@/lib/api/types";
 type Phase = "review" | "aadhaar" | "redirecting";
 
 /**
- * Step 5: the Scope of Work and the Aadhaar eSign. The client reads the PDF
+ * The Digital Mandate and the Aadhaar eSign. The client reads the PDF
  * in the dialog, confirms, and signs: on the provider's page in production,
  * or through a simulated Aadhaar OTP step in development. The mandate only
  * counts as signed once the provider's webhook verifies.
@@ -39,7 +39,8 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
   const [pdfVersion, setPdfVersion] = React.useState(0);
 
   const signed = detail.esign.status === "SIGNED";
-  const canSign = detail.viewerRole === "client" && detail.recoverStep === 5 && !signed;
+  const quoted = detail.money.feePct !== null;
+  const canSign = detail.viewerRole === "client" && detail.recoverStep === 5 && !signed && quoted;
   const pdfUrl = `/api/v1/cases/${detail.caseCode}/mandate?v=${pdfVersion}`;
 
   async function start() {
@@ -94,7 +95,9 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
               ? `Signed ${detail.esign.signedAt ? formatDateTime(detail.esign.signedAt) : ""}.`
               : detail.recoverStep < 5
                 ? "Opens at step 5, once you have agreed the offer."
-                : "Your Scope of Work is ready to read and sign."}
+                : detail.money.feePct === null
+                  ? "Your analyst is preparing your custom quote. The mandate opens once it is ready."
+                  : "Your Digital Mandate is ready to read and sign."}
           </p>
         </div>
         <StatusBadge
@@ -117,20 +120,22 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
             Review and sign
           </Button>
         )}
-        <Button asChild variant="outline" size={canSign ? "default" : "sm"}>
-          <a href={pdfUrl} target="_blank" rel="noopener">
-            <DownloadIcon aria-hidden="true" />
-            {signed ? "Signed mandate (PDF)" : "Scope of Work (PDF)"}
-          </a>
-        </Button>
+        {quoted && (
+          <Button asChild variant="outline" size={canSign ? "default" : "sm"}>
+            <a href={pdfUrl} target="_blank" rel="noopener">
+              <DownloadIcon aria-hidden="true" />
+              {signed ? "Signed mandate (PDF)" : "Digital Mandate (PDF)"}
+            </a>
+          </Button>
+        )}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent wide>
-          <DialogTitle>Scope of Work for {detail.caseCode}</DialogTitle>
+          <DialogTitle>Digital Mandate for {detail.caseCode}</DialogTitle>
           <DialogDescription>
-            {detail.money.feePct}% of the value actually credited, plus GST. Nothing upfront. You
-            can stop before filing at no charge.
+            Your agreed fee: {detail.money.feePct}% of the value actually credited, plus GST.
+            Nothing upfront. You can stop before filing at no charge.
           </DialogDescription>
           {error && (
             <Alert variant="blocker" role="alert" className="mt-4">
@@ -160,7 +165,7 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
                   onChange={(e) => setRead(e.target.checked)}
                   className="mt-1 size-5 shrink-0 accent-(--color-signal)"
                 />
-                I have read the Scope of Work and want to sign it with my Aadhaar.
+                I have read the Digital Mandate and want to sign it with my Aadhaar.
               </label>
               <Button className="mt-4" size="lg" disabled={!read || busy} onClick={start}>
                 {busy ? (

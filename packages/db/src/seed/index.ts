@@ -9,6 +9,10 @@
  * market sync in the API. Re-running updates contacts and corporate actions.
  *
  *   SEED_ADMIN_PHONE=98xxxxxxxx SEED_ADMIN_NAME="Your Name" npm run db:seed
+ *
+ * Without SEED_ADMIN_PHONE, development and test databases get a default
+ * administrator on 9000000001 so /admin works out of the box. Production
+ * never does: whoever holds that number would receive the admin login code.
  */
 import "dotenv/config";
 import { normalizeIndianMobile, REFERENCE_COMPANIES } from "@recoveryos/shared";
@@ -71,15 +75,18 @@ async function seedCompanies() {
   }
 }
 
+export const DEFAULT_ADMIN_PHONE = "9000000001";
+
 async function seedAdmin() {
-  const raw = process.env.SEED_ADMIN_PHONE;
+  const production = process.env.NODE_ENV === "production";
+  const raw = process.env.SEED_ADMIN_PHONE || (production ? undefined : DEFAULT_ADMIN_PHONE);
   if (!raw) {
     console.log("No SEED_ADMIN_PHONE set: no administrator created. Set it to sign in to /admin.");
     return;
   }
   const phone = normalizeIndianMobile(raw);
   if (!phone) throw new Error("SEED_ADMIN_PHONE is not a valid Indian mobile number.");
-  const name = process.env.SEED_ADMIN_NAME?.trim() || "Administrator";
+  const name = process.env.SEED_ADMIN_NAME?.trim() || "Finsol Administrator";
   await prisma.user.upsert({
     where: { phone },
     update: { role: "SUPER_ADMIN", isActive: true },
