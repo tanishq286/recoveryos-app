@@ -14,10 +14,14 @@ import { ENV, type Env } from "./config/env.js";
 };
 
 /** Builds the HTTP app; shared by main.ts and the end-to-end tests. */
-export async function createApp(opts: { logger?: false } = {}): Promise<INestApplication> {
+export async function createApp(
+  opts: { logger?: false; abortOnError?: boolean } = {},
+): Promise<INestApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
     bufferLogs: false,
+    // Serverless passes false: throw instead of process.exit, so the handler can answer 503.
+    abortOnError: opts.abortOnError ?? true,
     ...(opts.logger === false ? { logger: false } : {}),
   });
   const env = app.get<Env>(ENV);

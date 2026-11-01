@@ -25,6 +25,7 @@ import {
   AdminCompaniesController,
   CompaniesController,
 } from "./modules/companies/companies.controller.js";
+import { CronController } from "./modules/cron/cron.controller.js";
 import { CrmController } from "./modules/crm/crm.controller.js";
 import { CrmService } from "./modules/crm/crm.service.js";
 import { HealthController } from "./modules/health/health.controller.js";
@@ -68,16 +69,25 @@ import { ValuationController } from "./modules/valuation/valuation.controller.js
     ImportsController,
     MarketController,
     ValuationController,
+    CronController,
   ],
   providers: [
     { provide: ENV, useFactory: () => loadEnv() },
     { provide: OTP_SENDER, inject: [ENV], useFactory: (env: Env) => createOtpSender(env) },
     { provide: ESIGN_PROVIDER, inject: [ENV], useFactory: (env: Env) => createEsignProvider(env) },
-    { provide: DOCUMENT_STORAGE, inject: [ENV], useFactory: (env: Env) => createStorage(env) },
+    {
+      provide: DOCUMENT_STORAGE,
+      inject: [ENV, PrismaService],
+      useFactory: (env: Env, prisma: PrismaService) => createStorage(env, prisma.client),
+    },
     {
       provide: SEARCH_POOL,
-      inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => PostgresSearchEngine.pool(prisma.databaseUrl),
+      inject: [PrismaService, ENV],
+      // Session settings need a direct connection: Neon's PgBouncer refuses startup options.
+      useFactory: (prisma: PrismaService, env: Env) =>
+        PostgresSearchEngine.pool(env.DATABASE_URL_UNPOOLED ?? prisma.databaseUrl, {
+          max: env.SERVERLESS ? 3 : 10,
+        }),
     },
     {
       provide: SEARCH_ENGINE,

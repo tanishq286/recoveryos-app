@@ -31,6 +31,9 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [phase, setPhase] = React.useState<Phase>("review");
+  const [mode, setMode] = React.useState<"redirect" | "simulated" | "internal">("simulated");
+  /** Shown only while SMS is not live (internal mode). */
+  const [testCode, setTestCode] = React.useState<string | null>(null);
   const [read, setRead] = React.useState(false);
   const [aadhaar, setAadhaar] = React.useState("");
   const [otp, setOtp] = React.useState("");
@@ -47,16 +50,19 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await callApi<{ signUrl: string | null; mode: "redirect" | "simulated" }>(
-        `cases/${detail.caseCode}/esign/start`,
-        { method: "POST" },
-      );
+      const res = await callApi<{
+        signUrl: string | null;
+        mode: "redirect" | "simulated" | "internal";
+        testCode?: string;
+      }>(`cases/${detail.caseCode}/esign/start`, { method: "POST" });
       setPdfVersion((v) => v + 1);
       if (res.mode === "redirect" && res.signUrl) {
         setPhase("redirecting");
         window.location.assign(res.signUrl);
         return;
       }
+      setMode(res.mode);
+      setTestCode(res.testCode ?? null);
       setPhase("aadhaar");
     } catch (e) {
       setError((e as Error).message);
@@ -187,12 +193,28 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
 
           {phase === "aadhaar" && (
             <form onSubmit={complete} className="mt-5 grid gap-4">
-              <Alert variant="pending">
-                <AlertDescription>
-                  Development mode: this simulates the provider&apos;s Aadhaar OTP page. Any four
-                  digits and any six-digit code will do; nothing is sent to UIDAI.
-                </AlertDescription>
-              </Alert>
+              {mode === "internal" ? (
+                <Alert variant="pending" data-testid="esign-internal">
+                  <AlertDescription>
+                    Aadhaar eSign is being connected. Until then you accept this mandate
+                    electronically here, confirmed by a one-time code to your mobile.
+                    {testCode && (
+                      <>
+                        {" "}
+                        SMS is not live yet, so your code is{" "}
+                        <strong className="tnum font-mono tracking-[0.2em]">{testCode}</strong>.
+                      </>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert variant="pending">
+                  <AlertDescription>
+                    Development mode: this simulates the provider&apos;s Aadhaar OTP page. Any four
+                    digits and any six-digit code will do; nothing is sent to UIDAI.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="e-aadhaar" className="mb-1.5 block text-sm text-fg-2">
@@ -210,7 +232,7 @@ export function EsignPanel({ detail }: { detail: CaseDetail }) {
                 </div>
                 <div>
                   <label htmlFor="e-otp" className="mb-1.5 block text-sm text-fg-2">
-                    Aadhaar OTP
+                    {mode === "internal" ? "Code sent to your mobile" : "Aadhaar OTP"}
                   </label>
                   <Input
                     id="e-otp"

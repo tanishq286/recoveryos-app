@@ -18,6 +18,77 @@ export interface DocumentStorage {
 
 export const DOCUMENT_STORAGE = Symbol("DOCUMENT_STORAGE");
 
+function vaultKey(keyB64: string | undefined): Buffer {
+  const key = keyB64
+    ? Buffer.from(keyB64, "base64")
+    : createHash("sha256").update("recoveryos-development-only:storage").digest();
+  if (key.length !== 32)
+    throw new Error("STORAGE_ENCRYPTION_KEY must be 32 bytes, base64-encoded.");
+  return key;
+}
+
+function seal(key: Buffer, body: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const data = Buffer.concat([cipher.update(body), cipher.final()]);
+  return Buffer.concat([Buffer.from("ROS1"), iv, cipher.getAuthTag(), data]);
+}
+
+function open(key: Buffer, raw: Buffer): Buffer {
+  if (raw.subarray(0, 4).toString() !== "ROS1") throw new Error("Unrecognised vault object.");
+  const decipher = createDecipheriv("aes-256-gcm", key, raw.subarray(4, 16));
+  decipher.setAuthTag(raw.subarray(16, 32));
+  return Buffer.concat([decipher.update(raw.subarray(32)), decipher.final()]);
+}
+
+/** Minimal slice of the Prisma client the database vault needs. */
+interface StoredObjects {
+  storedObject: {
+    upsert(args: {
+      where: { key: string };
+      create: { key: string; data: Uint8Array<ArrayBuffer>; contentType: string };
+      update: { data: Uint8Array<ArrayBuffer>; contentType: string };
+    }): Promise<unknown>;
+    findUnique(args: {
+      where: { key: string };
+      select: { data: true };
+    }): Promise<{ data: Uint8Array } | null>;
+  };
+}
+
+/** Encrypted objects in Postgres: for hosts without a persistent disk, such as Vercel. */
+export class DatabaseEncryptedStorage implements DocumentStorage {
+  readonly name = "db";
+  private readonly key: Buffer;
+
+  constructor(
+    private readonly db: StoredObjects,
+    keyB64: string | undefined,
+  ) {
+    this.key = vaultKey(keyB64);
+  }
+
+  async put(key: string, body: Buffer, contentType: string): Promise<string> {
+    const data = new Uint8Array(seal(this.key, body));
+    await this.db.storedObject.upsert({
+      where: { key },
+      create: { key, data, contentType },
+      update: { data, contentType },
+    });
+    return `db://${key}`;
+  }
+
+  async get(url: string): Promise<Buffer> {
+    if (!url.startsWith("db://")) throw new Error("Not a database storage URL.");
+    const row = await this.db.storedObject.findUnique({
+      where: { key: url.slice("db://".length) },
+      select: { data: true },
+    });
+    if (!row) throw new Error("Vault object not found.");
+    return open(this.key, Buffer.from(row.data));
+  }
+}
+
 export class LocalEncryptedStorage implements DocumentStorage {
   readonly name = "local";
   private readonly root: string;
@@ -95,7 +166,11 @@ export class S3Storage implements DocumentStorage {
   }
 }
 
-export function createStorage(env: Env): DocumentStorage {
+export function createStorage(env: Env, db?: StoredObjects): DocumentStorage {
+  if (env.STORAGE_PROVIDER === "db") {
+    if (!db) throw new Error("STORAGE_PROVIDER=db needs the database client.");
+    return new DatabaseEncryptedStorage(db, env.STORAGE_ENCRYPTION_KEY);
+  }
   if (env.STORAGE_PROVIDER === "s3") {
     if (!env.S3_BUCKET) throw new Error("S3_BUCKET is required when STORAGE_PROVIDER=s3.");
     return new S3Storage(env.S3_BUCKET, env.S3_REGION, env.S3_KMS_KEY_ID, env.S3_ENDPOINT);

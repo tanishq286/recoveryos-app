@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -44,6 +46,7 @@ import {
   type EsignProvider,
 } from "../../common/providers/esign.provider.js";
 import { isoTime, num } from "../../common/serialize.js";
+import { OtpService } from "../auth/otp.service.js";
 import { buildMandatePdf, stampSigned } from "./mandate-pdf.js";
 
 type CaseFull = Prisma.RecoveryCaseGetPayload<{
@@ -77,7 +80,16 @@ export class CasesService {
     @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
     @Inject(ESIGN_PROVIDER) private readonly esign: EsignProvider,
     @Inject(ENV) private readonly env: Env,
+    private readonly otp: OtpService,
   ) {}
+
+  /**
+   * In production without Digio or Leegality the mandate is accepted inside
+   * the portal, confirmed by a one-time code to the client's mobile.
+   */
+  private get internalEsign(): boolean {
+    return this.esign instanceof MockEsignProvider && this.env.NODE_ENV === "production";
+  }
 
   /* ── Access ─────────────────────────────────────────────────────────── */
 
@@ -553,17 +565,30 @@ export class CasesService {
       where: { id: c.id },
       data: { esignRequestId: req.requestId, esignMandateUrl: url },
     });
+    let testCode: string | undefined;
+    if (this.internalEsign) {
+      try {
+        testCode = (await this.otp.request(c.client.phone, "UNLOCK", null)).testCode;
+      } catch (e) {
+        // A code sent in the last 30 seconds is still valid; anything else is a real failure.
+        if (!(e instanceof HttpException && e.getStatus() === HttpStatus.TOO_MANY_REQUESTS))
+          throw e;
+      }
+    }
     await this.event(
       c.id,
       user.sub,
       "esign",
-      "Digital Mandate generated and sent for Aadhaar eSign.",
+      this.internalEsign
+        ? "Digital Mandate generated for electronic acceptance in the portal."
+        : "Digital Mandate generated and sent for Aadhaar eSign.",
     );
     return {
       requestId: req.requestId,
       signUrl: req.signUrl,
       provider: this.esign.name,
-      mode: req.signUrl ? "redirect" : "simulated",
+      mode: req.signUrl ? "redirect" : this.internalEsign ? "internal" : "simulated",
+      ...(testCode ? { testCode } : {}),
     };
   }
 
@@ -575,6 +600,7 @@ export class CasesService {
     if (!c.esignRequestId) throw new ConflictException("Start the eSign first.");
     if (!/^\d{4}$/.test(aadhaarLast4) || !/^\d{6}$/.test(otp))
       throw new BadRequestException("Enter the last 4 digits of Aadhaar and the 6-digit code.");
+    if (this.internalEsign) await this.otp.verify(c.client.phone, "UNLOCK", otp);
     const hook = this.esign.buildWebhook(c.esignRequestId);
     await this.handleWebhook(this.esign.name, Buffer.from(hook.body), {
       "x-recoveryos-signature": hook.signature,
@@ -614,12 +640,12 @@ export class CasesService {
     }
     const signedAt = new Date();
     let mandateUrl = c.esignMandateUrl;
-    if (mandateUrl?.startsWith("local://") || mandateUrl?.startsWith("s3://")) {
+    if (mandateUrl && /^(local|s3|db):\/\//.test(mandateUrl)) {
       const signed = await stampSigned(
         await this.storage.get(mandateUrl),
         c.client.name,
         signedAt,
-        provider,
+        this.internalEsign ? "internal" : provider,
         result.requestId,
       );
       mandateUrl = await this.storage.put(

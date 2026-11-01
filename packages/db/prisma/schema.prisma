@@ -606,3 +606,14 @@ model NameWord {
 
   @@map("name_words")
 }
+
+/// Encrypted document bodies for STORAGE_PROVIDER=db (serverless hosts).
+model StoredObject {
+  key         String   @id
+  /// AES-256-GCM: "ROS1" + IV + tag + ciphertext.
+  data        Bytes
+  contentType String   @map("content_type")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("stored_objects")
+}

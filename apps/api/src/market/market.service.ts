@@ -43,6 +43,8 @@ export class MarketService implements OnApplicationBootstrap, OnModuleDestroy {
   ) {}
 
   onApplicationBootstrap() {
+    // On Vercel the daily cron (/api/v1/cron/daily) runs the sync instead.
+    if (this.env.SERVERLESS) return;
     if (!this.env.MARKET_SYNC_ENABLED) {
       this.log.log("Market sync is off (MARKET_SYNC_ENABLED=false).");
       return;

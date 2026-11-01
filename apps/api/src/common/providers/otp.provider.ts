@@ -12,6 +12,11 @@ export function otpMessage(code: string): string {
 /** Sends a one-time code. The code is generated and checked by AuthService, never here. */
 export interface OtpSender {
   readonly name: string;
+  /**
+   * True when no SMS goes out, so the sign-in screen must show the code itself.
+   * OtpService never reveals a staff account's code; staff read it from the server log.
+   */
+  readonly revealsCode?: boolean;
   send(phoneE164: string, code: string): Promise<void>;
 }
 
@@ -34,6 +39,21 @@ export class ConsoleOtpSender implements OtpSender {
 
   lastCode(phone: string): string | undefined {
     return this.last.get(phone);
+  }
+}
+
+/**
+ * Production stand-in until MSG91's DLT registration completes: no SMS is
+ * sent. Investors see their code on the sign-in screen (marked as test mode);
+ * staff codes are never shown and appear only in the server log.
+ */
+export class InternalOtpSender implements OtpSender {
+  readonly name = "internal";
+  readonly revealsCode = true;
+  private readonly log = new Logger("OTP");
+
+  async send(phone: string, code: string) {
+    this.log.warn(`Internal OTP for ${phone.slice(0, -4)}****: ${code}`);
   }
 }
 
@@ -97,6 +117,8 @@ export function createOtpSender(env: Env): OtpSender {
       if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_FROM)
         throw new Error("TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM are required.");
       return new TwilioOtpSender(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_FROM);
+    case "internal":
+      return new InternalOtpSender();
     default:
       return new ConsoleOtpSender();
   }

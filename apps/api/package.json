@@ -11,7 +11,8 @@
     "start": "node dist/main.js",
     "start:worker": "node dist/worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bundle:vercel": "node scripts/bundle-vercel.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1160.0",
@@ -37,13 +38,14 @@
     "@types/express": "^5.0.6",
     "@types/multer": "^2.3.0",
     "@types/node": "^20",
+    "@types/pg": "^8.15.0",
     "@types/supertest": "^7.2.1",
     "concurrently": "^9.2.0",
+    "pg": "^8.16.0",
+    "rolldown": "1.2.16",
     "supertest": "^7.3.1",
     "typescript": "^5",
     "unplugin-swc": "^2.0.0",
-    "vitest": "^5.0.0",
-    "pg": "^8.16.0",
-    "@types/pg": "^8.15.0"
+    "vitest": "^5.0.0"
   }
 }

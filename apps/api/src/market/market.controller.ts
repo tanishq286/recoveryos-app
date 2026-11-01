@@ -23,10 +23,9 @@ export class MarketController {
   async searchEquities(
     @Query({ schema: z.object({ q: z.string().trim().max(60).default("") }) }) query: { q: string },
   ) {
-    return {
-      directorySize: this.equities.directorySize,
-      results: await this.equities.search(query.q),
-    };
+    // Search first: on a fresh (serverless) instance it is what counts the directory.
+    const results = await this.equities.search(query.q);
+    return { directorySize: this.equities.directorySize, results };
   }
 
   /** One equity: live price, bonus and split history, and dividends paid per share. */

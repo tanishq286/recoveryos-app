@@ -53,3 +53,6 @@ packages/db/src/generated/
 # Pan-India drop folder: data files never go into git
 data/pan-india-drop/*
 !data/pan-india-drop/README.md
+
+# Vercel function bundle (built by apps/api/scripts/bundle-vercel.mjs)
+apps/api/bundle/

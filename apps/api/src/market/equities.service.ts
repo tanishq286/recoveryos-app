@@ -73,7 +73,13 @@ export class EquitiesService implements OnApplicationBootstrap {
   }
 
   onApplicationBootstrap() {
-    if (this.online) void this.loadNse();
+    if (this.online && !this.env.SERVERLESS) void this.loadNse();
+  }
+
+  /** Reloads the NSE directory now (the serverless daily cron). Returns the directory size. */
+  async refreshDirectory(): Promise<number> {
+    if (this.online) await this.loadNse();
+    return this.directorySize;
   }
 
   /**
