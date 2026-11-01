@@ -9,8 +9,8 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { TEMPLATE_HEADERS } from "@recoveryos/db";
-import { INGESTION_FORMS } from "@recoveryos/shared";
+import { TEMPLATE_HEADERS } from "@finsol/db";
+import { INGESTION_FORMS } from "@finsol/shared";
 import { z } from "zod";
 
 import { CurrentUser, Roles } from "../../common/auth/decorators.js";

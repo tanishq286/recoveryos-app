@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MailIcon } from "lucide-react";
-import { BRAND, BRAND_DESKS } from "@recoveryos/shared";
+import { BRAND, BRAND_DESKS } from "@finsol/shared";
 
 import { Wordmark } from "@/components/brand/wordmark";
 import { cn } from "@/lib/utils";

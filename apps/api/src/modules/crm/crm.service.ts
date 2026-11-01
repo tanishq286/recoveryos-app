@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma } from "@recoveryos/db";
+import { Prisma } from "@finsol/db";
 import {
   CRM_STAGE_LABELS,
   CRM_STAGES,
@@ -15,7 +15,7 @@ import {
   PHYSICAL_CERT_LABELS,
   type CrmStage,
   type ScenarioType,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { AuditService } from "../../common/audit.service.js";
 import { PrismaService } from "../../common/prisma.service.js";

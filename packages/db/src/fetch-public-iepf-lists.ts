@@ -2,10 +2,10 @@
  * Downloads the IEPF-2 / IEPF-4 / unclaimed-dividend statements companies
  * publish on their investor-relations pages, and optionally ingests them.
  *
- *   npm run fetch:iepf -w @recoveryos/db -- --all                 every company with an IR page on record
- *   npm run fetch:iepf -w @recoveryos/db -- --company wipro-limited --url https://…/investors/unclaimed-dividend
- *   npm run fetch:iepf -w @recoveryos/db -- --all --ingest        download, then ingest what parses
- *   npm run fetch:iepf -w @recoveryos/db -- --all --out data/pan-india-drop   also copy into the drop folder
+ *   npm run fetch:iepf -w @finsol/db -- --all                 every company with an IR page on record
+ *   npm run fetch:iepf -w @finsol/db -- --company wipro-limited --url https://…/investors/unclaimed-dividend
+ *   npm run fetch:iepf -w @finsol/db -- --all --ingest        download, then ingest what parses
+ *   npm run fetch:iepf -w @finsol/db -- --all --out data/pan-india-drop   also copy into the drop folder
  *
  * How it behaves:
  * - It identifies itself honestly, checks robots.txt, and waits between requests.

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "cd ../.. && npm ci --no-audit --no-fund",
-  "buildCommand": "cd ../.. && npm run build -w @recoveryos/shared && npm run build -w @recoveryos/db && npm run build -w @recoveryos/api && npm run bundle:vercel -w @recoveryos/api",
+  "buildCommand": "cd ../.. && npm run build -w @finsol/shared && npm run build -w @finsol/db && npm run build -w @finsol/api && npm run bundle:vercel -w @finsol/api",
   "outputDirectory": "public",
   "regions": ["sin1"],
   "functions": {

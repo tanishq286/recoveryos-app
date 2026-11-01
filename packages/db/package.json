@@ -1,8 +1,8 @@
 {
-  "name": "@recoveryos/db",
+  "name": "@finsol/db",
   "version": "0.2.0",
   "private": true,
-  "description": "Prisma schema, SQL migrations, seed and a local Postgres for RecoveryOS.",
+  "description": "Prisma schema, SQL migrations, seed and a local Postgres for Finsol Enterprises.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,7 +29,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
-    "@recoveryos/shared": "*",
+    "@finsol/shared": "*",
     "pdfjs-dist": "^6.4.299",
     "pg": "^8.23.1",
     "pg-copy-streams": "^7.0.0",

@@ -1,6 +1,6 @@
 import Form from "next/form";
 import { LockIcon, PlusIcon, SearchIcon } from "lucide-react";
-import type { SearchScope } from "@recoveryos/shared";
+import type { SearchScope } from "@finsol/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

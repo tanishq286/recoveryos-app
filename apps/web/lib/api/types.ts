@@ -13,9 +13,9 @@ import type {
   RtaName,
   ScenarioType,
   TrackStatus,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
-/** Response shapes of the RecoveryOS API, as the web app reads them. */
+/** Response shapes of the Finsol Enterprises API, as the web app reads them. */
 
 export interface Stats {
   folios: number;

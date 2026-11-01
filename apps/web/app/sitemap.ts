@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SERVICE_VERTICALS } from "@recoveryos/shared";
+import { SERVICE_VERTICALS } from "@finsol/shared";
 
 import { listCompanies } from "@/lib/companies";
 import { SITE_URL } from "@/lib/site";

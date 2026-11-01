@@ -1,5 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { holdingValuePaise } from "@recoveryos/shared";
+import { holdingValuePaise } from "@finsol/shared";
 
 import { Public } from "../../common/auth/decorators.js";
 import { PrismaService } from "../../common/prisma.service.js";

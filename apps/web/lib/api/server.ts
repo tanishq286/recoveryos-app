@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 
 import { API_URL, SESSION_COOKIE } from "@/lib/api/config";
 

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { CRM_STAGES, SCENARIO_TYPES } from "@recoveryos/shared";
+import { CRM_STAGES, SCENARIO_TYPES } from "@finsol/shared";
 import { z } from "zod";
 
 import { CurrentUser, Roles } from "../../common/auth/decorators.js";

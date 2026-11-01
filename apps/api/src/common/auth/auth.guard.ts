@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 
 import { IS_PUBLIC, ROLES, type AuthedRequest } from "./decorators.js";
 import { TokensService } from "./tokens.service.js";

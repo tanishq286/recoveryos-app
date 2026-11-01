@@ -1,6 +1,6 @@
 import { Logger } from "@nestjs/common";
 
-import { BRAND } from "@recoveryos/shared";
+import { BRAND } from "@finsol/shared";
 
 import type { Env } from "../../config/env.js";
 

@@ -8,7 +8,7 @@ import {
   STATE_LABELS,
   type SearchResponse,
   type SearchScope,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

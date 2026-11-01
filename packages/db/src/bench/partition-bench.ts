@@ -1,7 +1,7 @@
 /**
  * Load and search benchmark for the state-partitioned folio store.
  *
- *   npm run bench:partitions -w @recoveryos/db -- --rows 5000000
+ *   npm run bench:partitions -w @finsol/db -- --rows 5000000
  *
  * Runs ONLY against a database whose name ends in `_bench` (default
  * recoveryos_bench, created if missing). It fills that database with
@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { createHash } from "node:crypto";
 
 import pg from "pg";
-import { phoneticKeys, joinName } from "@recoveryos/shared";
+import { phoneticKeys, joinName } from "@finsol/shared";
 
 import { bulkUpsertFolios, type StagedFolio } from "../bulk-copy.js";
 import { keysFromEnv } from "../crypto.js";

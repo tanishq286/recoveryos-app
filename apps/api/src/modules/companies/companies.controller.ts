@@ -1,5 +1,5 @@
 import { Controller, Get, NotFoundException, Param, Query } from "@nestjs/common";
-import { RTA_LABELS } from "@recoveryos/shared";
+import { RTA_LABELS } from "@finsol/shared";
 import { z } from "zod";
 
 import { Public, Roles } from "../../common/auth/decorators.js";

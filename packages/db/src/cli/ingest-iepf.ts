@@ -1,8 +1,8 @@
 /**
  * Ingest a real IEPF-2 or IEPF-4 statement.
  *
- *   npm run ingest:iepf -w @recoveryos/db -- --cin L17110MH1973PLC019786 --file ./ril-iepf4-2025.xlsx
- *   npm run ingest:iepf -w @recoveryos/db -- --slug state-bank-of-india --file https://…/unclaimed.xls --dry-run
+ *   npm run ingest:iepf -w @finsol/db -- --cin L17110MH1973PLC019786 --file ./ril-iepf4-2025.xlsx
+ *   npm run ingest:iepf -w @finsol/db -- --slug state-bank-of-india --file https://…/unclaimed.xls --dry-run
  *
  * --cin | --isin | --slug   the company (it must be in the catalogue; SBI has no CIN, use --isin or --slug)
  * --file                    a local path or an http(s) URL (.xlsx, .xls, .csv or .pdf)

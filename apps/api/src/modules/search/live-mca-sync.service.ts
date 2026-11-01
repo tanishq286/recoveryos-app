@@ -9,8 +9,8 @@ import {
   sleep,
   type FieldKeys,
   type PrismaClient,
-} from "@recoveryos/db";
-import type { SearchScope } from "@recoveryos/shared";
+} from "@finsol/db";
+import type { SearchScope } from "@finsol/shared";
 import { Observable, Subject } from "rxjs";
 
 import { ENV, type Env } from "../../config/env.js";

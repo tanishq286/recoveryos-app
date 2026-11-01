@@ -7,7 +7,7 @@ import {
   LandmarkIcon,
   ScrollTextIcon,
 } from "lucide-react";
-import { TRACK_LABELS, type TrackStatus } from "@recoveryos/shared";
+import { TRACK_LABELS, type TrackStatus } from "@finsol/shared";
 
 import { DocumentVault } from "@/components/portal/document-vault";
 import { EsignPanel } from "@/components/portal/esign-panel";

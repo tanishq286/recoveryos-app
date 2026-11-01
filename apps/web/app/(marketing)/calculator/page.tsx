@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BRAND } from "@recoveryos/shared";
+import { BRAND } from "@finsol/shared";
 
 import { Calculator } from "@/components/calculator/calculator";
 

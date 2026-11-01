@@ -11,7 +11,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { decryptField, type Prisma } from "@recoveryos/db";
+import { decryptField, type Prisma } from "@finsol/db";
 import {
   associateCommission,
   canAdvanceRecoverStep,
@@ -33,7 +33,7 @@ import {
   STAFF_ROLES,
   type DocType,
   type TrackStatus,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { ENV, type Env } from "../../config/env.js";
 import { AuditService } from "../../common/audit.service.js";
@@ -603,6 +603,7 @@ export class CasesService {
     if (this.internalEsign) await this.otp.verify(c.client.phone, "UNLOCK", otp);
     const hook = this.esign.buildWebhook(c.esignRequestId);
     await this.handleWebhook(this.esign.name, Buffer.from(hook.body), {
+      "x-finsol-signature": hook.signature,
       "x-recoveryos-signature": hook.signature,
     });
     return this.get(code, user);

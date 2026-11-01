@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { formatOf, ingestStatement, mapHeaders, readStatement } from "@recoveryos/db";
-import type { IngestionForm } from "@recoveryos/shared";
+import { formatOf, ingestStatement, mapHeaders, readStatement } from "@finsol/db";
+import type { IngestionForm } from "@finsol/shared";
 
 import { AuditService } from "../../common/audit.service.js";
 import { PrismaService } from "../../common/prisma.service.js";

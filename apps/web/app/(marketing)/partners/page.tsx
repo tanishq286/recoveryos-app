@@ -9,7 +9,7 @@ import {
   PercentIcon,
   ShieldCheckIcon,
 } from "lucide-react";
-import { BRAND_EMAILS, isIndianState, STATE_LABELS, type IndianState } from "@recoveryos/shared";
+import { BRAND_EMAILS, isIndianState, STATE_LABELS, type IndianState } from "@finsol/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

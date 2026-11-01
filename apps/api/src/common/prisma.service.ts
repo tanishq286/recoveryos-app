@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
-import { createPrismaClient, keysFromEnv, type FieldKeys, type PrismaClient } from "@recoveryos/db";
+import { createPrismaClient, keysFromEnv, type FieldKeys, type PrismaClient } from "@finsol/db";
 
 import { ENV, type Env } from "../config/env.js";
 

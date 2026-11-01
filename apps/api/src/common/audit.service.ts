@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 
 import { PrismaService } from "./prisma.service.js";
 

@@ -1,8 +1,8 @@
 {
-  "name": "@recoveryos/shared",
+  "name": "@finsol/shared",
   "version": "0.2.0",
   "private": true,
-  "description": "Domain types, rules and reference data shared by the RecoveryOS API, web app and database seed.",
+  "description": "Domain types, rules and reference data shared by the Finsol Enterprises API, web app and database seed.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

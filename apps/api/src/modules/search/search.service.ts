@@ -1,6 +1,6 @@
 import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { decryptField, type Prisma } from "@recoveryos/db";
-import type { CustodyStatus, FolioState } from "@recoveryos/shared";
+import { decryptField, type Prisma } from "@finsol/db";
+import type { CustodyStatus, FolioState } from "@finsol/shared";
 import type pg from "pg";
 import {
   holdingValuePaise,
@@ -15,7 +15,7 @@ import {
   type SearchInput,
   type SearchResponse,
   type SearchResultItem,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { ENV, type Env } from "../../config/env.js";
 import { AuditService } from "../../common/audit.service.js";

@@ -636,7 +636,7 @@ describe("cases: R.E.C.O.V.E.R. tracker, eSign and vault", () => {
   it("refuses an eSign webhook with a bad signature", async () => {
     await request(http)
       .post("/api/v1/webhooks/esign/mock")
-      .set("x-recoveryos-signature", "00".repeat(32))
+      .set("x-finsol-signature", "00".repeat(32))
       .send({ requestId: "MOCK-x", status: "SIGNED" })
       .expect(401);
   });
@@ -1003,7 +1003,7 @@ describe("IEPF-2 / IEPF-4 ingestion", () => {
 describe("bulk loader: partition rebuild", () => {
   it("rebuilds a state partition off-line, swaps it in, and merges a repeat load", async () => {
     const { bulkUpsertFolios, folioColumns, folioSearchColumns, keysFromEnv } =
-      await import("@recoveryos/db");
+      await import("@finsol/db");
     const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
     await db.connect();
     const company = await db.query("SELECT id FROM companies WHERE slug = 'itc-limited'");
@@ -1261,7 +1261,7 @@ describe("Pan-India drop folder and legacy ISINs", () => {
     const { mkdtemp, writeFile } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
-    const { createPrismaClient, processFile } = await import("@recoveryos/db");
+    const { createPrismaClient, processFile } = await import("@finsol/db");
     const dir = await mkdtemp(join(tmpdir(), "drop-"));
     const scrips = join(dir, "ListOfScrips.csv");
     await writeFile(

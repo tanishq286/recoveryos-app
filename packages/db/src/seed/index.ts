@@ -15,7 +15,7 @@
  * never does: whoever holds that number would receive the admin login code.
  */
 import "dotenv/config";
-import { normalizeIndianMobile, REFERENCE_COMPANIES } from "@recoveryos/shared";
+import { normalizeIndianMobile, REFERENCE_COMPANIES } from "@finsol/shared";
 
 import { createPrismaClient } from "../index.js";
 import { MARKET_SYNC_SOURCES } from "../market-sources.js";

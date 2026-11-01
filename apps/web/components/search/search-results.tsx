@@ -16,7 +16,7 @@ import {
   type CustodyStatus,
   type ResultAccess,
   type SearchResultItem,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";

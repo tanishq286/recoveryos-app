@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from "@nestjs/common";
-import { MARKET_SYNC_SOURCES } from "@recoveryos/db";
+import { MARKET_SYNC_SOURCES } from "@finsol/db";
 
 import { ENV, type Env } from "../config/env.js";
 import { PrismaService } from "../common/prisma.service.js";

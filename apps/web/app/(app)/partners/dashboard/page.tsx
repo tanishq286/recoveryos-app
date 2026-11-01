@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BadgeCheckIcon, ClockIcon, WalletIcon } from "lucide-react";
-import { CRM_STAGE_LABELS } from "@recoveryos/shared";
+import { CRM_STAGE_LABELS } from "@finsol/shared";
 
 import { LeadForm } from "@/components/partners/lead-form";
 import { LedgerChart } from "@/components/partners/ledger-chart";

@@ -1,11 +1,11 @@
 import { createParamDecorator, SetMetadata, type ExecutionContext } from "@nestjs/common";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 import type { Request } from "express";
 
 import type { SessionClaims } from "./tokens.service.js";
 
-export const IS_PUBLIC = "recoveryos:public";
-export const ROLES = "recoveryos:roles";
+export const IS_PUBLIC = "finsol:public";
+export const ROLES = "finsol:roles";
 
 /** No session needed. A valid session, if sent, is still attached to the request. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);

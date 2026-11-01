@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm ci --no-audit --no-fund",
-  "buildCommand": "npm run build -w @recoveryos/shared && npm run build -w @recoveryos/web",
+  "buildCommand": "npm run build -w @finsol/shared && npm run build -w @finsol/web",
   "outputDirectory": "apps/web/.next"
 }

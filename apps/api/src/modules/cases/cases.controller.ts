@@ -13,7 +13,7 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { DOC_TYPES, TRACK_STATUSES, type DocType } from "@recoveryos/shared";
+import { DOC_TYPES, TRACK_STATUSES, type DocType } from "@finsol/shared";
 import type { Response } from "express";
 import { z } from "zod";
 

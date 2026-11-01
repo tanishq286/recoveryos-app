@@ -7,7 +7,7 @@ import {
   type FolioState,
   type CorporateActionLike,
   type IngestionForm,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { blindIndex, type FieldKeys } from "./crypto.js";
 import { folioColumns, folioSearchColumns } from "./columns.js";

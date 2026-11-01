@@ -15,7 +15,7 @@ import {
   ShieldCheckIcon,
   type LucideIcon,
 } from "lucide-react";
-import { BRAND, BRAND_DESKS, PUBLIC_PRICING, SERVICE_STEPS } from "@recoveryos/shared";
+import { BRAND, BRAND_DESKS, PUBLIC_PRICING, SERVICE_STEPS } from "@finsol/shared";
 
 import { Button } from "@/components/ui/button";
 import { VaultCard } from "@/components/ui/vault-card";

@@ -1,4 +1,4 @@
-import { INDIAN_STATES, STATE_LABELS } from "@recoveryos/shared";
+import { INDIAN_STATES, STATE_LABELS } from "@finsol/shared";
 
 /** The 36 states and union territories in alphabetical order, then Out of India / NRI. */
 const ORDERED = [...INDIAN_STATES]

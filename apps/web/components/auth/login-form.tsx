@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { KeyRoundIcon, LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

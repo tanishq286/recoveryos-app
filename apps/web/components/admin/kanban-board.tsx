@@ -16,7 +16,7 @@ import {
   SCENARIO_TYPES,
   TRACK_LABELS,
   type ScenarioType,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

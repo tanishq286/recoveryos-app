@@ -1,4 +1,4 @@
-import { joinName, maskFolio, normalizeName, phoneticKeys } from "@recoveryos/shared";
+import { joinName, maskFolio, normalizeName, phoneticKeys } from "@finsol/shared";
 
 import { blindIndex, encryptField, type FieldKeys } from "./crypto.js";
 

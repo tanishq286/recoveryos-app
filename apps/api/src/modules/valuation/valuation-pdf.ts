@@ -5,7 +5,7 @@ import {
   rupeesInWords,
   type HoldingValuation,
   type PortfolioTotals,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 const INK = rgb(0.07, 0.1, 0.16);
 const MUTED = rgb(0.35, 0.4, 0.48);

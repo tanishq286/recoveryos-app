@@ -12,7 +12,7 @@ import {
   DEFAULT_SUCCESS_FEE_BPS,
   associateCommission,
   netRealization,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { createPrismaClient, ingestStatement, keysFromEnv } from "../index.js";
 

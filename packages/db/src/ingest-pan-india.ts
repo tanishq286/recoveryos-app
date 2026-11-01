@@ -1,8 +1,8 @@
 /**
  * Pan-India drop folder. Files placed in data/pan-india-drop/ are loaded:
  *
- *   npm run ingest:pan-india -w @recoveryos/db              process what is there now
- *   npm run ingest:pan-india -w @recoveryos/db -- --watch   keep watching (polls every 10 s)
+ *   npm run ingest:pan-india -w @finsol/db              process what is there now
+ *   npm run ingest:pan-india -w @finsol/db -- --watch   keep watching (polls every 10 s)
  *
  * What it recognises, by the file's header row:
  * - IEPF-2 / IEPF-4 / registrar unclaimed-dividend statements (.xlsx, .xls,

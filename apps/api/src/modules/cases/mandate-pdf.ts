@@ -7,7 +7,7 @@ import {
   SCENARIO_LABELS,
   SCENARIO_TIMELINE_MONTHS,
   type ScenarioType,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 export interface MandateInput {
   caseCode: string;

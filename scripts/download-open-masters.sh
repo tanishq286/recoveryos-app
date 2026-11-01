@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Downloads public, static, non-CAPTCHA source files into data/pan-india-drop/,
-# ready for `npm run ingest:pan-india -w @recoveryos/db`:
+# ready for `npm run ingest:pan-india -w @finsol/db`:
 #   - NSE's equity lists (main board and SME/Emerge)
 #   - the IEPF-2 / IEPF-4 statement files linked from each company's
 #     investor-relations page on record (via the fetch:iepf tool, which checks
@@ -38,8 +38,8 @@ fetch "https://archives.nseindia.com/emerge/corporates/content/SME_EQUITY_L.csv"
 
 # Company IEPF statements from the investor-relations pages on record.
 if [[ "${1:-}" != "--skip-ir" ]]; then
-  (cd "$ROOT" && npm run -s build -w @recoveryos/db >/dev/null \
-    && npm run -s fetch:iepf -w @recoveryos/db -- --all --out "$DROP")
+  (cd "$ROOT" && npm run -s build -w @finsol/db >/dev/null \
+    && npm run -s fetch:iepf -w @finsol/db -- --all --out "$DROP")
 fi
 
-echo "Done. Load the files with: npm run ingest:pan-india -w @recoveryos/db"
+echo "Done. Load the files with: npm run ingest:pan-india -w @finsol/db"

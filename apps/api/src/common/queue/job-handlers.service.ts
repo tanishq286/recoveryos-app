@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
-import { maskPhone } from "@recoveryos/shared";
+import { maskPhone } from "@finsol/shared";
 
 import { PrismaService } from "../prisma.service.js";
 import { ImportsService } from "../../modules/imports/imports.service.js";

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 
 import { ENV, type Env } from "../../config/env.js";
 
@@ -29,8 +29,8 @@ export class TokensService {
       {
         secret: this.env.JWT_SECRET,
         expiresIn,
-        issuer: "recoveryos",
-        audience: "recoveryos-session",
+        issuer: "finsol",
+        audience: "finsol-session",
       },
     );
     return { token, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() };
@@ -40,8 +40,8 @@ export class TokensService {
     try {
       const c = this.jwt.verify<SessionClaims>(token, {
         secret: this.env.JWT_SECRET,
-        issuer: "recoveryos",
-        audience: "recoveryos-session",
+        issuer: ["finsol", "recoveryos"],
+        audience: ["finsol-session", "recoveryos-session"],
       });
       return c.typ === "session" ? c : null;
     } catch {

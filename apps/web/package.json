@@ -1,5 +1,5 @@
 {
-  "name": "@recoveryos/web",
+  "name": "@finsol/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -26,7 +26,7 @@
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
     "three": "^0.186.1",
-    "@recoveryos/shared": "*",
+    "@finsol/shared": "*",
     "recharts": "^3.3.0"
   },
   "devDependencies": {

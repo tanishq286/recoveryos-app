@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, LoaderCircleIcon, SaveIcon, WrenchIcon } from "lucide-react";
-import { TRACK_LABELS, TRACK_STATUSES, type TrackStatus } from "@recoveryos/shared";
+import { TRACK_LABELS, TRACK_STATUSES, type TrackStatus } from "@finsol/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

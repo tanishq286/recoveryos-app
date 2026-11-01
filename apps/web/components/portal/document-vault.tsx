@@ -11,7 +11,7 @@ import {
   RotateCcwIcon,
   XIcon,
 } from "lucide-react";
-import type { DocStatus, DocType } from "@recoveryos/shared";
+import type { DocStatus, DocType } from "@finsol/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

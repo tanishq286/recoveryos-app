@@ -19,7 +19,7 @@ import {
   INDIAN_STATES,
   PHYSICAL_CERT_STATUSES,
   RELATIONSHIPS,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 import { z } from "zod";
 
 import { clientIp, CurrentUser, Public, type AuthedRequest } from "../../common/auth/decorators.js";

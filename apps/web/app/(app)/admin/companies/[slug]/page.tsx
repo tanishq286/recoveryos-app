@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon, ArrowUpRightIcon, LockKeyholeIcon } from "lucide-react";
-import { CUSTODY_LABELS } from "@recoveryos/shared";
+import { CUSTODY_LABELS } from "@finsol/shared";
 
 import { api } from "@/lib/api/server";
 import { handleApiError } from "@/lib/api/guard";

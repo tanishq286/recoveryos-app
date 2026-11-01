@@ -8,7 +8,7 @@ import {
   PUBLIC_PRICING,
   SERVICE_VERTICALS,
   serviceBySlug,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

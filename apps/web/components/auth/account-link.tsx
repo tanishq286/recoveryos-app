@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { LogInIcon, UserRoundIcon } from "lucide-react";
-import type { Role } from "@recoveryos/shared";
+import type { Role } from "@finsol/shared";
 
 import { Button } from "@/components/ui/button";
 import { WHO_COOKIE } from "@/lib/api/config";

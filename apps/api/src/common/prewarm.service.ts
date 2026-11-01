@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 
-import { ALL_INDIA, resolveSearch } from "@recoveryos/shared";
+import { ALL_INDIA, resolveSearch } from "@finsol/shared";
 
 import { ENV, type Env } from "../config/env.js";
 import type pg from "pg";

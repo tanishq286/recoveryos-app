@@ -9,7 +9,7 @@ import {
   holdingValuePaise,
   PUBLIC_PRICING,
   SERVICE_STEPS,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { Button } from "@/components/ui/button";
 import { JsonLd } from "@/components/seo/json-ld";

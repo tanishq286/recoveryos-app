@@ -1,5 +1,5 @@
 import { CheckIcon } from "lucide-react";
-import { ROLE_LABELS } from "@recoveryos/shared";
+import { ROLE_LABELS } from "@finsol/shared";
 
 import type { CaseDetail } from "@/lib/api/types";
 import { cn } from "@/lib/utils";

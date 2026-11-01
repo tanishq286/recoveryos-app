@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRightIcon, ChartCandlestickIcon } from "lucide-react";
-import { SERVICE_VERTICALS } from "@recoveryos/shared";
+import { SERVICE_VERTICALS } from "@finsol/shared";
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SERVICE_ICONS } from "@/components/services/icons";

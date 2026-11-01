@@ -86,7 +86,7 @@ export class MockEsignProvider implements EsignProvider {
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>,
   ): WebhookResult | null {
-    const sig = header(headers, "x-recoveryos-signature");
+    const sig = header(headers, "x-finsol-signature") ?? header(headers, "x-recoveryos-signature");
     if (!sig || !safeEqualHex(sig, signWebhookBody(rawBody, this.secret))) return null;
     const body = JSON.parse(rawBody.toString("utf8")) as { requestId?: string; status?: string };
     if (!body.requestId || (body.status !== "SIGNED" && body.status !== "FAILED")) return null;

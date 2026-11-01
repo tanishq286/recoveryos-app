@@ -10,7 +10,7 @@ import {
   CALCULATOR_STOCKS,
   verifiedActionsFor,
   type CorporateActionLike,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { ENV, type Env } from "../config/env.js";
 import { PrismaService } from "../common/prisma.service.js";

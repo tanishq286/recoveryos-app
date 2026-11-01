@@ -8,7 +8,7 @@ import {
   PROFESSIONS,
   type IndianState,
   type Profession,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

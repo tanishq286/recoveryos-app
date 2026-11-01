@@ -15,7 +15,7 @@ import {
   type PhysicalCertStatus,
   type Profession,
   type Relationship,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 
 import { AuditService } from "../../common/audit.service.js";
 import { PrismaService } from "../../common/prisma.service.js";

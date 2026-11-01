@@ -1,6 +1,6 @@
 # Pan-India drop folder
 
-Put files here and run `npm run ingest:pan-india -w @recoveryos/db` (add `-- --watch` to keep
+Put files here and run `npm run ingest:pan-india -w @finsol/db` (add `-- --watch` to keep
 watching). Recognised by their header row:
 
 - IEPF-2 / IEPF-4 / registrar unclaimed-dividend statements (.xlsx, .xls, .csv, .pdf). Name the

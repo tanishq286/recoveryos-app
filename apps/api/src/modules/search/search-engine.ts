@@ -1,9 +1,9 @@
 import { Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
 
-import { Prisma, type PrismaClient } from "@recoveryos/db";
+import { Prisma, type PrismaClient } from "@finsol/db";
 import pg from "pg";
-import { ALL_INDIA, INDIAN_STATES, phoneticKeys, type ResolvedSearch } from "@recoveryos/shared";
+import { ALL_INDIA, INDIAN_STATES, phoneticKeys, type ResolvedSearch } from "@finsol/shared";
 
 export interface SearchHit {
   id: string;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { REFERENCE_COMPANIES, referenceCompanyBySlug } from "@recoveryos/shared";
+import { REFERENCE_COMPANIES, referenceCompanyBySlug } from "@finsol/shared";
 
 import { apiOrNull } from "@/lib/api/server";
 import type { CompanyDetail, CompanyListItem } from "@/lib/api/types";

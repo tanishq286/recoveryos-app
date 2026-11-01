@@ -16,7 +16,7 @@ import {
   portfolioTotals,
   valueHolding,
   type HoldingValuation,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 import type { Response } from "express";
 import { z } from "zod";
 

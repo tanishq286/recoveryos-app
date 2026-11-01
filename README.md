@@ -5,7 +5,7 @@ Check** with only a name and a state; signed-in members see what is held and its
 Finsol's case team does everything else. **No Upfront Fee • No Recovery, No Fee • 100%
 Confidential.**
 
-The platform (internal package scope `@recoveryos/*`) has:
+The platform (internal package scope `@finsol/*`) has:
 
 - a public 3-Minute Check over companies' IEPF-2/IEPF-4 filings, in a state-partitioned
   PostgreSQL table, with a live refresh of company-published statements behind every search;
@@ -57,7 +57,7 @@ npm run build:packages        # shared + db (generates the Prisma client)
 npm run db:start              # terminal 1: PostgreSQL 18 on :54329, data in .data/pg
 npm run db:migrate
 npm run db:seed               # catalogue + first admin (see below)
-npm run build -w @recoveryos/api && npm run dev:api     # terminal 2: API on :4000/api/v1
+npm run build -w @finsol/api && npm run dev:api     # terminal 2: API on :4000/api/v1
 npm run dev:web               # terminal 3: web on :3000
 ```
 
@@ -73,13 +73,13 @@ Investor records come from the statutory statements companies publish under the 
 
 ```bash
 # One statement, from a file or straight from the company's site (.xlsx, .xls, .csv or .pdf)
-npm run ingest:iepf -w @recoveryos/db -- --cin L24230DL1975PLC007908 \
+npm run ingest:iepf -w @finsol/db -- --cin L24230DL1975PLC007908 \
   --file https://www.dabur.com/sites/default/files/2021-06/61617-l24230dl1975plc007908_6.pdf
-npm run ingest:iepf -w @recoveryos/db -- --slug state-bank-of-india --file ./sbi-iepf4.xlsx --dry-run
+npm run ingest:iepf -w @finsol/db -- --slug state-bank-of-india --file ./sbi-iepf4.xlsx --dry-run
 
 # Find and download statement files linked from companies' investor pages (polite, robots-aware)
-npm run fetch:iepf -w @recoveryos/db -- --all [--ingest]
-npm run fetch:iepf -w @recoveryos/db -- --company dabur-india-limited --url <investor page>
+npm run fetch:iepf -w @finsol/db -- --all [--ingest]
+npm run fetch:iepf -w @finsol/db -- --company dabur-india-limited --url <investor page>
 ```
 
 Admins can also upload statements at `/admin/ingestion`. The parser reads the MCA statutory
@@ -106,7 +106,7 @@ automatically: download those statements and upload them.
 | `npm run typecheck` / `npm run lint` / `npm run build`     | Across all workspaces                                                                |
 
 **Drop folder.** Files placed in `data/pan-india-drop/` are loaded by
-`npm run ingest:pan-india -w @recoveryos/db` (`-- --watch` keeps polling): IEPF-2/IEPF-4 and
+`npm run ingest:pan-india -w @finsol/db` (`-- --watch` keeps polling): IEPF-2/IEPF-4 and
 registrar statements stream into the state partitions; BSE's "List of Scrips" export and NSE's
 equity lists fill the calculator's directory. Rows are matched to companies by CIN, current or
 legacy ISIN (Bajaj Finance's pre-split `INE296A01024` maps to `INE296A01032`) or name, or by a

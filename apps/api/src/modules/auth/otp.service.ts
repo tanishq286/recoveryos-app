@@ -1,7 +1,7 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { normalizeIndianMobile, STAFF_ROLES } from "@recoveryos/shared";
+import { normalizeIndianMobile, STAFF_ROLES } from "@finsol/shared";
 
 import { ENV, type Env } from "../../config/env.js";
 import { PrismaService } from "../../common/prisma.service.js";

@@ -4,7 +4,7 @@ import {
   PHYSICAL_CERT_STATUSES,
   PROFESSIONS,
   RELATIONSHIPS,
-} from "@recoveryos/shared";
+} from "@finsol/shared";
 import { z } from "zod";
 
 import { CurrentUser, Public, Roles } from "../../common/auth/decorators.js";

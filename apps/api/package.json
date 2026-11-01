@@ -1,8 +1,8 @@
 {
-  "name": "@recoveryos/api",
+  "name": "@finsol/api",
   "version": "0.2.0",
   "private": true,
-  "description": "RecoveryOS API: search and unlock, cases, CRM, associates, ETL. NestJS 12 + BullMQ.",
+  "description": "Finsol Enterprises API: search and unlock, cases, CRM, associates, ETL. NestJS 12 + BullMQ.",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -21,8 +21,8 @@
     "@nestjs/jwt": "^12.0.3",
     "@nestjs/platform-express": "^12.3.2",
     "@nestjs/throttler": "^6.7.1",
-    "@recoveryos/db": "*",
-    "@recoveryos/shared": "*",
+    "@finsol/db": "*",
+    "@finsol/shared": "*",
     "bullmq": "^5.0.0",
     "csv-parse": "^7.0.3",
     "exceljs": "^4.4.0",
