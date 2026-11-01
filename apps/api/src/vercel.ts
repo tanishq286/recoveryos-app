@@ -12,7 +12,7 @@ import { createApp } from "./bootstrap.js";
 let ready: Promise<Express> | null = null;
 
 function instance() {
-  ready ??= createApp()
+  ready ??= createApp({ abortOnError: false })
     .then(async (app) => {
       await app.init();
       return app.getHttpAdapter().getInstance() as Express;
