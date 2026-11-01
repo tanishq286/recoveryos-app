@@ -110,7 +110,9 @@ automatically: download those statements and upload them.
 registrar statements stream into the state partitions; BSE's "List of Scrips" export and NSE's
 equity lists fill the calculator's directory. Rows are matched to companies by CIN, current or
 legacy ISIN (Bajaj Finance's pre-split `INE296A01024` maps to `INE296A01032`) or name, or by a
-file name starting with a CIN, ISIN or slug. Download each file yourself from its source: the
+file name starting with a CIN, ISIN or slug. `scripts/download-open-masters.sh` fills the folder
+with what can be fetched openly: NSE's equity lists, and the holder-wise statements linked from
+the companies' investor-relations pages on record (notices and FAQs found there are skipped). Download each file yourself from its source: the
 tools never fetch from sites that refuse automated clients, so BSE and registrar data arrive
 through this folder or a licensed feed.
 
@@ -340,6 +342,12 @@ runs as the API does: prepared statements with cached generic plans, 400 queries
 | Common names (key match)     | 0.40 / 3.83 / 7.24 | 0.58 / 0.88 / 9.58 |
 | Misspelt names               | 0.37 / 0.59 / 4.41 | 0.56 / 0.77 / 1.00 |
 | No phonetic match (fuzzy)    | 0.77 / 1.37 / 2.01 | 1.16 / 1.59 / 9.49 |
+
+Through the API over HTTP, on the real data (16,539 holders): an All India 3-Minute Check takes
+about 3 ms (2.5–4.2 ms) and a single-state check about 3 ms; the first request after an API start
+takes about 8 ms. Matched rows are fetched with one prepared query selecting only the result
+columns, masked company names are cached per company, and the search pool keeps its connections
+(and prepared statements) open, with sequential scans off.
 
 The p99 values include each connection's first use of a statement, before its plan is cached.
 With an empty OS cache after a machine restart, an earlier run measured common-name p95 at 6.7 ms

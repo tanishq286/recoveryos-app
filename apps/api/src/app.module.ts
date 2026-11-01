@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import type pg from "pg";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
@@ -33,7 +34,7 @@ import { SearchController } from "./modules/search/search.controller.js";
 import { MeiliSearchEngine, PostgresSearchEngine } from "./modules/search/search-engine.js";
 import { SearchService } from "./modules/search/search.service.js";
 import { LiveMcaSyncService } from "./modules/search/live-mca-sync.service.js";
-import { SEARCH_ENGINE } from "./modules/search/search.tokens.js";
+import { SEARCH_ENGINE, SEARCH_POOL } from "./modules/search/search.tokens.js";
 import { StatsController } from "./modules/stats/stats.controller.js";
 import { MarketController } from "./market/market.controller.js";
 import { defaultProviders, MarketService, QUOTE_PROVIDERS } from "./market/market.service.js";
@@ -74,10 +75,15 @@ import { ValuationController } from "./modules/valuation/valuation.controller.js
     { provide: ESIGN_PROVIDER, inject: [ENV], useFactory: (env: Env) => createEsignProvider(env) },
     { provide: DOCUMENT_STORAGE, inject: [ENV], useFactory: (env: Env) => createStorage(env) },
     {
+      provide: SEARCH_POOL,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => PostgresSearchEngine.pool(prisma.databaseUrl),
+    },
+    {
       provide: SEARCH_ENGINE,
-      inject: [ENV, PrismaService],
-      useFactory: (env: Env, prisma: PrismaService) => {
-        const pg = new PostgresSearchEngine(PostgresSearchEngine.pool(prisma.databaseUrl));
+      inject: [ENV, SEARCH_POOL],
+      useFactory: (env: Env, pool: pg.Pool) => {
+        const pg = new PostgresSearchEngine(pool);
         return env.MEILI_HOST ? new MeiliSearchEngine(env.MEILI_HOST, env.MEILI_API_KEY, pg) : pg;
       },
     },

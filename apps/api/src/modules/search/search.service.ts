@@ -1,6 +1,7 @@
 import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { decryptField, type Prisma } from "@recoveryos/db";
-import type { IndianState } from "@recoveryos/shared";
+import type { CustodyStatus, FolioState } from "@recoveryos/shared";
+import type pg from "pg";
 import {
   holdingValuePaise,
   maskCompanyName,
@@ -23,22 +24,66 @@ import type { SessionClaims } from "../../common/auth/tokens.service.js";
 import { JobQueueService } from "../../common/queue/job-queue.service.js";
 import { num } from "../../common/serialize.js";
 import { LiveMcaSyncService } from "./live-mca-sync.service.js";
-import { SEARCH_ENGINE } from "./search.tokens.js";
+import { SEARCH_ENGINE, SEARCH_POOL } from "./search.tokens.js";
 import type { SearchEngine, SearchHit } from "./search-engine.js";
 
 type FolioWithCompany = Prisma.UnclaimedFolioGetPayload<{ include: { company: true } }>;
 
 const RESULT_LIMIT = 50;
 
-/** Folio lookups by (state, ids); hits without a state (Meilisearch) fall back to id only. */
-function byState(hits: SearchHit[]): Prisma.UnclaimedFolioWhereInput[] {
-  const groups = new Map<string, string[]>();
-  for (const h of hits) groups.set(h.state ?? "", [...(groups.get(h.state ?? "") ?? []), h.id]);
-  const where = [...groups].map(([state, ids]) =>
-    state ? { state: state as IndianState, id: { in: ids } } : { id: { in: ids } },
-  );
-  return where.length ? where : [{ id: { in: [] } }];
+/** Exactly the columns a search result needs, one row per matched folio. */
+interface ResultRow {
+  id: string;
+  state: FolioState;
+  investor_full_name: string;
+  father_or_spouse_name: string | null;
+  city: string | null;
+  pincode: string | null;
+  investor_cluster_id: string;
+  custody_status: CustodyStatus;
+  folio_number: string;
+  folio_number_masked: string;
+  post_action_shares: number;
+  dividend_rupees: number;
+  event_date: string | null;
+  investment_type: string | null;
+  transfer_financial_year: string | null;
+  company_name: string;
+  company_slug: string;
+  price_rupees: number | null;
+  price_updated_at: Date | null;
 }
+
+const RESULT_COLUMNS = `
+  f.id, f.state::text AS state, f.investor_full_name, f.father_or_spouse_name, f.city, f.pincode,
+  f.investor_cluster_id, f.custody_status::text AS custody_status, f.folio_number,
+  f.folio_number_masked, f.post_action_shares, f.unclaimed_dividend_amount::float8 AS dividend_rupees,
+  to_char(f.event_date, 'YYYY-MM-DD') AS event_date, f.investment_type, f.transfer_financial_year,
+  c.name AS company_name, c.slug AS company_slug,
+  c.current_market_price::float8 AS price_rupees, c.price_updated_at
+FROM unclaimed_folios f JOIN companies c ON c.id = f.company_id`;
+/** Pruned to the matched states at run time; Meilisearch hits carry no state. */
+export const RESULTS_BY_STATE = {
+  name: "search_results_by_state",
+  text: `SELECT ${RESULT_COLUMNS} WHERE f.state = ANY($2::"IndianState"[]) AND f.id = ANY($1::uuid[])`,
+};
+export const RESULTS_BY_ID = {
+  name: "search_results_by_id",
+  text: `SELECT ${RESULT_COLUMNS} WHERE f.id = ANY($1::uuid[])`,
+};
+
+/** Masked company names, computed once per company rather than once per row. */
+const maskedNames = new Map<string, string>();
+function maskedCompany(name: string): string {
+  let m = maskedNames.get(name);
+  if (m === undefined) {
+    if (maskedNames.size > 20_000) maskedNames.clear();
+    m = maskCompanyName(name);
+    maskedNames.set(name, m);
+  }
+  return m;
+}
+
 const MAX_CLAIM_FOLIOS = 10;
 
 export function estimateValuePaise(f: FolioWithCompany): number {
@@ -56,11 +101,12 @@ export class SearchService {
     private readonly audit: AuditService,
     private readonly jobs: JobQueueService,
     @Inject(SEARCH_ENGINE) private readonly engine: SearchEngine,
+    @Inject(SEARCH_POOL) private readonly pool: pg.Pool,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
   private item(
-    f: FolioWithCompany,
+    f: ResultRow,
     hit: SearchHit,
     access: ResultAccess,
     released: Set<string>,
@@ -68,32 +114,34 @@ export class SearchService {
   ): SearchResultItem {
     const open = access !== "public";
     const folioReleased = access === "staff" || released.has(f.id);
-    const price = f.company.currentMarketPrice;
+    const dividendPaise = Math.round(f.dividend_rupees * 100);
     return {
       id: f.id,
       access,
-      investorFullName: f.investorFullName,
-      fatherOrSpouseName: f.fatherOrSpouseName,
+      investorFullName: f.investor_full_name,
+      fatherOrSpouseName: f.father_or_spouse_name,
       city: f.city,
       pincodeMasked: maskPincode(f.pincode),
-      investorClusterId: f.investorClusterId,
+      investorClusterId: f.investor_cluster_id,
       state: f.state,
-      custodyStatus: f.custodyStatus,
-      companyName: open ? f.company.name : maskCompanyName(f.company.name),
-      companySlug: open ? f.company.slug : null,
+      custodyStatus: f.custody_status,
+      companyName: open ? f.company_name : maskedCompany(f.company_name),
+      companySlug: open ? f.company_slug : null,
+      // Ciphertext is decrypted only for a row this viewer may see.
       folioNumber: folioReleased
-        ? decryptField(f.folioNumber, this.prisma.fieldKeys)
-        : f.folioNumberMasked,
+        ? decryptField(f.folio_number, this.prisma.fieldKeys)
+        : f.folio_number_masked,
       folioReleased,
-      postActionShares: open ? f.postActionShares : null,
-      estimatedTotalValuePaise: open ? estimateValuePaise(f) : null,
-      sharePricePaise: open && price !== null ? Math.round(num(price) * 100) : null,
-      priceUpdatedAt:
-        open && f.company.priceUpdatedAt ? f.company.priceUpdatedAt.toISOString() : null,
-      unclaimedDividendPaise: open ? Math.round(num(f.unclaimedDividendAmount) * 100) : null,
-      eventDate: f.eventDate ? f.eventDate.toISOString().slice(0, 10) : null,
-      investmentType: f.investmentType,
-      transferFinancialYear: f.transferFinancialYear,
+      postActionShares: open ? f.post_action_shares : null,
+      estimatedTotalValuePaise: open
+        ? holdingValuePaise(f.post_action_shares, f.price_rupees ?? 0) + dividendPaise
+        : null,
+      sharePricePaise: open && f.price_rupees !== null ? Math.round(f.price_rupees * 100) : null,
+      priceUpdatedAt: open && f.price_updated_at ? f.price_updated_at.toISOString() : null,
+      unclaimedDividendPaise: open ? dividendPaise : null,
+      eventDate: f.event_date,
+      investmentType: f.investment_type,
+      transferFinancialYear: f.transfer_financial_year,
       matchedHolder,
       matchScore: hit.score,
       matchedBy: hit.matchedBy,
@@ -166,11 +214,18 @@ export class SearchService {
     for (const h of primaryHits) hits.set(h.id, { hit: h, holder: "primary" });
     for (const h of jointHits) if (!hits.has(h.id)) hits.set(h.id, { hit: h, holder: "joint" });
 
-    const folios = await this.prisma.client.unclaimedFolio.findMany({
-      // Grouped by state, so Postgres prunes to the partitions that matched.
-      where: { OR: byState([...hits.values()].map((h) => h.hit)) },
-      include: { company: true },
-    });
+    const matched = [...hits.values()].map((h) => h.hit);
+    const ids = matched.map((h) => h.id);
+    const states = [...new Set(matched.map((h) => h.state))];
+    const folios = ids.length
+      ? (
+          await this.pool.query<ResultRow>(
+            states.every(Boolean)
+              ? { ...RESULTS_BY_STATE, values: [ids, states] }
+              : { ...RESULTS_BY_ID, values: [ids] },
+          )
+        ).rows
+      : [];
     const byId = new Map(folios.map((f) => [f.id, f]));
     const released = access === "member" ? await this.releasedFor(user!.sub) : new Set<string>();
     const results = [...hits.values()].flatMap(({ hit, holder }) => {

@@ -5,6 +5,7 @@
  *   npm run fetch:iepf -w @recoveryos/db -- --all                 every company with an IR page on record
  *   npm run fetch:iepf -w @recoveryos/db -- --company wipro-limited --url https://…/investors/unclaimed-dividend
  *   npm run fetch:iepf -w @recoveryos/db -- --all --ingest        download, then ingest what parses
+ *   npm run fetch:iepf -w @recoveryos/db -- --all --out data/pan-india-drop   also copy into the drop folder
  *
  * How it behaves:
  * - It identifies itself honestly, checks robots.txt, and waits between requests.
@@ -48,6 +49,8 @@ async function main() {
       url: { type: "string" },
       ingest: { type: "boolean", default: false },
       max: { type: "string", default: "25" },
+      /** Also copy each new file here, named <company-slug>__<file>, e.g. the drop folder. */
+      out: { type: "string" },
     },
   });
   const prisma = createPrismaClient();
@@ -123,6 +126,29 @@ async function main() {
             });
           }
           console.log(`  saved ${name} (${Math.round(file.buffer.length / 1024)} KB)`);
+          // Only holder-wise statements go to the drop folder, not notices or FAQs.
+          const isStatement =
+            values.out &&
+            !(
+              (await ingestStatement(
+                prisma,
+                keys,
+                { buffer: file.buffer, fileName: name, contentType: file.contentType },
+                { companyId: company.id, dryRun: true },
+              ).catch((e: Error) => e)) instanceof Error
+            );
+          if (values.out && !isStatement)
+            console.log("    not a holder-wise statement; not copied");
+          if (values.out && isStatement) {
+            // The slug prefix tells the drop-folder importer which company the file is for.
+            const target = join(resolve(values.out), `${company.slug}__${name}`);
+            await mkdir(dirname(target), { recursive: true });
+            await writeFile(target, file.buffer, { flag: "wx" }).catch(
+              (e: NodeJS.ErrnoException) => {
+                if (e.code !== "EEXIST") throw e;
+              },
+            );
+          }
           if (values.ingest) {
             const probe = await ingestStatement(
               prisma,

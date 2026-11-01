@@ -1,6 +1,13 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 
+import { ALL_INDIA, resolveSearch } from "@recoveryos/shared";
+
 import { ENV, type Env } from "../config/env.js";
+import type pg from "pg";
+
+import { SEARCH_ENGINE, SEARCH_POOL } from "../modules/search/search.tokens.js";
+import { RESULTS_BY_ID, RESULTS_BY_STATE } from "../modules/search/search.service.js";
+import type { SearchEngine } from "../modules/search/search-engine.js";
 import { PrismaService } from "./prisma.service.js";
 
 /** Index definitions the two search phases read; matched on each partition's index. */
@@ -31,6 +38,8 @@ export class PrewarmService implements OnApplicationBootstrap {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
+    @Inject(SEARCH_ENGINE) private readonly engine: SearchEngine,
+    @Inject(SEARCH_POOL) private readonly pool: pg.Pool,
   ) {}
 
   onApplicationBootstrap() {
@@ -57,6 +66,26 @@ export class PrewarmService implements OnApplicationBootstrap {
     const vocab = await db.$queryRaw<{ n: bigint }[]>`
       SELECT pg_prewarm('name_words_word_trgm'::regclass, 'buffer') + pg_prewarm('name_words'::regclass, 'buffer') AS n`;
     blocks += Number(vocab[0]?.n ?? 0);
+    // Prepare the common statement shapes on every pooled connection, so the
+    // first real searches skip the one-off planning (tens of ms each).
+    const warm = (state: string) =>
+      this.engine.search(
+        resolveSearch({ fullName: "Warmup Search", state: state as typeof ALL_INDIA })!,
+        50,
+      );
+    for (const state of [ALL_INDIA, "MAHARASHTRA"])
+      await Promise.all(Array.from({ length: 10 }, () => warm(state)));
+    await Promise.all(
+      Array.from({ length: 10 }, async () => {
+        const c = await this.pool.connect();
+        try {
+          await c.query({ ...RESULTS_BY_STATE, values: [[], ["MAHARASHTRA"]] });
+          await c.query({ ...RESULTS_BY_ID, values: [[]] });
+        } finally {
+          c.release();
+        }
+      }),
+    );
     this.last = { indexes: wanted.length + 2, blocks, ms: Math.round(performance.now() - started) };
     this.log.log(
       `Prewarmed ${this.last.indexes} search indexes (${blocks} blocks) in ${this.last.ms} ms.`,

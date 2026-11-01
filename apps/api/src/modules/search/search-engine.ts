@@ -43,15 +43,20 @@ export class PostgresSearchEngine implements SearchEngine {
   /**
    * A pool of its own: every search runs as a named prepared statement with a
    * cached generic plan, because planning a query over 38 partitions costs
-   * about 5 ms while running it costs under 1 ms. The connections also carry
-   * the fuzzy-match settings (trigram threshold 0.45, GIN result cap 500).
+   * about 5 ms while running it costs under 1 ms. Every search query is
+   * index-driven, so sequential scans are off for these connections: generic
+   * plans otherwise pick them for small partitions and evaluate the match
+   * functions on every row. The connections also carry the fuzzy-match
+   * settings (trigram threshold 0.45, GIN result cap 500).
    */
   static pool(databaseUrl: string): pg.Pool {
     return new pg.Pool({
       connectionString: databaseUrl,
       max: 10,
+      // Keep connections (and their prepared statements) instead of closing them after 10 s idle.
+      idleTimeoutMillis: 0,
       options:
-        "-c plan_cache_mode=force_generic_plan -c pg_trgm.similarity_threshold=0.45 -c gin_fuzzy_search_limit=500",
+        "-c plan_cache_mode=force_generic_plan -c enable_seqscan=off -c pg_trgm.similarity_threshold=0.45 -c gin_fuzzy_search_limit=500",
     });
   }
 
