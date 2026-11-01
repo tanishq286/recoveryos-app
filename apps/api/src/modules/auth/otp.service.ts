@@ -1,13 +1,14 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { normalizeIndianMobile } from "@recoveryos/shared";
+import { normalizeIndianMobile, STAFF_ROLES } from "@recoveryos/shared";
 
 import { ENV, type Env } from "../../config/env.js";
 import { PrismaService } from "../../common/prisma.service.js";
 import { OTP_SENDER, type OtpSender } from "../../common/providers/otp.provider.js";
 
-export type OtpPurpose = "LOGIN";
+/** LOGIN signs in; UNLOCK confirms the Digital Mandate when no eSign provider is configured. */
+export type OtpPurpose = "LOGIN" | "UNLOCK";
 
 const TTL_MS = 5 * 60_000;
 const RESEND_AFTER_MS = 30_000;
@@ -67,11 +68,20 @@ export class OtpService {
       data: { phone, purpose, codeHash: this.hash(phone, purpose, code), expiresAt, requestIp: ip },
     });
     await this.sender.send(phone, code);
+    // Without an SMS provider the code is shown on screen, but never for a staff
+    // account: anyone could otherwise sign in as staff by typing their number.
+    let testCode: string | undefined;
+    if (this.sender.revealsCode) {
+      const account = await db.user.findUnique({ where: { phone }, select: { role: true } });
+      const staff = account && (STAFF_ROLES as readonly string[]).includes(account.role);
+      if (!staff) testCode = code;
+    }
     return {
       phone,
       expiresAt: expiresAt.toISOString(),
       resendAfterSeconds: RESEND_AFTER_MS / 1000,
       channel: this.sender.name,
+      ...(testCode ? { testCode } : {}),
     };
   }
 

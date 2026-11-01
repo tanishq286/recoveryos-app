@@ -49,10 +49,10 @@ export class PostgresSearchEngine implements SearchEngine {
    * functions on every row. The connections also carry the fuzzy-match
    * settings (trigram threshold 0.45, GIN result cap 500).
    */
-  static pool(databaseUrl: string): pg.Pool {
+  static pool(databaseUrl: string, opts: { max?: number } = {}): pg.Pool {
     return new pg.Pool({
       connectionString: databaseUrl,
-      max: 10,
+      max: opts.max ?? 10,
       // Keep connections (and their prepared statements) instead of closing them after 10 s idle.
       idleTimeoutMillis: 0,
       options:

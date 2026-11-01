@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import { z } from "zod";
 
 /**
@@ -18,14 +20,22 @@ const schema = z
     OTP_SECRET: z.string().min(32).optional(),
     SESSION_TTL_HOURS: z.coerce.number().default(24 * 7),
 
-    OTP_PROVIDER: z.enum(["console", "msg91", "twilio"]).default("console"),
+    /**
+     * Unset: MSG91 when its keys are present, otherwise "internal" (the code is
+     * shown on screen to non-staff numbers and written to the server log).
+     */
+    OTP_PROVIDER: z.enum(["console", "internal", "msg91", "twilio"]).optional(),
     MSG91_AUTH_KEY: z.string().optional(),
     MSG91_TEMPLATE_ID: z.string().optional(),
     TWILIO_ACCOUNT_SID: z.string().optional(),
     TWILIO_AUTH_TOKEN: z.string().optional(),
     TWILIO_FROM: z.string().optional(),
 
-    ESIGN_PROVIDER: z.enum(["mock", "digio", "leegality"]).default("mock"),
+    /**
+     * Unset: Digio or Leegality when their keys are present, otherwise "mock"
+     * (an OTP-confirmed electronic acceptance inside the portal, labelled as such).
+     */
+    ESIGN_PROVIDER: z.enum(["mock", "digio", "leegality"]).optional(),
     ESIGN_WEBHOOK_SECRET: z.string().min(16).optional(),
     DIGIO_CLIENT_ID: z.string().optional(),
     DIGIO_CLIENT_SECRET: z.string().optional(),
@@ -33,7 +43,8 @@ const schema = z
     LEEGALITY_AUTH_TOKEN: z.string().optional(),
     LEEGALITY_BASE_URL: z.string().default("https://app1.leegality.com/api/v3.0"),
 
-    STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+    /** Unset: "db" in production (no persistent disk on Vercel), otherwise "local". */
+    STORAGE_PROVIDER: z.enum(["local", "s3", "db"]).optional(),
     STORAGE_LOCAL_DIR: z.string().default("../../.uploads"),
     STORAGE_ENCRYPTION_KEY: z.string().optional(),
     S3_BUCKET: z.string().optional(),
@@ -53,12 +64,18 @@ const schema = z
     LIVE_SYNC_ENABLED: z
       .enum(["true", "false"])
       .optional()
-      .transform((v) => (v === undefined ? process.env.NODE_ENV !== "test" : v === "true")),
+      .transform((v) =>
+        // Off on Vercel: per-instance memory and start-up work don't suit serverless.
+        v === undefined ? process.env.NODE_ENV !== "test" && !process.env.VERCEL : v === "true",
+      ),
     /** Load the search indexes into cache on start-up. Off under test. */
     PREWARM_ENABLED: z
       .enum(["true", "false"])
       .optional()
-      .transform((v) => (v === undefined ? process.env.NODE_ENV !== "test" : v === "true")),
+      .transform((v) =>
+        // Off on Vercel: per-instance memory and start-up work don't suit serverless.
+        v === undefined ? process.env.NODE_ENV !== "test" && !process.env.VERCEL : v === "true",
+      ),
     /** Hours before the same company's published statements are fetched again. */
     LIVE_SYNC_TTL_HOURS: z.coerce.number().min(1).default(24),
     /** Live NSE/BSE price sync. Off by default under test. */
@@ -68,38 +85,41 @@ const schema = z
       .transform((v) => (v === undefined ? process.env.NODE_ENV !== "test" : v === "true")),
     MARKET_SYNC_INTERVAL_MINUTES: z.coerce.number().min(1).default(15),
     MAX_UPLOAD_MB: z.coerce.number().default(10),
+    /** Bearer token Vercel Cron sends to /api/v1/cron/daily. */
+    CRON_SECRET: z.string().min(16).optional(),
+    /** Set by Vercel: no long-lived process, so no timers or start-up sync. */
+    VERCEL: z.string().optional(),
+    /** Neon's direct (non-PgBouncer) URL, used by the search pool's session settings. */
+    DATABASE_URL_UNPOOLED: z.string().optional(),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV !== "production") return;
-    for (const key of [
-      "JWT_SECRET",
-      "OTP_SECRET",
-      "ESIGN_WEBHOOK_SECRET",
-      "STORAGE_ENCRYPTION_KEY",
-    ] as const) {
-      if (env.STORAGE_PROVIDER === "s3" && key === "STORAGE_ENCRYPTION_KEY") continue;
-      if (!env[key])
-        ctx.addIssue({ code: "custom", path: [key], message: `${key} is required in production` });
-    }
-    if (env.OTP_PROVIDER === "console")
+    // Every other secret can be derived from JWT_SECRET (see loadEnv), so a
+    // production deployment needs this one secret plus the folio keys.
+    if (env.NODE_ENV === "production" && !env.JWT_SECRET)
       ctx.addIssue({
         code: "custom",
-        path: ["OTP_PROVIDER"],
-        message: "console OTP is for development only",
-      });
-    if (env.ESIGN_PROVIDER === "mock")
-      ctx.addIssue({
-        code: "custom",
-        path: ["ESIGN_PROVIDER"],
-        message: "mock eSign is for development only",
+        path: ["JWT_SECRET"],
+        message: "JWT_SECRET is required in production",
       });
   });
 
-export type Env = z.infer<typeof schema> & {
+export type Env = Omit<
+  z.infer<typeof schema>,
+  "OTP_PROVIDER" | "ESIGN_PROVIDER" | "STORAGE_PROVIDER"
+> & {
   JWT_SECRET: string;
   OTP_SECRET: string;
   ESIGN_WEBHOOK_SECRET: string;
+  STORAGE_ENCRYPTION_KEY: string | undefined;
+  OTP_PROVIDER: "console" | "internal" | "msg91" | "twilio";
+  ESIGN_PROVIDER: "mock" | "digio" | "leegality";
+  STORAGE_PROVIDER: "local" | "s3" | "db";
+  SERVERLESS: boolean;
 };
+
+function derive(root: string, label: string): string {
+  return createHmac("sha256", root).update(`finsol:${label}`).digest("hex");
+}
 
 const DEV_SECRET = (label: string) => `finsol-development-only-${label}-0123456789abcdef`;
 
@@ -110,11 +130,35 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(`Invalid environment:\n${lines}`);
   }
   const env = parsed.data;
+  const prod = env.NODE_ENV === "production";
+  // In production a missing secret is derived from JWT_SECRET with a distinct label,
+  // so one secret never doubles as another.
+  const secret = (value: string | undefined, label: string) =>
+    value ?? (prod ? derive(env.JWT_SECRET!, label) : DEV_SECRET(label));
+  const otpProvider =
+    env.OTP_PROVIDER ??
+    (env.MSG91_AUTH_KEY && env.MSG91_TEMPLATE_ID ? "msg91" : prod ? "internal" : "console");
+  const esignProvider =
+    env.ESIGN_PROVIDER ??
+    (env.DIGIO_CLIENT_ID && env.DIGIO_CLIENT_SECRET
+      ? "digio"
+      : env.LEEGALITY_AUTH_TOKEN
+        ? "leegality"
+        : "mock");
   return {
     ...env,
+    OTP_PROVIDER: otpProvider,
+    SERVERLESS: Boolean(env.VERCEL),
+    STORAGE_PROVIDER: env.STORAGE_PROVIDER ?? (prod ? "db" : "local"),
+    ESIGN_PROVIDER: esignProvider,
     JWT_SECRET: env.JWT_SECRET ?? DEV_SECRET("session"),
-    OTP_SECRET: env.OTP_SECRET ?? DEV_SECRET("otp"),
-    ESIGN_WEBHOOK_SECRET: env.ESIGN_WEBHOOK_SECRET ?? DEV_SECRET("esign"),
+    OTP_SECRET: secret(env.OTP_SECRET, "otp"),
+    ESIGN_WEBHOOK_SECRET: secret(env.ESIGN_WEBHOOK_SECRET, "esign"),
+    STORAGE_ENCRYPTION_KEY:
+      env.STORAGE_ENCRYPTION_KEY ??
+      (prod
+        ? createHmac("sha256", env.JWT_SECRET!).update("finsol:storage").digest("base64")
+        : undefined),
   };
 }
 

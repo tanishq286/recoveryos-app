@@ -28,6 +28,9 @@ export function LoginForm({
   const router = useRouter();
   const [form, setForm] = React.useState({ name: "", phone: "", email: "", code: "" });
   const [sent, setSent] = React.useState(false);
+  /** Set only while SMS is not live: the API returns the code for non-staff numbers. */
+  const [testCode, setTestCode] = React.useState<string | null>(null);
+  const [channel, setChannel] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -37,7 +40,11 @@ export function LoginForm({
     setBusy(true);
     setError(null);
     try {
-      await callApi("auth/otp/request", { body: { phone: form.phone, purpose: "LOGIN" } });
+      const res = await callApi<{ channel?: string; testCode?: string }>("auth/otp/request", {
+        body: { phone: form.phone, purpose: "LOGIN" },
+      });
+      setTestCode(res.testCode ?? null);
+      setChannel(res.channel ?? null);
       setSent(true);
     } catch (err) {
       setError((err as Error).message);
@@ -139,6 +146,20 @@ export function LoginForm({
         </form>
       ) : (
         <form onSubmit={verify} className="grid gap-4">
+          {testCode ? (
+            <Alert role="status" data-testid="otp-test-code">
+              <AlertDescription>
+                SMS delivery is not live yet. Your test code is{" "}
+                <strong className="tnum font-mono tracking-[0.2em]">{testCode}</strong>
+              </AlertDescription>
+            </Alert>
+          ) : channel === "internal" ? (
+            <Alert role="status">
+              <AlertDescription>
+                SMS delivery is not live yet. Staff codes are in the server log.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <div>
             <label htmlFor={id("code")} className="mb-1.5 block text-sm text-fg-2">
               6-digit code sent to {form.phone}

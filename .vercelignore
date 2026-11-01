@@ -1,0 +1,10 @@
+# CLI uploads only: never send local secrets, databases or data drops.
+.env*
+!.env.example
+.uploads
+data/pan-india-drop/*
+!data/pan-india-drop/README.md
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
